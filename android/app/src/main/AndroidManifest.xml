@@ -2,7 +2,7 @@
     <!-- Required for release builds: debug/profile manifests are not merged here. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <application
-        android:label="attendance_app"
+        android:label="myRekod"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">

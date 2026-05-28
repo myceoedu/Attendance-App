@@ -180,7 +180,7 @@ class _AttendanceAppState extends State<AttendanceApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Attendance App',
+      title: 'myRekod',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       builder: (context, child) {

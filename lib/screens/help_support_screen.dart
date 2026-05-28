@@ -19,7 +19,7 @@ class HelpSupportScreen extends StatelessWidget {
     scheme: 'mailto',
     path: HelpSupportConfig.supportEmail,
     queryParameters: <String, String>{
-      'subject': 'Attendance App — Support request',
+      'subject': 'myRekod — Support request',
       'body': 'Please describe your issue below:\n\n',
     },
   );
@@ -42,7 +42,7 @@ class HelpSupportScreen extends StatelessWidget {
     final name = u?.name.trim() ?? '';
     final who = name.isEmpty ? email : '$name · $email';
     return '''
-Attendance App · v${HelpSupportConfig.appVersionLabel}
+myRekod · v${HelpSupportConfig.appVersionLabel}
 Role: $role
 Account: $who
 Platform: ${_platformLabel()}'''.trim();
@@ -277,7 +277,7 @@ Platform: ${_platformLabel()}'''.trim();
             const SizedBox(height: 14),
             Center(
               child: Text(
-                'Attendance App · v${HelpSupportConfig.appVersionLabel}',
+                'myRekod · v${HelpSupportConfig.appVersionLabel}',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
