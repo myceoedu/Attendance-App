@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_theme.dart';
+import '../../utils/app_route.dart';
 import '../../models/app_user.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/empty_state.dart';
@@ -65,7 +66,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
 
   Future<void> _openEditor(AppUser e) async {
     final ok = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
+      AppRoute<bool>(
         builder: (_) => AdminEmployeeEditScreen(employee: e),
       ),
     );

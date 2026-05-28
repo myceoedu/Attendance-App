@@ -7,14 +7,12 @@ import 'package:flutter/material.dart';
 ///
 /// **iOS / macOS**
 /// * Push is **instant** (zero transition duration) — the screen appears the
-///   moment you tap, exactly like switching a footer tab. No animation means
-///   no first-frame hitch.
-/// * Pop (back button) slides out in 200 ms.
-/// * Swipe-back follows the finger via [CupertinoPageRoute]'s built-in
-///   gesture detector — no delay, no threshold stutter.
-/// * The **secondary animation** (parallax slide + dimming of the underlying
-///   screen) is disabled, cutting per-frame GPU work roughly in half during
-///   any back transition.
+///   moment you tap, exactly like switching a footer tab.
+/// * Pop (back button) slides out in 350 ms with native Cupertino easing.
+/// * Swipe-back follows the finger with full iOS parallax on the screen below.
+/// * [allowSnapshotting] pre-rasterises both routes before the back animation,
+///   so heavy screens (gradients, lists) move as textures instead of repainting
+///   every frame.
 ///
 /// **Android / Web**
 /// * 220 ms fade with [allowSnapshotting] — Flutter pre-rasterises both
@@ -29,15 +27,18 @@ Route<T> AppRoute<T>({
   required WidgetBuilder builder,
   RouteSettings? settings,
 }) {
+  Widget wrappedBuilder(BuildContext ctx) =>
+      RepaintBoundary(child: builder(ctx));
+
   if (defaultTargetPlatform == TargetPlatform.iOS ||
       defaultTargetPlatform == TargetPlatform.macOS) {
-    return _AppIOSRoute<T>(builder: builder, settings: settings);
+    return _AppIOSRoute<T>(builder: wrappedBuilder, settings: settings);
   }
 
   // Android / Web: fast fade, pre-rasterised on both enter and exit.
   return PageRouteBuilder<T>(
     settings: settings,
-    pageBuilder: (ctx, _, __) => builder(ctx),
+    pageBuilder: (ctx, _, __) => wrappedBuilder(ctx),
     transitionDuration: const Duration(milliseconds: 220),
     reverseTransitionDuration: const Duration(milliseconds: 180),
     allowSnapshotting: true,
@@ -51,18 +52,14 @@ Route<T> AppRoute<T>({
   );
 }
 
-/// Subclass of [CupertinoPageRoute] with two changes:
+/// Subclass of [CupertinoPageRoute] tuned for myRekod:
 ///
 /// 1. **`transitionDuration: Duration.zero`** — push is instant (no slide-in).
-///    The screen appears immediately, like a tab swap in the footer bar.
-///
-/// 2. **Secondary animation disabled** — [kAlwaysDismissedAnimation] is passed
-///    for the secondary slot, so the underlying screen never shifts left or
-///    darkens. Halves GPU compositing cost on every pop / swipe-back frame.
-///
-/// Swipe-back and tap-back both still work: [CupertinoPageRoute] owns the
-/// edge-gesture detector; the 200 ms [reverseTransitionDuration] drives the
-/// slide-out after a committed pop.
+/// 2. **`reverseTransitionDuration: 350 ms`** — native iOS pop timing.
+/// 3. **`allowSnapshotting: true`** — both routes are rasterised before back
+///    transitions, keeping swipe-back at 60 fps even on gradient-heavy screens.
+/// 4. **Default secondary animation** — underlying screen parallax + dimming
+///    restored for native iOS feel (no frozen background).
 class _AppIOSRoute<T> extends CupertinoPageRoute<T> {
   _AppIOSRoute({required super.builder, super.settings});
 
@@ -70,24 +67,11 @@ class _AppIOSRoute<T> extends CupertinoPageRoute<T> {
   @override
   Duration get transitionDuration => Duration.zero;
 
-  /// Pop slides out in 200 ms (tap-back or swipe-commit).
+  /// Native iOS pop slide-out (tap-back or swipe-commit).
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 200);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 350);
 
+  /// Pre-rasterise route content before back/swipe transitions.
   @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    // Replace the real secondaryAnimation with one that is always at 0,
-    // so the screen underneath never translates or dims — less per-frame work.
-    return super.buildTransitions(
-      context,
-      animation,
-      kAlwaysDismissedAnimation,
-      child,
-    );
-  }
+  bool get allowSnapshotting => true;
 }

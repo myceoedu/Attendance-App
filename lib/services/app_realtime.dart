@@ -11,7 +11,11 @@ final class AppRealtime {
 
   static void disposeChannel(RealtimeChannel? channel) {
     if (channel == null) return;
-    unawaited(SupabaseService.client.removeChannel(channel));
+    // Defer teardown so Supabase channel removal does not compete with the
+    // final pop animation frame on iOS.
+    scheduleMicrotask(() {
+      unawaited(SupabaseService.client.removeChannel(channel));
+    });
   }
 
   static RealtimeChannel subscribeMyAttendance({
