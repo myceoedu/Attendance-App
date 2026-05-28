@@ -135,7 +135,9 @@ class SupabaseService {
     return AppUser.fromMap(data);
   }
 
-  static Future<List<AppUser>> getAllEmployees({bool forceRefresh = false}) async {
+  static Future<List<AppUser>> getAllEmployees({
+    bool forceRefresh = false,
+  }) async {
     final cached = _employeesCache;
     final cachedAt = _employeesCacheAt;
     if (!forceRefresh && cached != null && cachedAt != null) {
@@ -691,6 +693,21 @@ class SupabaseService {
     return data.map<Attendance>((e) => Attendance.fromMap(e)).toList();
   }
 
+  static Future<List<Attendance>> _getAttendanceRowsByMonth(
+    DateTime month,
+  ) async {
+    final monthStart = DateTime(month.year, month.month);
+    final monthEnd = DateTime(month.year, month.month + 1);
+    final data = await client
+        .from('attendance')
+        .select(_attendanceRowSelect)
+        .gte('date', _dateString(monthStart))
+        .lt('date', _dateString(monthEnd))
+        .order('date', ascending: false)
+        .order('clock_in_time');
+    return data.map<Attendance>((e) => Attendance.fromMap(e)).toList();
+  }
+
   static Future<List<Attendance>> getEmployeeAttendanceByMonth(
     String userId,
     DateTime month,
@@ -1228,6 +1245,22 @@ class SupabaseService {
     return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
   }
 
+  static Future<List<LeaveRequest>> _getApprovedLeaveRowsByMonth(
+    DateTime month,
+  ) async {
+    final monthStart = DateTime(month.year, month.month);
+    final monthEnd = DateTime(month.year, month.month + 1);
+    final lastDay = monthEnd.subtract(const Duration(days: 1));
+    final data = await client
+        .from('leave_requests')
+        .select(_leaveListSelect)
+        .eq('status', 'approved')
+        .lte('start_date', _dateString(lastDay))
+        .gte('end_date', _dateString(monthStart))
+        .order('start_date');
+    return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
+  }
+
   static Future<List<LeaveRequest>> getEmployeeApprovedLeavesByMonth(
     String userId,
     DateTime month,
@@ -1251,8 +1284,8 @@ class SupabaseService {
   ) async {
     final results = await Future.wait([
       getAllEmployees(),
-      getAttendanceByMonth(month),
-      getApprovedLeavesByMonth(month),
+      _getAttendanceRowsByMonth(month),
+      _getApprovedLeaveRowsByMonth(month),
     ]);
 
     final employees = results[0] as List<AppUser>;
@@ -1327,14 +1360,12 @@ class SupabaseService {
     DateTime month,
   ) async {
     final normalizedMonth = DateTime(month.year, month.month);
-    final attendanceRecords = await getEmployeeAttendanceByMonth(
-      employeeId,
-      normalizedMonth,
-    );
-    final approvedLeaves = await getEmployeeApprovedLeavesByMonth(
-      employeeId,
-      normalizedMonth,
-    );
+    final results = await Future.wait([
+      getEmployeeAttendanceByMonth(employeeId, normalizedMonth),
+      getEmployeeApprovedLeavesByMonth(employeeId, normalizedMonth),
+    ]);
+    final attendanceRecords = results[0] as List<Attendance>;
+    final approvedLeaves = results[1] as List<LeaveRequest>;
 
     final attendanceByDate = <String, List<Attendance>>{};
     for (final record in attendanceRecords) {
@@ -1457,6 +1488,17 @@ class SupabaseService {
         .toList();
   }
 
+  static Future<int> getCompanyAnnouncementCountAfter(
+    DateTime? afterUtc,
+  ) async {
+    var query = client.from('company_announcements').select('id');
+    if (afterUtc != null) {
+      query = query.gt('created_at', afterUtc.toUtc().toIso8601String());
+    }
+    final data = await query;
+    return data.length;
+  }
+
   static Future<CompanyAnnouncement> createCompanyAnnouncement({
     required String title,
     required String body,
@@ -1532,8 +1574,16 @@ class SupabaseService {
 
   static Future<PayrollStatutoryConfig?>
   getLatestPayrollStatutoryConfig() async {
-    final list = await getPayrollStatutoryConfigs();
-    return list.isEmpty ? null : list.first;
+    final data = await client
+        .from('payroll_statutory_config')
+        .select(_payrollStatutorySelect)
+        .order('effective_from', ascending: false)
+        .order('created_at', ascending: false)
+        .limit(1);
+    if ((data as List).isEmpty) return null;
+    return PayrollStatutoryConfig.fromMap(
+      Map<String, dynamic>.from(data.first as Map),
+    );
   }
 
   static Future<PayrollStatutoryConfig> insertPayrollStatutoryConfig(
@@ -1605,7 +1655,10 @@ class SupabaseService {
     if (rows.isEmpty) return 0;
     await client
         .from('payroll_runs')
-        .update({'statutory_config_id': toConfigId, 'updated_at': DateTime.now().toUtc().toIso8601String()})
+        .update({
+          'statutory_config_id': toConfigId,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        })
         .eq('statutory_config_id', fromConfigId);
     return rows.length;
   }

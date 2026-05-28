@@ -91,6 +91,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
   Widget build(BuildContext context) {
     final money = NumberFormat('#,##0.00');
     final dateFmt = DateFormat('d MMM yyyy');
+    final filteredClaims = _filtered;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -98,9 +99,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(
-              builder: (_) => const SubmitClaimScreen(),
-            ),
+            MaterialPageRoute<void>(builder: (_) => const SubmitClaimScreen()),
           );
           if (mounted) _load(showSpinner: false);
         },
@@ -110,180 +109,161 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: () => _load(showSpinner: true),
-                          child: const Text('Retry'),
-                        ),
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => _load(showSpinner: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () => _load(showSpinner: true),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: AppFilterBar(
+                      chipOptions: const [
+                        AppFilterOption(value: 'all', label: 'All'),
+                        AppFilterOption(value: 'pending', label: 'Pending'),
+                        AppFilterOption(value: 'approved', label: 'Approved'),
+                        AppFilterOption(value: 'rejected', label: 'Rejected'),
                       ],
+                      selectedChip: _statusFilter,
+                      onChipSelected: (v) => setState(() => _statusFilter = v),
                     ),
                   ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _load(showSpinner: true),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                        child: AppFilterBar(
-                          chipOptions: const [
-                            AppFilterOption(value: 'all', label: 'All'),
-                            AppFilterOption(value: 'pending', label: 'Pending'),
-                            AppFilterOption(
-                              value: 'approved',
-                              label: 'Approved',
-                            ),
-                            AppFilterOption(
-                              value: 'rejected',
-                              label: 'Rejected',
-                            ),
-                          ],
-                          selectedChip: _statusFilter,
-                          onChipSelected: (v) =>
-                              setState(() => _statusFilter = v),
-                        ),
-                      ),
-                      Expanded(
-                        child: _filtered.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 48),
-                                  EmptyState(
-                                    icon: Icons.receipt_long_outlined,
-                                    title: 'No claims yet',
-                                    subtitle:
-                                        'Submit receipts, invoices, or other documents for reimbursement. Tap “New claim” to get started.',
-                                  ),
-                                ],
-                              )
-                            : ListView.builder(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  12,
-                                  16,
-                                  100,
-                                ),
-                                addAutomaticKeepAlives: false,
-                                cacheExtent: 400,
-                                itemCount: _filtered.length,
-                                itemBuilder: (context, i) {
-                                  final c = _filtered[i];
-                                  return KeyedSubtree(
-                                    key: ValueKey<String>(c.id),
-                                    child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: Material(
-                                      color: AppColors.cardBg,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(16),
-                                        side: const BorderSide(
-                                          color: AppColors.divider,
-                                        ),
+                  Expanded(
+                    child: filteredClaims.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 48),
+                              EmptyState(
+                                icon: Icons.receipt_long_outlined,
+                                title: 'No claims yet',
+                                subtitle:
+                                    'Submit receipts, invoices, or other documents for reimbursement. Tap “New claim” to get started.',
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                            addAutomaticKeepAlives: false,
+                            cacheExtent: 400,
+                            itemCount: filteredClaims.length,
+                            itemBuilder: (context, i) {
+                              final c = filteredClaims[i];
+                              return KeyedSubtree(
+                                key: ValueKey<String>(c.id),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Material(
+                                    color: AppColors.cardBg,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(
+                                        color: AppColors.divider,
                                       ),
-                                      child: InkWell(
-                                        borderRadius:
-                                            BorderRadius.circular(16),
-                                        onTap: () {
-                                          Navigator.of(context).push<void>(
-                                            MaterialPageRoute<void>(
-                                              builder: (_) =>
-                                                  ClaimDetailScreen(
-                                                claimId: c.id,
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        Navigator.of(context).push<void>(
+                                          MaterialPageRoute<void>(
+                                            builder: (_) => ClaimDetailScreen(
+                                              claimId: c.id,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    c.title,
+                                                    style: const TextStyle(
+                                                      fontSize: 15,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                                StatusChip.fromStatus(c.status),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              c.categoryDisplay,
+                                              style: const TextStyle(
+                                                fontSize: 12.5,
+                                                color: AppColors.textSecondary,
                                               ),
                                             ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      c.title,
-                                                      style: const TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                      ),
-                                                    ),
+                                            const SizedBox(height: 10),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  '${c.currency} ${money.format(c.amount)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        AppColors.primaryDark,
                                                   ),
-                                                  StatusChip.fromStatus(
-                                                    c.status,
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                c.categoryDisplay,
-                                                style: const TextStyle(
-                                                  fontSize: 12.5,
-                                                  color:
-                                                      AppColors.textSecondary,
                                                 ),
-                                              ),
-                                              const SizedBox(height: 10),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    '${c.currency} ${money.format(c.amount)}',
-                                                    style: const TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color:
-                                                          AppColors.primaryDark,
-                                                    ),
+                                                const Spacer(),
+                                                Text(
+                                                  'Expense: ${dateFmt.format(c.expenseDate)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color:
+                                                        AppColors.textSecondary,
                                                   ),
-                                                  const Spacer(),
-                                                  Text(
-                                                    'Expense: ${dateFmt.format(c.expenseDate)}',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: AppColors
-                                                          .textSecondary,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 6),
-                                              Text(
-                                                'Submitted ${dateFmt.format(c.createdAt)}',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppColors.textHint
-                                                      .withValues(alpha: 0.95),
                                                 ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              'Submitted ${dateFmt.format(c.createdAt)}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: AppColors.textHint
+                                                    .withValues(alpha: 0.95),
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
-                ),
+                ],
+              ),
+            ),
     );
   }
 }

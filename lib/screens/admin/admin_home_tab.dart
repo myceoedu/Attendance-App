@@ -40,14 +40,16 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   RealtimeChannel? _leaveChannel;
   RealtimeChannel? _claimChannel;
 
-  DateTime _now = AppTime.malaysiaNow();
+  late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
+    AppTime.malaysiaNow(),
+  );
   Timer? _clockTicker;
 
   @override
   void initState() {
     super.initState();
     _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) setState(() => _now = AppTime.malaysiaNow());
+      if (mounted) _now.value = AppTime.malaysiaNow();
     });
     _load();
     WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
@@ -60,6 +62,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     AppRealtime.disposeChannel(_attendanceChannel);
     AppRealtime.disposeChannel(_leaveChannel);
     AppRealtime.disposeChannel(_claimChannel);
+    _now.dispose();
     super.dispose();
   }
 
@@ -101,8 +104,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         _pendingLeaveCount = results[2] as int;
         _pendingClaimCount = results[3] as int;
         _loading = false;
-        _now = AppTime.malaysiaNow();
       });
+      _now.value = AppTime.malaysiaNow();
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -149,8 +152,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     final displayName = user.name.isNotEmpty ? user.name : 'Admin';
 
     final checkedIn = _todayAttendance.length;
-    final completed =
-        _todayAttendance.where((a) => a.status == 'completed').length;
+    final completed = _todayAttendance
+        .where((a) => a.status == 'completed')
+        .length;
     final pendingClaims = _pendingClaimCount;
     final pendingTotal = _pendingLeaveCount + pendingClaims;
 
@@ -172,34 +176,39 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.zero,
             children: [
-            _heroHeader(displayName, dateFmt.format(_now), _now),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppLayout.screenPaddingH,
-                20,
-                AppLayout.screenPaddingH,
-                0,
+              ValueListenableBuilder<DateTime>(
+                valueListenable: _now,
+                builder: (context, now, _) {
+                  return _heroHeader(displayName, dateFmt.format(now), now);
+                },
               ),
-              child: _todayPulseCard(
-                teamCount: _employees.length,
-                checkedIn: checkedIn,
-                completed: completed,
-                pendingApprovals: pendingTotal,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppLayout.screenPaddingH,
+                  20,
+                  AppLayout.screenPaddingH,
+                  0,
+                ),
+                child: _todayPulseCard(
+                  teamCount: _employees.length,
+                  checkedIn: checkedIn,
+                  completed: completed,
+                  pendingApprovals: pendingTotal,
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppLayout.screenPaddingH,
-                16,
-                AppLayout.screenPaddingH,
-                36,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppLayout.screenPaddingH,
+                  16,
+                  AppLayout.screenPaddingH,
+                  36,
+                ),
+                child: _quickAccessSection(
+                  context,
+                  pendingClaims: pendingClaims,
+                  pendingLeaves: _pendingLeaveCount,
+                ),
               ),
-              child: _quickAccessSection(
-                context,
-                pendingClaims: pendingClaims,
-                pendingLeaves: _pendingLeaveCount,
-              ),
-            ),
             ],
           ),
         ),
@@ -288,8 +297,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color:
-                                    AppColors.violet.withValues(alpha: 0.35),
+                                color: AppColors.violet.withValues(alpha: 0.35),
                                 blurRadius: 14,
                                 offset: const Offset(0, 4),
                               ),
@@ -525,8 +533,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                   width: 1.5,
                 )
               : null,
-          color:
-               emphasize ? AppColors.warningLight.withValues(alpha: 0.35) : null,
+          color: emphasize
+              ? AppColors.warningLight.withValues(alpha: 0.35)
+              : null,
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
@@ -548,8 +557,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.4,
-                  color:
-                      emphasize ? AppColors.orange : AppColors.textPrimary,
+                  color: emphasize ? AppColors.orange : AppColors.textPrimary,
                   height: 1,
                 ),
               ),
@@ -688,9 +696,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
             Expanded(
               child: _bentoActionCard(
                 context,
-                label: pendingClaims > 0
-                    ? 'Claims ($pendingClaims)'
-                    : 'Claims',
+                label: pendingClaims > 0 ? 'Claims ($pendingClaims)' : 'Claims',
                 hint: 'Approve expense claims',
                 icon: Icons.receipt_long_rounded,
                 iconGradient: AppGradients.sunset,
@@ -739,8 +745,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 onTap: () {
                   Navigator.of(context).push<void>(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          const HelpSupportScreen(adminView: true),
+                      builder: (_) => const HelpSupportScreen(adminView: true),
                     ),
                   );
                 },
@@ -839,8 +844,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: AppColors.orange
-                                        .withValues(alpha: 0.45),
+                                    color: AppColors.orange.withValues(
+                                      alpha: 0.45,
+                                    ),
                                     blurRadius: 6,
                                   ),
                                 ],
@@ -904,11 +910,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         ],
       ),
       alignment: Alignment.center,
-      child: Icon(
-        icon,
-        color: Colors.white,
-        size: iconSize ?? size * 0.48,
-      ),
+      child: Icon(icon, color: Colors.white, size: iconSize ?? size * 0.48),
     );
   }
 }

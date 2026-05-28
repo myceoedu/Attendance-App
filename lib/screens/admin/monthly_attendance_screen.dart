@@ -113,43 +113,63 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
             )
           : RefreshIndicator(
               onRefresh: () async => _load(showSpinner: true),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                children: [
-                  _monthHeader(),
-                  const SizedBox(height: 14),
-
-                  AppFilterBar(
-                    searchController: _searchCtrl,
-                    onSearchChanged: (_) => _searchDebounce(() {
-                      if (mounted) setState(() {});
-                    }),
-                    searchHint: 'Search employee, username, or email',
-                    chipOptions: const [
-                      AppFilterOption(value: 'all', label: 'All'),
-                      AppFilterOption(value: 'clean', label: 'Clean'),
-                      AppFilterOption(
-                        value: 'no_attendance',
-                        label: 'No Attendance',
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _monthHeader(),
+                          const SizedBox(height: 14),
+                          AppFilterBar(
+                            searchController: _searchCtrl,
+                            onSearchChanged: (_) => _searchDebounce(() {
+                              if (mounted) setState(() {});
+                            }),
+                            searchHint: 'Search employee, username, or email',
+                            chipOptions: const [
+                              AppFilterOption(value: 'all', label: 'All'),
+                              AppFilterOption(value: 'clean', label: 'Clean'),
+                              AppFilterOption(
+                                value: 'no_attendance',
+                                label: 'No Attendance',
+                              ),
+                            ],
+                            selectedChip: _reviewFilter,
+                            onChipSelected: (value) {
+                              setState(() => _reviewFilter = value);
+                            },
+                            margin: const EdgeInsets.only(top: 14),
+                          ),
+                        ],
                       ),
-                    ],
-                    selectedChip: _reviewFilter,
-                    onChipSelected: (value) {
-                      setState(() => _reviewFilter = value);
-                    },
-                    margin: const EdgeInsets.only(top: 14),
+                    ),
                   ),
                   if (filtered.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 12),
-                      child: EmptyState(
-                        icon: Icons.filter_alt_off,
-                        title: 'No employees match the filters',
-                        subtitle: 'Try another month or review filter',
+                    const SliverPadding(
+                      padding: EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      sliver: SliverToBoxAdapter(
+                        child: EmptyState(
+                          icon: Icons.filter_alt_off,
+                          title: 'No employees match the filters',
+                          subtitle: 'Try another month or review filter',
+                        ),
                       ),
                     )
                   else
-                    ...filtered.map(_summaryCard),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      sliver: SliverList.separated(
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (context, index) => RepaintBoundary(
+                          child: _summaryCard(filtered[index]),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -218,7 +238,6 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
     );
   }
 
-
   Widget _summaryCard(MonthlyAttendanceSummary summary) {
     final lastAttendance = summary.lastAttendanceDate == null
         ? 'No attendance yet'
@@ -241,15 +260,12 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
     };
 
     return Container(
-      margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: summary.hasNoAttendance
-              ? AppColors.border
-              : AppColors.divider,
+          color: summary.hasNoAttendance ? AppColors.border : AppColors.divider,
         ),
         boxShadow: [
           BoxShadow(

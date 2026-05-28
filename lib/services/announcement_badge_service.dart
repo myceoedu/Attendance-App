@@ -43,12 +43,6 @@ class AnnouncementBadgeService {
   /// No cursor yet → total current count (everything is "new" until they open).
   static Future<int> unreadCountForUser(String userId) async {
     final cursor = await _newestSeenCursorUtc(userId);
-    final items = await SupabaseService.getCompanyAnnouncements(limit: 200);
-    if (cursor == null) return items.length;
-    var n = 0;
-    for (final a in items) {
-      if (a.createdAt.toUtc().isAfter(cursor)) n++;
-    }
-    return n;
+    return SupabaseService.getCompanyAnnouncementCountAfter(cursor);
   }
 }

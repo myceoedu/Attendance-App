@@ -173,47 +173,34 @@ class _LeaveTabState extends State<LeaveTab> {
     );
   }
 
-  Future<void> _loadSummary(String uid, {required int year}) async {
-    try {
-      final s = await SupabaseService.getAnnualLeaveSummary(uid, year: year);
-      if (!mounted) return;
-      setState(() {
-        _summary = s;
-        _leaveYear = year;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _summary = null);
-    }
-  }
-
   Future<void> _load({bool showSpinner = true}) async {
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final uid = context.read<AuthProvider>().user!.id;
       final year = AppTime.malaysiaNow().year;
 
-      await Future.wait([
-        _loadSummary(uid, year: year),
-        (() async {
-          final page = await SupabaseService.getMyLeaveRequestsPage(
-            uid,
-            offset: 0,
-            limit: _pageSize,
-            leaveTypes: _queryLeaveTypes,
-            statusEquals: _statusFilter == 'all' ? null : _statusFilter,
-          );
-          if (!mounted) return;
-          setState(() {
-            _requests = page;
-            _nextOffset = page.length;
-            _hasMore = page.length >= _pageSize;
-            _loading = false;
-            _error = null;
-          });
-          _tryFillLeaveViewport();
-        })(),
+      final results = await Future.wait<Object?>([
+        SupabaseService.getAnnualLeaveSummary(uid, year: year),
+        SupabaseService.getMyLeaveRequestsPage(
+          uid,
+          offset: 0,
+          limit: _pageSize,
+          leaveTypes: _queryLeaveTypes,
+          statusEquals: _statusFilter == 'all' ? null : _statusFilter,
+        ),
       ]);
+      if (!mounted) return;
+      final page = results[1] as List<LeaveRequest>;
+      setState(() {
+        _summary = results[0] as AnnualLeaveSummary?;
+        _leaveYear = year;
+        _requests = page;
+        _nextOffset = page.length;
+        _hasMore = page.length >= _pageSize;
+        _loading = false;
+        _error = null;
+      });
+      _tryFillLeaveViewport();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -271,10 +258,12 @@ class _LeaveTabState extends State<LeaveTab> {
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.primaryDark,
                   foregroundColor: AppColors.onBrand,
-                  disabledBackgroundColor:
-                      AppColors.primaryDark.withValues(alpha: 0.45),
-                  disabledForegroundColor:
-                      AppColors.onBrand.withValues(alpha: 0.7),
+                  disabledBackgroundColor: AppColors.primaryDark.withValues(
+                    alpha: 0.45,
+                  ),
+                  disabledForegroundColor: AppColors.onBrand.withValues(
+                    alpha: 0.7,
+                  ),
                   elevation: 0,
                   shadowColor: Colors.transparent,
                   minimumSize: Size.zero,
@@ -298,201 +287,193 @@ class _LeaveTabState extends State<LeaveTab> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: AppColors.danger),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () async => _load(showSpinner: true),
-                  child: CustomScrollView(
-                    controller: _listScrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    cacheExtent: 480,
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: AppColors.danger),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: () async => _load(showSpinner: true),
+              child: CustomScrollView(
+                controller: _listScrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                cacheExtent: 480,
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Expanded(
-                                    child: SegmentedButton<_LeaveHomeSection>(
-                                      style: SegmentedButton.styleFrom(
-                                        visualDensity: VisualDensity.compact,
-                                        tapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 6,
-                                        ),
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: AppColors.textPrimary,
-                                        selectedForegroundColor:
-                                            AppColors.onBrand,
-                                        selectedBackgroundColor:
-                                            AppColors.primaryDark,
-                                        side: const BorderSide(
-                                          color: AppColors.divider,
+                              Expanded(
+                                child: SegmentedButton<_LeaveHomeSection>(
+                                  style: SegmentedButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: AppColors.textPrimary,
+                                    selectedForegroundColor: AppColors.onBrand,
+                                    selectedBackgroundColor:
+                                        AppColors.primaryDark,
+                                    side: const BorderSide(
+                                      color: AppColors.divider,
+                                    ),
+                                  ),
+                                  showSelectedIcon: false,
+                                  segments: const [
+                                    ButtonSegment(
+                                      value: _LeaveHomeSection.annual,
+                                      label: Text('Annual'),
+                                      tooltip: 'Annual leave balance & history',
+                                      icon: Icon(
+                                        Icons.beach_access_rounded,
+                                        size: 16,
+                                      ),
+                                    ),
+                                    ButtonSegment(
+                                      value: _LeaveHomeSection.other,
+                                      label: Text('Other'),
+                                      tooltip:
+                                          'Sick, unpaid, maternity, marriage, PH, etc.',
+                                      icon: Icon(
+                                        Icons.folder_shared_rounded,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ],
+                                  selected: {_section},
+                                  onSelectionChanged: (next) {
+                                    setState(() => _section = next.first);
+                                    if (!_loading) {
+                                      unawaited(_reloadLeaveListFromFilters());
+                                    }
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: _section == _LeaveHomeSection.annual
+                                    ? 'Annual leave: dates, reason, optional proof. Days count once approved.'
+                                    : 'Other leave: sick MC, emergency, unpaid, statutory — separate from annual balance.',
+                                onPressed: () {
+                                  showModalBottomSheet<void>(
+                                    context: context,
+                                    showDragHandle: true,
+                                    builder: (ctx) => Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        8,
+                                        20,
+                                        24,
+                                      ),
+                                      child: Text(
+                                        _section == _LeaveHomeSection.annual
+                                            ? 'You submit dates, reason, and optional proof. Days count against your annual balance once approved.'
+                                            : 'Other leave uses separate policies (sick MC, unpaid payroll, maternity/paternity/marriage/PH replacement, etc.). These types do not use your annual leave balance.',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          height: 1.45,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textPrimary
+                                              .withValues(alpha: 0.92),
                                         ),
                                       ),
-                                      showSelectedIcon: false,
-                                      segments: const [
-                                        ButtonSegment(
-                                          value: _LeaveHomeSection.annual,
-                                          label: Text('Annual'),
-                                          tooltip:
-                                              'Annual leave balance & history',
-                                          icon: Icon(
-                                            Icons.beach_access_rounded,
-                                            size: 16,
-                                          ),
-                                        ),
-                                        ButtonSegment(
-                                          value: _LeaveHomeSection.other,
-                                          label: Text('Other'),
-                                          tooltip:
-                                              'Sick, unpaid, maternity, marriage, PH, etc.',
-                                          icon: Icon(
-                                            Icons.folder_shared_rounded,
-                                            size: 16,
-                                          ),
-                                        ),
-                                      ],
-                                      selected: {_section},
-                                      onSelectionChanged: (next) {
-                                        setState(() => _section = next.first);
-                                        if (!_loading) {
-                                          unawaited(
-                                            _reloadLeaveListFromFilters(),
-                                          );
-                                        }
-                                      },
                                     ),
+                                  );
+                                },
+                                icon: Icon(
+                                  Icons.info_outline_rounded,
+                                  size: 22,
+                                  color: AppColors.textSecondary.withValues(
+                                    alpha: 0.9,
                                   ),
-                                  const SizedBox(width: 6),
-                                  IconButton(
-                                    tooltip: _section ==
-                                            _LeaveHomeSection.annual
-                                        ? 'Annual leave: dates, reason, optional proof. Days count once approved.'
-                                        : 'Other leave: sick MC, emergency, unpaid, statutory — separate from annual balance.',
-                                    onPressed: () {
-                                      showModalBottomSheet<void>(
-                                        context: context,
-                                        showDragHandle: true,
-                                        builder: (ctx) => Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            20,
-                                            8,
-                                            20,
-                                            24,
-                                          ),
-                                          child: Text(
-                                            _section ==
-                                                    _LeaveHomeSection.annual
-                                                ? 'You submit dates, reason, and optional proof. Days count against your annual balance once approved.'
-                                                : 'Other leave uses separate policies (sick MC, unpaid payroll, maternity/paternity/marriage/PH replacement, etc.). These types do not use your annual leave balance.',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              height: 1.45,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.textPrimary
-                                                  .withValues(alpha: 0.92),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    icon: Icon(
-                                      Icons.info_outline_rounded,
-                                      size: 22,
-                                      color: AppColors.textSecondary
-                                          .withValues(alpha: 0.9),
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_section == _LeaveHomeSection.annual)
+                    SliverToBoxAdapter(child: _annualDashboard(context))
+                  else
+                    SliverToBoxAdapter(child: _otherLeaveIntroCard()),
+                  SliverToBoxAdapter(child: _leaveFilterStrip()),
+                  if (_requests.isEmpty)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: EmptyState(
+                            icon: _section == _LeaveHomeSection.annual
+                                ? Icons.event_available_outlined
+                                : Icons.healing_outlined,
+                            title: _emptyTitle(),
+                            subtitle: _emptySubtitle(),
+                          ),
                         ),
                       ),
-                      if (_section == _LeaveHomeSection.annual)
-                        SliverToBoxAdapter(child: _annualDashboard(context))
-                      else
-                        SliverToBoxAdapter(child: _otherLeaveIntroCard()),
-                      SliverToBoxAdapter(child: _leaveFilterStrip()),
-                      if (_requests.isEmpty)
-                        SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                              ),
-                              child: EmptyState(
-                                icon: _section == _LeaveHomeSection.annual
-                                    ? Icons.event_available_outlined
-                                    : Icons.healing_outlined,
-                                title: _emptyTitle(),
-                                subtitle: _emptySubtitle(),
-                              ),
-                            ),
-                          ),
-                        )
-                      else ...[
-                        SliverPadding(
-                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, i) {
-                                if (i >= _requests.length) {
-                                  if (_loadingMore) {
-                                    return const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        vertical: 20,
+                    )
+                  else ...[
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            if (i >= _requests.length) {
+                              if (_loadingMore) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 20),
+                                  child: Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
                                       ),
-                                      child: Center(
-                                        child: SizedBox(
-                                          width: 24,
-                                          height: 24,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return const SizedBox(height: 16);
-                                }
-                                final r = _requests[i];
-                                return Padding(
-                                  padding: EdgeInsets.only(
-                                    bottom: i < _requests.length - 1 ? 10 : 0,
-                                  ),
-                                  child: KeyedSubtree(
-                                    key: ValueKey<String>(r.id),
-                                    child: _leaveRequestTile(r, dateFmt),
+                                    ),
                                   ),
                                 );
-                              },
-                              childCount: _requests.length +
-                                  ((_loadingMore || _hasMore) ? 1 : 0),
-                              addAutomaticKeepAlives: false,
-                            ),
-                          ),
+                              }
+                              return const SizedBox(height: 16);
+                            }
+                            final r = _requests[i];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: i < _requests.length - 1 ? 10 : 0,
+                              ),
+                              child: KeyedSubtree(
+                                key: ValueKey<String>(r.id),
+                                child: _leaveRequestTile(r, dateFmt),
+                              ),
+                            );
+                          },
+                          childCount:
+                              _requests.length +
+                              ((_loadingMore || _hasMore) ? 1 : 0),
+                          addAutomaticKeepAlives: false,
                         ),
-                      ],
-                    ],
-                  ),
-                ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
     );
   }
 
@@ -541,9 +522,7 @@ class _LeaveTabState extends State<LeaveTab> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
-              children: [
-                for (final o in options) statusChip(o.value, o.label),
-              ],
+              children: [for (final o in options) statusChip(o.value, o.label)],
             ),
           ),
           if (_section == _LeaveHomeSection.other) ...[
@@ -622,7 +601,10 @@ class _LeaveTabState extends State<LeaveTab> {
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
             initiallyExpanded: false,
-            tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 2,
+            ),
             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             leading: Container(
               padding: const EdgeInsets.all(6),
@@ -897,25 +879,25 @@ class _LeaveTabState extends State<LeaveTab> {
     final usedHeroStr = used == null
         ? '—'
         : used == used.roundToDouble()
-            ? '${used.round()}'
-            : used.toString();
+        ? '${used.round()}'
+        : used.toString();
     final entStr = ent == null
         ? '—'
         : ent == ent.roundToDouble()
-            ? '${ent.round()}'
-            : ent.toString();
+        ? '${ent.round()}'
+        : ent.toString();
 
     final rem = s?.remaining;
     final remStr = rem == null
         ? '—'
         : rem == rem.roundToDouble()
-            ? '${rem.round()}'
-            : rem.toString();
+        ? '${rem.round()}'
+        : rem.toString();
     final pendStr = s?.pending == null
         ? '—'
         : s!.pending == s.pending.roundToDouble()
-            ? '${s.pending.round()}'
-            : s.pending.toString();
+        ? '${s.pending.round()}'
+        : s.pending.toString();
 
     final entVal = ent;
     final usedVal = used ?? 0.0;
@@ -982,8 +964,9 @@ class _LeaveTabState extends State<LeaveTab> {
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 height: 1.05,
-                                color: AppColors.textPrimary
-                                    .withValues(alpha: 0.88),
+                                color: AppColors.textPrimary.withValues(
+                                  alpha: 0.88,
+                                ),
                               ),
                             ),
                             const TextSpan(
@@ -1005,7 +988,9 @@ class _LeaveTabState extends State<LeaveTab> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary.withValues(alpha: 0.95),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.95,
+                          ),
                         ),
                       ),
                     ],
@@ -1040,10 +1025,7 @@ class _LeaveTabState extends State<LeaveTab> {
     );
   }
 
-  Widget _detailTag({
-    required IconData icon,
-    required String label,
-  }) {
+  Widget _detailTag({required IconData icon, required String label}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
