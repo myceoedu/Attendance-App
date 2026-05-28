@@ -51,11 +51,13 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   @override
   void initState() {
     super.initState();
-    _load();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) setState(() => _now = AppTime.malaysiaNow());
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

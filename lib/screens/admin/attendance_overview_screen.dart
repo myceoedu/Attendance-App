@@ -37,8 +37,10 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

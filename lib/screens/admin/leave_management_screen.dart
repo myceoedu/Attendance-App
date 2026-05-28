@@ -53,8 +53,10 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   void initState() {
     super.initState();
     _selectedEmployeeId = widget.initialEmployeeId;
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

@@ -46,8 +46,10 @@ class _EmployeeAttendanceLogScreenState
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

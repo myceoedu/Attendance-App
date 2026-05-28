@@ -32,7 +32,7 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
   }
 
   @override
@@ -86,7 +86,7 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
         _selectedMonth.month + delta,
       );
     });
-    _load();
+WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
   }
 
   bool get _canMoveForward {

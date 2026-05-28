@@ -68,8 +68,10 @@ class _LeaveTabState extends State<LeaveTab> {
     super.initState();
     _listScrollController = ScrollController()..addListener(_onLeaveListScroll);
     _leaveYear = AppTime.malaysiaNow().year;
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

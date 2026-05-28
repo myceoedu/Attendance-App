@@ -52,8 +52,10 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) _now.value = AppTime.malaysiaNow();
     });
-    _load();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _attachRealtime());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+      _attachRealtime();
+    });
   }
 
   @override

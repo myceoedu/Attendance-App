@@ -32,7 +32,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
   }
 
   Future<void> _load() async {
