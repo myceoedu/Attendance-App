@@ -1,36 +1,52 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 
-/// Drop-in replacement for [MaterialPageRoute] that:
+/// Platform-aware drop-in replacement for [MaterialPageRoute].
 ///
-/// * Uses [allowSnapshotting] so Flutter pre-rasterises both the outgoing
-///   and incoming surfaces before the animation begins — eliminating the
-///   "stuck" freeze that occurs when the new screen's first build runs
-///   during an in-flight slide transition.
-/// * Replaces the heavyweight slide transform with a lightweight fade
-///   (no matrix translation → cheaper GPU compositing).
-/// * Shorter durations (220 ms forward, 180 ms reverse) feel snappier than
-///   the default 300 ms slide.
+/// **iOS / macOS:** uses [CupertinoPageRoute] — native horizontal slide that
+/// follows the user's finger during a swipe-back gesture. The interactive pop
+/// feels identical to every other iPhone app; no delay or "stuck" sensation.
+///
+/// **Android / Web / other:** lightweight fade transition with
+/// [allowSnapshotting] so Flutter pre-rasterises both screens before the
+/// animation begins — eliminates the freeze that occurred with a heavy first
+/// build during a slide transition.
 ///
 /// Usage — identical to [MaterialPageRoute]:
 /// ```dart
 /// Navigator.of(context).push(AppRoute(builder: (_) => const LeaveTab()));
 /// ```
-class AppRoute<T> extends PageRouteBuilder<T> {
-  AppRoute({required WidgetBuilder builder, super.settings})
-      : super(
-          pageBuilder: (ctx, _, __) => builder(ctx),
-          transitionDuration: const Duration(milliseconds: 220),
-          reverseTransitionDuration: const Duration(milliseconds: 180),
-          // Pre-rasterise both screens so no build work happens mid-animation.
-          allowSnapshotting: true,
-          transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-              ),
-              child: child,
-            );
-          },
-        );
+// ignore: non_constant_identifier_names
+Route<T> AppRoute<T>({
+  required WidgetBuilder builder,
+  RouteSettings? settings,
+}) {
+  final platform = defaultTargetPlatform;
+  if (platform == TargetPlatform.iOS || platform == TargetPlatform.macOS) {
+    // CupertinoPageRoute delivers:
+    //   • Slide animation that follows the finger in real-time
+    //   • Native swipe-back (no perceived delay, cancellable mid-drag)
+    //   • allowSnapshotting: true by default in Flutter 3.16+
+    return CupertinoPageRoute<T>(builder: builder, settings: settings);
+  }
+
+  // Android / Web: fast fade, pre-rasterised on both enter and exit.
+  return PageRouteBuilder<T>(
+    settings: settings,
+    pageBuilder: (ctx, _, __) => builder(ctx),
+    transitionDuration: const Duration(milliseconds: 220),
+    reverseTransitionDuration: const Duration(milliseconds: 180),
+    allowSnapshotting: true,
+    transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ),
+        child: child,
+      );
+    },
+  );
 }
