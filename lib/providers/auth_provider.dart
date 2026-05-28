@@ -129,7 +129,11 @@ class AuthProvider extends ChangeNotifier {
     try {
       await SupabaseService.signInWithIdentifier(identifier, password);
       _user = await SupabaseService.getCurrentUserProfile();
-      if (_user != null) await SessionProfileCache.save(_user!);
+      if (_user == null) {
+        await SupabaseService.signOut();
+        return 'Signed in but your profile was not found. Contact HR or IT.';
+      }
+      await SessionProfileCache.save(_user!);
       notifyListeners();
       return null;
     } on AuthException catch (e) {
@@ -145,8 +149,13 @@ class AuthProvider extends ChangeNotifier {
       final s = e.toString().toLowerCase();
       if (s.contains('socketexception') ||
           s.contains('failed host lookup') ||
-          s.contains('network is unreachable')) {
+          s.contains('network is unreachable') ||
+          s.contains('failed to fetch') ||
+          s.contains('connection refused')) {
         return 'No internet connection. Check Wi‑Fi or data and try again.';
+      }
+      if (s.contains('invalid username or password')) {
+        return 'Invalid username or password';
       }
       return 'Invalid username or password';
     }
