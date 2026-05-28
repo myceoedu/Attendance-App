@@ -90,10 +90,11 @@ class AuthProvider extends ChangeNotifier {
           }
           break;
         case AuthChangeEvent.tokenRefreshed:
-          if (_user == null) {
-            _user = await SupabaseService.getCurrentUserProfile();
-            if (_user != null) await SessionProfileCache.save(_user!);
-          }
+          // Token silently refreshed — user identity unchanged.
+          // Only fetch profile (and notify) if we somehow have no user yet.
+          if (_user != null) return; // nothing changed; skip rebuild
+          _user = await SupabaseService.getCurrentUserProfile();
+          if (_user != null) await SessionProfileCache.save(_user!);
           break;
         case AuthChangeEvent.signedOut:
           _user = null;

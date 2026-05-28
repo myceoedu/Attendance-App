@@ -6,6 +6,55 @@ import '../providers/auth_provider.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
+// ── Dot-grid background painter ──────────────────────────────────────────────
+class _DotGridPainter extends CustomPainter {
+  final Color color;
+  const _DotGridPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const gap = 26.0;
+    const radius = 1.3;
+    final paint = Paint()..color = color;
+    for (double x = 0; x < size.width; x += gap) {
+      for (double y = 0; y < size.height; y += gap) {
+        canvas.drawCircle(Offset(x, y), radius, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DotGridPainter old) => old.color != color;
+}
+
+// ── Diagonal wave/arc decoration ─────────────────────────────────────────────
+class _WavePainter extends CustomPainter {
+  final Color color;
+  const _WavePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(0, size.height * 0.68)
+      ..quadraticBezierTo(
+        size.width * 0.45,
+        size.height * 0.55,
+        size.width,
+        size.height * 0.72,
+      )
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_WavePainter old) => old.color != color;
+}
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,7 +62,8 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   static const double _cardRadius = 28;
 
   final _formKey = GlobalKey<FormState>();
@@ -23,10 +73,24 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _error;
 
+  late final AnimationController _pulse;
+  late final Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
+    _pulseAnim = CurvedAnimation(parent: _pulse, curve: Curves.easeInOut);
+  }
+
   @override
   void dispose() {
     _usernameCtrl.dispose();
     _passwordCtrl.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
@@ -73,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderSide: const BorderSide(color: AppColors.teal, width: 2),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(radius),
@@ -86,48 +150,110 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _backgroundOrbs() {
+  // ── Background layers ─────────────────────────────────────────────────────
+
+  Widget _buildBackground(Size size) {
     return Stack(
-      clipBehavior: Clip.none,
+      fit: StackFit.expand,
       children: [
+        // Base gradient: deep navy → indigo → blue
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF071428), // near-black navy
+                Color(0xFF0F2255), // deep navy
+                Color(0xFF1A3A8F), // brand indigo
+              ],
+              stops: [0.0, 0.45, 1.0],
+            ),
+          ),
+        ),
+        // Dot grid overlay
+        Opacity(
+          opacity: 0.28,
+          child: CustomPaint(
+            size: size,
+            painter: _DotGridPainter(
+              color: Colors.white.withValues(alpha: 0.55),
+            ),
+          ),
+        ),
+        // Wave/arc at bottom
         Positioned(
-          right: -72,
-          top: -28,
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: size.height * 0.28,
+          child: CustomPaint(
+            painter: _WavePainter(
+              color: Colors.white.withValues(alpha: 0.03),
+            ),
+          ),
+        ),
+        // Teal glow orb — bottom left
+        Positioned(
+          left: -90,
+          bottom: size.height * 0.12,
           child: IgnorePointer(
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.07),
+            child: AnimatedBuilder(
+              animation: _pulseAnim,
+              builder: (_, __) => Container(
+                width: 320 + _pulseAnim.value * 28,
+                height: 320 + _pulseAnim.value * 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF0D9488).withValues(alpha: 0.28),
+                      const Color(0xFF0D9488).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
+        // Indigo glow orb — top right
         Positioned(
-          left: -56,
-          top: 120,
+          right: -80,
+          top: -40,
           child: IgnorePointer(
-            child: Container(
-              width: 160,
-              height: 160,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.05),
+            child: AnimatedBuilder(
+              animation: _pulseAnim,
+              builder: (_, __) => Container(
+                width: 280 + (1 - _pulseAnim.value) * 24,
+                height: 280 + (1 - _pulseAnim.value) * 24,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF4F46E5).withValues(alpha: 0.22),
+                      const Color(0xFF4F46E5).withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
+        // Bright accent circle — mid-left
         Positioned(
-          left: 40,
-          bottom: 100,
+          left: -30,
+          top: size.height * 0.3,
           child: IgnorePointer(
             child: Container(
               width: 120,
               height: 120,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.04),
+                color: Colors.white.withValues(alpha: 0.03),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  width: 1,
+                ),
               ),
             ),
           ),
@@ -136,21 +262,110 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ── Brand hero section ────────────────────────────────────────────────────
+
+  Widget _buildHero() {
+    return Column(
+      children: [
+        // Icon badge
+        Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF0D9488).withValues(alpha: 0.45),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.fingerprint_rounded,
+              size: 38,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        // Brand name: "my" white + "Rekod" teal
+        RichText(
+          textAlign: TextAlign.center,
+          text: const TextSpan(
+            style: TextStyle(
+              fontSize: 42,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -1.8,
+              height: 1.0,
+            ),
+            children: [
+              TextSpan(
+                text: 'my',
+                style: TextStyle(color: Colors.white),
+              ),
+              TextSpan(
+                text: 'Rekod',
+                style: TextStyle(color: Color(0xFF2DD4BF)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        // Badge pill: HR Platform
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: const Color(0xFF0D9488).withValues(alpha: 0.55),
+            ),
+            color: const Color(0xFF0D9488).withValues(alpha: 0.14),
+          ),
+          child: const Text(
+            'Smart HR · Attendance · Leave · Claims',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF5EEAD4),
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        _trustStrip(),
+      ],
+    );
+  }
+
+  // ── Trust strip ──────────────────────────────────────────────────────────
+
   Widget _trustStrip() {
     Widget item(IconData icon, String label) {
       return Expanded(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 15, color: AppColors.onBrandMuted),
-            const SizedBox(width: 6),
+            Icon(icon, size: 14, color: AppColors.onBrandMuted),
+            const SizedBox(width: 5),
             Flexible(
               child: Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w600,
                   color: AppColors.onBrandMuted,
                 ),
@@ -162,55 +377,60 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.brandChipBorder),
-        color: AppColors.brandChipFill,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.14),
+        ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.10),
+            Colors.white.withValues(alpha: 0.05),
+          ],
+        ),
       ),
       child: Row(
         children: [
-          item(Icons.verified_user_outlined, 'Secure session'),
-          Container(
-            width: 1,
-            height: 18,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            color: Colors.white.withValues(alpha: 0.22),
-          ),
-          item(Icons.schedule_rounded, 'Live attendance'),
-          Container(
-            width: 1,
-            height: 18,
-            margin: const EdgeInsets.symmetric(horizontal: 6),
-            color: Colors.white.withValues(alpha: 0.22),
-          ),
+          item(Icons.verified_user_outlined, 'Secure'),
+          _divider(),
+          item(Icons.schedule_rounded, 'Live data'),
+          _divider(),
           item(Icons.groups_outlined, 'Team-ready'),
         ],
       ),
     );
   }
 
+  Widget _divider() => Container(
+    width: 1,
+    height: 16,
+    margin: const EdgeInsets.symmetric(horizontal: 4),
+    color: Colors.white.withValues(alpha: 0.18),
+  );
+
+  // ── Sign-in CTA button ────────────────────────────────────────────────────
+
   Widget _signInCta(VoidCallback? onPressed, bool busy) {
     final radius = BorderRadius.circular(14);
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: AppGradients.brandPanel,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF14B8A6)],
+        ),
         borderRadius: radius,
         boxShadow: [
           BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.35),
-            blurRadius: 20,
+            color: const Color(0xFF0D9488).withValues(alpha: 0.45),
+            blurRadius: 22,
             offset: const Offset(0, 10),
           ),
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -234,14 +454,32 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : Text(
-                      'Sign in',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Sign in',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
             ),
           ),
@@ -250,43 +488,36 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  // ── Root build ────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final screenW = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
     final topInset = MediaQuery.paddingOf(context).top;
-    final logoW = (screenW - 44).clamp(240.0, 380.0);
-    const logoH = 118.0;
     const maxContentW = 440.0;
 
     final linkButtonStyle = TextButton.styleFrom(
-      foregroundColor: AppColors.primary,
-      textStyle: TextStyle(
-        fontWeight: FontWeight.w600,
-        fontSize: 13,
-      ),
+      foregroundColor: AppColors.teal,
+      textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppChrome.onBrand.copyWith(
-        systemNavigationBarColor: AppColors.surface,
-        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: const Color(0xFF0A1628),
+        systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: AppColors.primaryDark,
+        backgroundColor: const Color(0xFF071428),
         body: Stack(
           fit: StackFit.expand,
           children: [
-            Container(
-              decoration:
-                  const BoxDecoration(gradient: AppGradients.brandHeader),
-            ),
-            _backgroundOrbs(),
+            _buildBackground(size),
             SafeArea(
               child: Center(
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     22,
-                    topInset > 28 ? 8 : 14,
+                    topInset > 28 ? 8 : 20,
                     22,
                     28,
                   ),
@@ -294,106 +525,58 @@ class _LoginScreenState extends State<LoginScreen> {
                     constraints: const BoxConstraints(maxWidth: maxContentW),
                     child: Column(
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.22),
-                                blurRadius: 36,
-                                offset: const Offset(0, 14),
-                              ),
-                              BoxShadow(
-                                color: AppColors.primary.withValues(alpha: 0.25),
-                                blurRadius: 48,
-                                spreadRadius: -8,
-                              ),
-                            ],
-                          ),
-                          child: SizedBox(
-                            width: logoW,
-                            height: logoH,
-                            child: Image.asset(
-                              'lib/assets/logo-CEO.png',
-                              fit: BoxFit.contain,
-                              alignment: Alignment.center,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.fingerprint_rounded,
-                                size: logoH * 0.55,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        Text(
-                          'Attendance',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -1.35,
-                            height: 1.02,
-                            color: AppColors.onBrand,
-                          ),
-                        ),
+                        _buildHero(),
                         const SizedBox(height: 10),
-                        Text(
-                          'Workforce attendance, leave & claims — in one place.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            height: 1.45,
-                            color: AppColors.onBrandSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 18),
-                        _trustStrip(),
-                        const SizedBox(height: 14),
+                        // Divider accent line
                         Center(
                           child: Container(
-                            height: 3,
-                            width: 64,
+                            height: 2,
+                            width: 48,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(2),
                               gradient: LinearGradient(
                                 colors: [
-                                  Colors.white.withValues(alpha: 0.2),
-                                  Colors.white.withValues(alpha: 0.85),
-                                  Colors.white.withValues(alpha: 0.2),
+                                  Colors.white.withValues(alpha: 0.08),
+                                  const Color(0xFF2DD4BF).withValues(
+                                    alpha: 0.7,
+                                  ),
+                                  Colors.white.withValues(alpha: 0.08),
                                 ],
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 14),
                         Text(
-                          'Sign in with your work username or company email',
+                          'Sign in with your work username or email',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13.5,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                             height: 1.4,
                             color: AppColors.onBrandMuted,
                           ),
                         ),
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 24),
+                        // Form card
                         DecoratedBox(
                           decoration: BoxDecoration(
-                            borderRadius:
-                                BorderRadius.circular(_cardRadius + 2),
+                            borderRadius: BorderRadius.circular(
+                              _cardRadius + 2,
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.textPrimary
-                                    .withValues(alpha: 0.12),
-                                blurRadius: 40,
-                                offset: const Offset(0, 18),
-                                spreadRadius: -8,
+                                color: Colors.black.withValues(alpha: 0.32),
+                                blurRadius: 48,
+                                offset: const Offset(0, 20),
+                                spreadRadius: -6,
                               ),
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.08),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
+                                color: const Color(0xFF0D9488).withValues(
+                                  alpha: 0.12,
+                                ),
+                                blurRadius: 36,
+                                spreadRadius: -4,
                               ),
                             ],
                           ),
@@ -403,11 +586,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             shadowColor: Colors.transparent,
                             surfaceTintColor: Colors.transparent,
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(_cardRadius),
+                              borderRadius: BorderRadius.circular(_cardRadius),
                               side: BorderSide(
-                                color: AppColors.textPrimary
-                                    .withValues(alpha: 0.06),
+                                color: Colors.black.withValues(alpha: 0.06),
                               ),
                             ),
                             clipBehavior: Clip.antiAlias,
@@ -415,10 +596,18 @@ class _LoginScreenState extends State<LoginScreen> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                // Teal accent bar
                                 Container(
-                                  height: 4,
+                                  height: 5,
                                   decoration: const BoxDecoration(
-                                    gradient: AppGradients.brandPanel,
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Color(0xFF0F766E),
+                                        Color(0xFF0D9488),
+                                        Color(0xFF2DD4BF),
+                                        Color(0xFF1A56DB),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 Padding(
@@ -430,8 +619,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   child: Theme(
                                     data: Theme.of(context).copyWith(
-                                      inputDecorationTheme:
-                                          _loginInputTheme(context),
+                                      inputDecorationTheme: _loginInputTheme(
+                                        context,
+                                      ),
                                     ),
                                     child: Form(
                                       key: _formKey,
@@ -439,24 +629,24 @@ class _LoginScreenState extends State<LoginScreen> {
                                         crossAxisAlignment:
                                             CrossAxisAlignment.stretch,
                                         children: [
+                                          // Card header row
                                           Row(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Container(
-                                                padding:
-                                                    const EdgeInsets.all(8),
+                                                padding: const EdgeInsets.all(
+                                                  8,
+                                                ),
                                                 decoration: BoxDecoration(
-                                                  color: AppColors
-                                                      .primaryLight
-                                                      .withValues(alpha: 0.75),
+                                                  color: AppColors.tealLight,
                                                   borderRadius:
                                                       BorderRadius.circular(12),
                                                 ),
                                                 child: const Icon(
                                                   Icons.lock_open_rounded,
                                                   size: 20,
-                                                  color: AppColors.primary,
+                                                  color: AppColors.teal,
                                                 ),
                                               ),
                                               const SizedBox(width: 12),
@@ -465,7 +655,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   crossAxisAlignment:
                                                       CrossAxisAlignment.start,
                                                   children: [
-                                                    Text(
+                                                    const Text(
                                                       'Welcome back',
                                                       style: TextStyle(
                                                         fontSize: 20,
@@ -478,7 +668,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                                     ),
                                                     const SizedBox(height: 2),
                                                     Text(
-                                                      'Enter your credentials to access the app.',
+                                                      'Enter your credentials to continue.',
                                                       style: TextStyle(
                                                         fontSize: 13,
                                                         height: 1.35,
@@ -504,7 +694,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                           ),
                                           const SizedBox(height: 12),
-                                          Text(
+                                          const Text(
                                             'Username or email',
                                             style: TextStyle(
                                               fontSize: 13,
@@ -545,7 +735,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             },
                                           ),
                                           const SizedBox(height: 18),
-                                          Text(
+                                          const Text(
                                             'Password',
                                             style: TextStyle(
                                               fontSize: 13,
@@ -559,8 +749,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                             obscureText: _obscure,
                                             textInputAction:
                                                 TextInputAction.done,
-                                            onFieldSubmitted: (_) =>
-                                                _submit(),
+                                            onFieldSubmitted: (_) => _submit(),
                                             decoration: InputDecoration(
                                               hintText: '••••••••',
                                               prefixIcon: const Icon(
@@ -571,12 +760,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                                 icon: Icon(
                                                   _obscure
                                                       ? Icons
-                                                          .visibility_off_outlined
+                                                            .visibility_off_outlined
                                                       : Icons
-                                                          .visibility_outlined,
+                                                            .visibility_outlined,
                                                   size: 20,
-                                                  color: AppColors
-                                                      .textSecondary,
+                                                  color:
+                                                      AppColors.textSecondary,
                                                 ),
                                                 onPressed: () => setState(
                                                   () => _obscure = !_obscure,
@@ -585,8 +774,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                             ),
                                             validator: (v) =>
                                                 (v == null || v.length < 6)
-                                                    ? 'Min 6 characters'
-                                                    : null,
+                                                ? 'Min 6 characters'
+                                                : null,
                                           ),
                                           Align(
                                             alignment: Alignment.centerRight,
@@ -595,8 +784,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                               onPressed: _busy
                                                   ? null
                                                   : () {
-                                                      Navigator.of(context)
-                                                          .push(
+                                                      Navigator.of(
+                                                        context,
+                                                      ).push(
                                                         MaterialPageRoute<void>(
                                                           builder: (_) =>
                                                               const ForgotPasswordScreen(),
@@ -613,9 +803,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                             Container(
                                               padding:
                                                   const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 10,
-                                              ),
+                                                    horizontal: 12,
+                                                    vertical: 10,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: AppColors.danger
                                                     .withValues(alpha: 0.08),
@@ -637,9 +827,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                                   Expanded(
                                                     child: Text(
                                                       _error!,
-                                                      style: TextStyle(
-                                                        color:
-                                                            AppColors.danger,
+                                                      style: const TextStyle(
+                                                        color: AppColors.danger,
                                                         fontSize: 13,
                                                         fontWeight:
                                                             FontWeight.w600,
@@ -661,17 +850,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                             style: linkButtonStyle.copyWith(
                                               textStyle:
                                                   WidgetStateProperty.all(
-                                                TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 14,
-                                                ),
-                                              ),
+                                                    const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
                                             ),
                                             onPressed: _busy
                                                 ? null
                                                 : () {
-                                                    Navigator.of(context)
-                                                        .push(
+                                                    Navigator.of(context).push(
                                                       MaterialPageRoute<void>(
                                                         builder: (_) =>
                                                             const RegisterScreen(),
@@ -693,10 +882,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 20),
                         Text(
-                          'Protected access • Contact your administrator if you need help',
+                          'myRekod · Protected access · Contact your admin for help',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 11.5,
+                            fontSize: 11,
                             height: 1.4,
                             fontWeight: FontWeight.w500,
                             color: AppColors.onBrandFaint,

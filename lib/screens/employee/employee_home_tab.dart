@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -16,7 +15,6 @@ import '../../services/announcement_badge_service.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
-import '../../utils/leave_catalog.dart';
 import '../../widgets/employee_quick_access_tile.dart';
 import '../../widgets/notification_bell_button.dart';
 import '../announcements_screen.dart';
@@ -41,9 +39,14 @@ class EmployeeHomeTab extends StatefulWidget {
 
 class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   Attendance? _today;
-  List<LeaveRequest> _leaves = [];
+  // Narrow: only today's approved leave (replaces the 400-row list).
+  LeaveRequest? _todayLeave;
+  // Count of user's pending leave requests (HEAD query, zero data transfer).
+  int _pendingLeaveCount = 0;
   bool _loading = true;
   int _announcementUnread = 0;
+
+  static final _dateFmt = DateFormat('EEEE, d MMMM yyyy');
 
   Timer? _realtimeDebounce;
   Timer? _announcementBadgeDebounce;
@@ -51,8 +54,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   RealtimeChannel? _leaveChannel;
   RealtimeChannel? _announcementsChannel;
 
-  late final ValueNotifier<DateTime> _clockNow =
-      ValueNotifier<DateTime>(AppTime.malaysiaNow());
+  late final ValueNotifier<DateTime> _clockNow = ValueNotifier<DateTime>(
+    AppTime.malaysiaNow(),
+  );
   late Timer _clockTicker;
 
   @override
@@ -108,11 +112,14 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       channelSuffix: 'employee_home_badge',
       onReload: () {
         _announcementBadgeDebounce?.cancel();
-        _announcementBadgeDebounce = Timer(const Duration(milliseconds: 400), () {
-          if (mounted) {
-            unawaited(_refreshAnnouncementBadge());
-          }
-        });
+        _announcementBadgeDebounce = Timer(
+          const Duration(milliseconds: 400),
+          () {
+            if (mounted) {
+              unawaited(_refreshAnnouncementBadge());
+            }
+          },
+        );
       },
     );
   }
@@ -145,16 +152,20 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         if (mounted) setState(() => _loading = false);
         return;
       }
+      final today = AppTime.malaysiaNow();
+      // Four parallel, narrow queries — replaces a single 400-row leave fetch.
       final results = await Future.wait<Object?>([
         SupabaseService.getTodayAttendance(uid),
-        SupabaseService.getMyLeaveRequests(uid),
+        SupabaseService.getApprovedLeaveForToday(uid, today),
+        SupabaseService.getPendingLeaveCountForUser(uid),
         AnnouncementBadgeService.unreadCountForUser(uid),
       ]);
       if (!mounted) return;
       setState(() {
         _today = results[0] as Attendance?;
-        _leaves = results[1] as List<LeaveRequest>;
-        _announcementUnread = results[2] as int;
+        _todayLeave = results[1] as LeaveRequest?;
+        _pendingLeaveCount = results[2] as int;
+        _announcementUnread = results[3] as int;
         _loading = false;
       });
       _clockNow.value = AppTime.malaysiaNow();
@@ -162,28 +173,6 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       if (!mounted) return;
       setState(() => _loading = false);
     }
-  }
-
-  LeaveRequest? _todayApprovedLeaveAt(DateTime now) {
-    final today = DateTime(now.year, now.month, now.day);
-    for (final leave in _leaves) {
-      if (leave.status.toLowerCase() != 'approved') continue;
-      if (!LeaveCatalog.blocksFullDayClockIn(leave.leaveType)) continue;
-      final start = DateTime(
-        leave.startDate.year,
-        leave.startDate.month,
-        leave.startDate.day,
-      );
-      final end = DateTime(
-        leave.endDate.year,
-        leave.endDate.month,
-        leave.endDate.day,
-      );
-      if (!today.isBefore(start) && !today.isAfter(end)) {
-        return leave;
-      }
-    }
-    return null;
   }
 
   String _greeting(DateTime now) {
@@ -200,6 +189,13 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     return 16;
   }
 
+  String _shiftLabelForNow(DateTime now) {
+    final h = now.hour;
+    if (h >= 6 && h < 14) return 'Day shift';
+    if (h >= 14 && h < 22) return 'Second shift';
+    return 'Night shift';
+  }
+
   // ──────────────────────────────────────────────
   // UI
   // ──────────────────────────────────────────────
@@ -209,19 +205,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     final user = context.select<AuthProvider, AppUser?>((a) => a.user);
     if (user == null) return const SizedBox.shrink();
 
-    final dateFmt = DateFormat('EEEE, d MMMM yyyy');
-
-    if (kDebugMode) {
-      debugPrint(
-        'EmployeeHomeTab build: loading=$_loading name=${user.name.isNotEmpty ? user.name : user.email}',
-      );
-    }
-
-    // No nested [Scaffold] — only [EmployeeShell] is a scaffold on this route.
-    // [ListView] + [RefreshIndicator] avoids sliver/viewport quirks on some Android
-    // emulators that produced a blank or solid-color body while logs showed builds.
     final hPad = _horizontalPadding(context);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final displayName = user.name.isNotEmpty ? user.name : user.email;
 
     if (_loading) {
       return SizedBox.expand(
@@ -231,6 +217,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         ),
       );
     }
+
     return SizedBox.expand(
       child: ColoredBox(
         color: AppColors.surface,
@@ -241,28 +228,20 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.only(bottom: bottomInset + 32),
             children: [
+              // Hero header + attendance card rebuild every minute (clock).
               ValueListenableBuilder<DateTime>(
                 valueListenable: _clockNow,
-                builder: (context, now, _) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _heroHeader(
-                        user.name.isNotEmpty ? user.name : user.email,
-                        dateFmt.format(now),
-                        now,
-                      ),
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 0),
-                        child: _attendanceSnapshotCard(context, now),
-                      ),
-                    ],
-                  );
-                },
+                builder: (context, now, _) => _heroHeader(
+                  displayName,
+                  _dateFmt.format(now),
+                  now,
+                ),
               ),
+              // Quick access rebuilds ONLY on data change (_load / realtime).
+              // It is intentionally outside the ValueListenableBuilder so the
+              // stat strip + tile grid are NOT repainted every clock tick.
               Padding(
-                padding: EdgeInsets.fromLTRB(hPad, 28, hPad, 8),
+                padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 8),
                 child: _quickAccessSection(context),
               ),
             ],
@@ -272,158 +251,147 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     );
   }
 
+  // ── Hero header + embedded attendance card ──────────────────────────────
+
   Widget _heroHeader(String name, String dateText, DateTime now) {
+    final leave = _todayLeave;
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppChrome.onBrand,
       child: Container(
-        width: double.infinity,
         decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F2255),
+              Color(0xFF1A3A8F),
+              Color(0xFF1A56DB),
+            ],
+            stops: [0.0, 0.48, 1.0],
+          ),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(30),
+          ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.brandHeaderShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-              spreadRadius: -4,
+              color: AppColors.primaryDark.withValues(alpha: 0.28),
+              blurRadius: 28,
+              offset: const Offset(0, 10),
             ),
           ],
         ),
-        child: ClipRect(
-          child: Stack(
-            clipBehavior: Clip.none,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.brandHeader,
-                    border: Border(
-                      bottom: BorderSide(color: AppColors.brandHeaderBorder),
-                    ),
-                  ),
-                ),
-              ),
-              // Light orbs — draws once per frame, no images / blur filters.
-              Positioned(
-                right: -36,
-                top: -24,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.07),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: -28,
-                top: 56,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 88,
-                    height: 88,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.05),
-                    ),
-                  ),
-                ),
-              ),
-              SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppLayout.screenPaddingH,
-                    16,
-                    AppLayout.screenPaddingH,
-                    24,
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              gradient: AppGradients.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: AppColors.brandAvatarRing,
-                                width: 2,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.22),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
+              // Greeting row
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Teal avatar badge
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF0D9488).withValues(
+                              alpha: 0.4,
                             ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              (name.isNotEmpty ? name[0] : '?').toUpperCase(),
-                              style: AppTypography.employeeHeroAvatarInitial(),
+                            blurRadius: 14,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        (name.isNotEmpty ? name[0] : '?').toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _greeting(now),
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withValues(alpha: 0.72),
+                              letterSpacing: 0.1,
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _greeting(now),
-                                  style: AppTypography.employeeHeroGreeting(
-                                    AppColors.onBrandSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  name,
+                          const SizedBox(height: 2),
+                          Text(
+                            name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.55,
+                              height: 1.15,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 12,
+                                color: Colors.white.withValues(alpha: 0.62),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  dateText,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.employeeHeroName(
-                                    AppColors.onBrand,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white.withValues(alpha: 0.7),
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          Material(
-                            type: MaterialType.transparency,
-                            child: NotificationBellButton(
-                              iconColor: AppColors.onBrand,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.calendar_today_rounded,
-                            size: 14,
-                            color: AppColors.onBrandFaint,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              dateText,
-                              style: AppTypography.employeeHeroDate(
-                                AppColors.onBrandMuted,
                               ),
-                            ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Material(
+                      type: MaterialType.transparency,
+                      child: NotificationBellButton(
+                        iconColor: AppColors.onBrand,
+                      ),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              // Attendance card embedded in the header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+                child: _attendanceEmbeddedCard(now, leave),
               ),
             ],
           ),
@@ -431,188 +399,288 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       ),
     );
   }
-  
-  /// Clock-in / clock-out detail; [leadWithDivider] false when nested in snapshot card.
-  Widget _attendanceTimesBody(
-    BuildContext context, {
-    bool leadWithDivider = true,
-  }) {
-    final t = _today;
-    final timeFmt = DateFormat('h:mm a');
-    final w = MediaQuery.sizeOf(context).width;
 
+  // ── Attendance card (inside header) ────────────────────────────────────
+
+  Widget _attendanceEmbeddedCard(DateTime now, LeaveRequest? leave) {
+    final t = _today;
+    final onLeave = leave != null;
+    final idle = !onLeave && t == null;
+    final working =
+        !onLeave &&
+        t != null &&
+        t.clockOutTime == null &&
+        t.status != 'completed';
+    final done =
+        !onLeave &&
+        t != null &&
+        (t.clockOutTime != null || t.status == 'completed');
+
+    final Color statusColor = onLeave
+        ? AppColors.leave
+        : done
+        ? AppColors.success
+        : working
+        ? AppColors.open
+        : AppColors.textHint;
+
+    final Color statusBg = onLeave
+        ? AppColors.leaveLight
+        : done
+        ? AppColors.successLight
+        : working
+        ? AppColors.openLight
+        : AppColors.surface;
+
+    final IconData statusIcon = onLeave
+        ? Icons.beach_access_rounded
+        : done
+        ? Icons.check_circle_rounded
+        : working
+        ? Icons.radio_button_checked
+        : Icons.circle_outlined;
+
+    final String statusLabel = done
+        ? 'Complete'
+        : onLeave
+        ? 'On leave'
+        : working
+        ? 'Working'
+        : 'Clock in';
+
+    final String statusMessage = onLeave
+        ? 'On approved leave today'
+        : idle
+        ? 'Please clock in'
+        : working
+        ? 'You are clocked in'
+        : 'All done for today';
+
+    final timeFmt = DateFormat('h:mm a');
     final hasIn = t?.clockInTime != null;
     final hasOut = t?.clockOutTime != null;
-
-    final inDisplay =
-        hasIn ? timeFmt.format(AppTime.toMalaysia(t!.clockInTime!)) : '—';
+    final inDisplay = hasIn
+        ? timeFmt.format(AppTime.toMalaysia(t!.clockInTime!))
+        : '—';
     final outDisplay = hasOut
         ? timeFmt.format(AppTime.toMalaysia(t!.clockOutTime!))
-        : (hasIn ? 'In progress' : '—');
+        : hasIn
+        ? 'In progress'
+        : '—';
 
-    bool isSecondaryValue(String v) =>
-        v == '—' || v.toLowerCase() == 'in progress';
+    bool secondary(String v) => v == '—' || v.toLowerCase() == 'in progress';
 
-    Widget timeHalf({
-      required IconData icon,
-      required Color iconColor,
-      required String label,
-      required String value,
-    }) {
-      final secondary = isSecondaryValue(value);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: iconColor),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypography.employeeTimeRowLabel(
-                    AppColors.textSecondary.withValues(alpha: 0.88),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: secondary
-                ? AppTypography.employeeTimeSecondary()
-                : AppTypography.employeeTimeNumeric(w),
-          ),
-        ],
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (leadWithDivider) ...[
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.divider.withValues(alpha: 0.9),
-          ),
-          const SizedBox(height: 10),
-        ],
-        Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(
-                Icons.access_time_filled_rounded,
-                size: 16,
-                color: AppColors.primaryDark.withValues(alpha: 0.82),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              "Today's times",
-              style: AppTypography.employeeSectionHeading(
-                AppColors.textPrimary,
-              ).copyWith(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.22,
-                height: 1.2,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: timeHalf(
-                    icon: Icons.login_rounded,
-                    iconColor: const Color(0xFF047857),
-                    label: 'Clock in',
-                    value: inDisplay,
-                  ),
-                ),
-              ),
-              VerticalDivider(
-                width: 1,
-                thickness: 1,
-                indent: 4,
-                endIndent: 4,
-                color: AppColors.border.withValues(alpha: 0.75),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: timeHalf(
-                    icon: Icons.logout_rounded,
-                    iconColor: AppColors.primaryDark.withValues(alpha: 0.92),
-                    label: 'Clock out',
-                    value: outDisplay,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// Single card: status + log rail, then subtle band for today's times.
-  Widget _attendanceSnapshotCard(BuildContext context, DateTime now) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        border: Border.all(
-          color: AppColors.border.withValues(alpha: 0.65),
-        ),
-        boxShadow: AppElevation.cardOnSurface,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.1),
+            blurRadius: 12,
+            spreadRadius: -4,
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _attendanceStatusBody(now),
+          // Status-colored top accent strip
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: onLeave
+                    ? [AppColors.leave, AppColors.leave.withValues(alpha: 0.55)]
+                    : done
+                    ? [const Color(0xFF059669), const Color(0xFF34D399)]
+                    : working
+                    ? [AppColors.primaryDark, AppColors.primary]
+                    : [AppColors.border, AppColors.surface],
+              ),
+            ),
+          ),
+          // ── Status row ─────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Tappable status pill → Clock tab
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => EmployeeTabScope.goToTabOf(context, 1),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Ink(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: statusColor.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, color: statusColor, size: 17),
+                          const SizedBox(width: 5),
+                          Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color.lerp(
+                                statusColor,
+                                AppColors.textPrimary,
+                                0.18,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        statusMessage,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      if (!onLeave) ...[
+                        const SizedBox(height: 4),
+                        _shiftChip(_shiftLabelForNow(now)),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
           Divider(
             height: 1,
             thickness: 1,
-            color: AppColors.divider.withValues(alpha: 0.65),
+            color: AppColors.divider.withValues(alpha: 0.8),
           ),
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(
-              bottom: Radius.circular(AppLayout.cardRadiusLg - 1),
-            ),
-            child: ColoredBox(
-              color: Color.lerp(
-                AppColors.surface,
-                AppColors.primaryLight,
-                0.22,
-              )!,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                child: _attendanceTimesBody(
-                  context,
-                  leadWithDivider: false,
+          // ── Clock times row ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 11, 14, 13),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: _timeColumn(
+                    icon: Icons.login_rounded,
+                    iconColor: const Color(0xFF059669),
+                    label: 'Clock in',
+                    value: inDisplay,
+                    isSecondary: secondary(inDisplay),
+                  ),
                 ),
-              ),
+                Container(
+                  width: 1,
+                  height: 40,
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  color: AppColors.border.withValues(alpha: 0.7),
+                ),
+                Expanded(
+                  child: _timeColumn(
+                    icon: Icons.logout_rounded,
+                    iconColor: AppColors.primaryDark.withValues(alpha: 0.85),
+                    label: 'Clock out',
+                    value: outDisplay,
+                    isSecondary: secondary(outDisplay),
+                  ),
+                ),
+                // View log button
+                const SizedBox(width: 10),
+                Material(
+                  color: Colors.transparent,
+                  child: Tooltip(
+                    message: 'Open attendance log',
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const EmployeeAttendanceLogScreen(),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(13),
+                      child: Ink(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFF0F2255),
+                              Color(0xFF1A56DB),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.history_rounded,
+                              color: Colors.white.withValues(alpha: 0.96),
+                              size: 20,
+                            ),
+                            const SizedBox(height: 3),
+                            const Text(
+                              'Log',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                height: 1.1,
+                              ),
+                            ),
+                            const Text(
+                              'Entries',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                                height: 1.1,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -620,224 +688,79 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     );
   }
 
-  Widget _quickAccessSection(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, c) {
-        final w = c.maxWidth;
-        final gap = w >= 400 ? 14.0 : 8.0;
-        final aspect = w >= 400 ? 0.92 : 0.88;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+  Widget _timeColumn({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+    required bool isSecondary,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        AppColors.primary,
-                        AppColors.primaryDark,
-                      ],
-                    ),
-                  ),
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary.withValues(alpha: 0.88),
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Tools & links',
-                        style: AppTypography.employeeCardOverline(
-                          AppColors.textSecondary.withValues(alpha: 0.72),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Self-service',
-                        style: AppTypography.employeeSectionHeading(
-                          AppColors.textPrimary,
-                        ).copyWith(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.35,
-                          height: 1.18,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Leave, claims, payroll, notices & calendar',
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.38,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: -0.01,
-                          color:
-                              AppColors.textSecondary.withValues(alpha: 0.88),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                ),
-                boxShadow: AppElevation.cardOnSurface,
-              ),
-              child: GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: gap,
-                crossAxisSpacing: gap,
-                childAspectRatio: aspect,
-                children: [
-                  EmployeeQuickAccessTile(
-                    label: 'Leave',
-                    semanticAction:
-                        'Opens leave — annual balance, sick leave, and emergency leave.',
-                    icon: Icons.event_available_rounded,
-                    accentColor: AppColors.teal,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const LeaveTab(),
-                        ),
-                      );
-                    },
-                  ),
-                  EmployeeQuickAccessTile(
-                    label: 'Claim',
-                    semanticAction:
-                        'Opens expense claims and receipt uploads.',
-                    icon: Icons.receipt_long_rounded,
-                    accentColor: AppColors.orange,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ClaimsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  EmployeeQuickAccessTile(
-                    label: 'Payroll',
-                    semanticAction:
-                        'Opens your payslip history and PDF downloads.',
-                    icon: Icons.receipt_long_rounded,
-                    accentColor: AppColors.violet,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              const EmployeePayrollHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  EmployeeQuickAccessTile(
-                    label: 'Announcements',
-                    semanticAction:
-                        'Company-wide notices posted by administrators.',
-                    icon: Icons.campaign_rounded,
-                    accentColor: AppColors.accent,
-                    badgeCount:
-                        _announcementUnread > 0 ? _announcementUnread : null,
-                    onTap: () async {
-                      await Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AnnouncementsScreen(),
-                        ),
-                      );
-                      if (mounted) await _refreshAnnouncementBadge();
-                    },
-                  ),
-                  EmployeeQuickAccessTile(
-                    label: 'My calendar',
-                    semanticAction: 'Opens your attendance calendar.',
-                    icon: Icons.calendar_month_rounded,
-                    accentColor: AppColors.indigo,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const AttendanceHistoryScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  EmployeeQuickAccessTile(
-                    label: 'Help & support',
-                    semanticAction:
-                        'Opens help topics, contact HR or IT, and copy diagnostics.',
-                    icon: Icons.support_agent_rounded,
-                    accentColor: AppColors.sky,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const HelpSupportScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
               ),
             ),
           ],
-        );
-      },
+        ),
+        const SizedBox(height: 3),
+        Text(
+          value,
+          style: isSecondary
+              ? TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textHint,
+                )
+              : const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.8,
+                  height: 1.1,
+                ),
+        ),
+      ],
     );
   }
 
-  String _shiftLabelForNow(DateTime now) {
-    final h = now.hour;
-    if (h >= 6 && h < 14) return 'Day shift';
-    if (h >= 14 && h < 22) return 'Second shift';
-    return 'Night shift';
-  }
-
-  Widget _corporateShiftChip(String label) {
+  Widget _shiftChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.18),
-        ),
+        color: AppColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             Icons.schedule_rounded,
-            size: 15,
-            color: AppColors.primaryDark.withValues(alpha: 0.88),
+            size: 12,
+            color: AppColors.primaryDark.withValues(alpha: 0.82),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 4),
           Text(
             label,
-            style: AppTypography.employeeShiftSecondary(
-              AppColors.textPrimary.withValues(alpha: 0.88),
-            ).copyWith(
-              fontSize: 12,
+            style: TextStyle(
+              fontSize: 11,
               fontWeight: FontWeight.w600,
-              letterSpacing: -0.02,
+              color: AppColors.textPrimary.withValues(alpha: 0.85),
             ),
           ),
         ],
@@ -845,277 +768,288 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     );
   }
 
-  /// Full-height right rail (layout pattern: primary block + icon / label stack).
-  Widget _attendanceLogSideStrip() {
-    return Tooltip(
-      message: 'Open attendance log',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const EmployeeAttendanceLogScreen(),
-              ),
-            );
-          },
-          child: Ink(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.primaryDark,
-                  Color.lerp(AppColors.primaryDark, AppColors.indigo, 0.22)!,
-                ],
-              ),
-            ),
-            child: SizedBox(
-              width: 62,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.history_rounded,
-                      color: Colors.white.withValues(alpha: 0.96),
-                      size: 22,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Log',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.employeeRailPrimaryLabel(),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Entries',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.employeeRailSecondaryLabel(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  // ── Slim at-a-glance stat strip ─────────────────────────────────────────
 
-  Widget _homeSmallActionCircle({
-    required Color color,
-    required VoidCallback onTap,
-    required Widget child,
-    double size = 52,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const CircleBorder(),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.4),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: child,
-        ),
-      ),
-    );
-  }
+  Widget _statStrip() {
+    final t = _today;
+    final leave = _todayLeave;
 
-  Widget _homeClockDisc({
-    required bool onLeave,
-    required bool idle,
-    required bool working,
-    required bool done,
-  }) {
-    void goClock() => EmployeeTabScope.goToTabOf(context, 1);
+    final bool working =
+        leave == null &&
+        t != null &&
+        t.clockOutTime == null &&
+        t.status != 'completed';
+    final bool done =
+        leave == null &&
+        t != null &&
+        (t.clockOutTime != null || t.status == 'completed');
 
-    const double core = 50;
-    if (onLeave) {
-      return _homeSmallActionCircle(
-        color: AppColors.leave,
-        onTap: goClock,
-        child: const Icon(Icons.block_rounded, color: Colors.white, size: 26),
-      );
-    }
-    if (done) {
-      return _homeSmallActionCircle(
-        color: AppColors.success,
-        onTap: goClock,
-        child: const Icon(Icons.check_rounded, color: Colors.white, size: 28),
-      );
-    }
+    final Color attColor = leave != null
+        ? AppColors.leave
+        : done
+        ? AppColors.success
+        : working
+        ? AppColors.open
+        : AppColors.textHint;
+    final IconData attIcon = leave != null
+        ? Icons.beach_access_rounded
+        : done
+        ? Icons.check_circle_rounded
+        : working
+        ? Icons.radio_button_checked
+        : Icons.circle_outlined;
+    final String attLabel = leave != null
+        ? 'On leave'
+        : done
+        ? 'Complete'
+        : working
+        ? 'Clocked in'
+        : 'Not clocked';
 
-    final Color accent = idle ? const Color(0xFF22C55E) : AppColors.teal;
-    return InkWell(
-      onTap: goClock,
-      customBorder: const CircleBorder(),
-      child: SizedBox(
-        width: 76,
-        height: 76,
-        child: Stack(
-          alignment: Alignment.center,
+    Widget stat({
+      required IconData icon,
+      required Color color,
+      required String value,
+      required String caption,
+    }) {
+      return Expanded(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent.withValues(alpha: 0.08),
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(9),
               ),
+              child: Icon(icon, size: 15, color: color),
             ),
-            Container(
-              width: 68,
-              height: 68,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent.withValues(alpha: 0.12),
-              ),
-            ),
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent.withValues(alpha: 0.2),
-              ),
-            ),
-            Container(
-              width: core,
-              height: core,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: accent,
-                boxShadow: [
-                  BoxShadow(
-                    color: accent.withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+            const SizedBox(width: 7),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                      height: 1.1,
+                    ),
+                  ),
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textHint,
+                      height: 1.2,
+                    ),
                   ),
                 ],
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                idle ? 'Clock\nIn' : 'Clock\nOut',
-                textAlign: TextAlign.center,
-                style: AppTypography.employeePrimaryActionLabel().copyWith(
-                      fontSize: 13,
-                      height: 1.05,
-                    ),
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _attendanceStatusBody(DateTime now) {
-    final t = _today;
-    final leave = _todayApprovedLeaveAt(now);
-
-    final onLeave = leave != null;
-    final idle = !onLeave && t == null;
-    final working = !onLeave &&
-        t != null &&
-        t.clockOutTime == null &&
-        t.status != 'completed';
-    final done = !onLeave &&
-        t != null &&
-        (t.clockOutTime != null || t.status == 'completed');
-
-    final statusMessage = onLeave
-        ? 'On approved leave today'
-        : idle
-            ? 'Please clock in'
-            : working
-                ? 'You are clocked in'
-                : 'All done for today';
-
-    final TextStyle statusStyle = onLeave || working || done
-        ? AppTypography.employeeSnapshotHeadline(AppColors.textPrimary)
-        : AppTypography.employeeSnapshotHeadline(
-            AppColors.textSecondary.withValues(alpha: 0.92),
-          ).copyWith(fontWeight: FontWeight.w600);
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white,
-                    Color.lerp(Colors.white, AppColors.surface, 0.55)!,
-                  ],
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  _homeClockDisc(
-                    onLeave: onLeave,
-                    idle: idle,
-                    working: working,
-                    done: done,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Attendance',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.employeeCardOverline(
-                            AppColors.textHint.withValues(alpha: 0.95),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          statusMessage,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: statusStyle,
-                        ),
-                        if (!onLeave) ...[
-                          const SizedBox(height: 8),
-                          _corporateShiftChip(_shiftLabelForNow(now)),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
-          _attendanceLogSideStrip(),
+        ],
+      ),
+      child: Row(
+        children: [
+          stat(
+            icon: attIcon,
+            color: attColor,
+            value: attLabel,
+            caption: 'Today',
+          ),
+          Container(
+            width: 1,
+            height: 28,
+            color: AppColors.border.withValues(alpha: 0.7),
+          ),
+          stat(
+            icon: Icons.event_note_rounded,
+            color: _pendingLeaveCount > 0 ? AppColors.warning : AppColors.success,
+            value: _pendingLeaveCount == 0 ? 'None' : '$_pendingLeaveCount pending',
+            caption: 'Leave',
+          ),
+          Container(
+            width: 1,
+            height: 28,
+            color: AppColors.border.withValues(alpha: 0.7),
+          ),
+          stat(
+            icon: Icons.campaign_rounded,
+            color: _announcementUnread > 0
+                ? AppColors.accent
+                : AppColors.textHint,
+            value: _announcementUnread == 0 ? 'All read' : '$_announcementUnread new',
+            caption: 'Notices',
+          ),
         ],
       ),
     );
   }
 
+  // ── Quick access section ─────────────────────────────────────────────────
+
+  Widget _quickAccessSection(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        const gap = 10.0;
+        // 3 columns on all phones → 6 tiles in 2 rows → fits on one screen
+        final crossAxisCount = w >= 720 ? 4 : 3;
+        // Slightly taller than wide to fit icon + label comfortably
+        const aspect = 1.02;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Slim stat strip (uses stored state — no 'now' needed)
+            _statStrip(),
+            const SizedBox(height: 16),
+            // Section heading — compact single line
+            Row(
+              children: [
+                const Text(
+                  'Quick access',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: -0.4,
+                    height: 1.1,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '6 tools',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textHint,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            GridView.count(
+              crossAxisCount: crossAxisCount,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: gap,
+              crossAxisSpacing: gap,
+              childAspectRatio: aspect,
+              children: [
+                EmployeeQuickAccessTile(
+                  label: 'Leave',
+                  subLabel: 'Balance & history',
+                  semanticAction:
+                      'Opens leave — annual balance, sick leave, and emergency leave.',
+                  icon: Icons.event_available_rounded,
+                  accentColor: AppColors.teal,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const LeaveTab(),
+                    ),
+                  ),
+                ),
+                EmployeeQuickAccessTile(
+                  label: 'Claim',
+                  subLabel: 'Expenses',
+                  semanticAction: 'Opens expense claims and receipt uploads.',
+                  icon: Icons.receipt_long_rounded,
+                  accentColor: AppColors.orange,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ClaimsScreen(),
+                    ),
+                  ),
+                ),
+                EmployeeQuickAccessTile(
+                  label: 'Payroll',
+                  subLabel: 'Payslips',
+                  semanticAction:
+                      'Opens your payslip history and PDF downloads.',
+                  icon: Icons.payments_rounded,
+                  accentColor: AppColors.violet,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const EmployeePayrollHistoryScreen(),
+                    ),
+                  ),
+                ),
+                EmployeeQuickAccessTile(
+                  label: 'Notices',
+                  subLabel: 'Announcements',
+                  semanticAction:
+                      'Company-wide notices posted by administrators.',
+                  icon: Icons.campaign_rounded,
+                  accentColor: AppColors.accent,
+                  badgeCount:
+                      _announcementUnread > 0 ? _announcementUnread : null,
+                  onTap: () async {
+                    await Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AnnouncementsScreen(),
+                      ),
+                    );
+                    if (mounted) await _refreshAnnouncementBadge();
+                  },
+                ),
+                EmployeeQuickAccessTile(
+                  label: 'Calendar',
+                  subLabel: 'Attendance',
+                  semanticAction: 'Opens your attendance calendar.',
+                  icon: Icons.calendar_month_rounded,
+                  accentColor: AppColors.indigo,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AttendanceHistoryScreen(),
+                    ),
+                  ),
+                ),
+                EmployeeQuickAccessTile(
+                  label: 'Help',
+                  subLabel: 'HR & IT support',
+                  semanticAction:
+                      'Opens help topics, contact HR or IT, and copy diagnostics.',
+                  icon: Icons.support_agent_rounded,
+                  accentColor: AppColors.sky,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const HelpSupportScreen(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
 }

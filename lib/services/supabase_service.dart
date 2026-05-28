@@ -848,6 +848,37 @@ class SupabaseService {
     return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
   }
 
+  /// Returns the first approved leave covering [today] for [userId], or null.
+  /// Far lighter than [getMyLeaveRequests] — sends only a 1-row date-filtered
+  /// query instead of up to 400 rows.
+  static Future<LeaveRequest?> getApprovedLeaveForToday(
+    String userId,
+    DateTime today,
+  ) async {
+    final dateStr = _dateString(today);
+    final data = await client
+        .from('leave_requests')
+        .select(_leaveListSelect)
+        .eq('user_id', userId)
+        .eq('status', 'approved')
+        .lte('start_date', dateStr)
+        .gte('end_date', dateStr)
+        .limit(1);
+    if (data.isEmpty) return null;
+    return LeaveRequest.fromMap(data.first);
+  }
+
+  /// Count of pending leave requests for [userId].
+  static Future<int> getPendingLeaveCountForUser(String userId) async {
+    final res = await client
+        .from('leave_requests')
+        .select()
+        .eq('user_id', userId)
+        .eq('status', 'pending')
+        .count(CountOption.exact);
+    return res.count;
+  }
+
   /// Paginated leave history with optional type + status filters.
   static Future<List<LeaveRequest>> getMyLeaveRequestsPage(
     String userId, {
@@ -1098,20 +1129,23 @@ class SupabaseService {
       );
       final cid = claim.id;
 
-      for (final file in files) {
-        final path = await uploadClaimAttachment(
+      // Upload all attachments in parallel then insert their DB rows.
+      final paths = await Future.wait(
+        files.map((file) => uploadClaimAttachment(
           userId: userId,
           claimId: cid,
           file: file,
-        );
-        uploadedPaths.add(path);
-        await insertClaimAttachmentRow(
+        )),
+      );
+      uploadedPaths.addAll(paths);
+      await Future.wait(
+        List.generate(files.length, (i) => insertClaimAttachmentRow(
           claimId: cid,
-          storagePath: path,
-          originalName: file.name,
-          byteSize: file.size > 0 ? file.size : null,
-        );
-      }
+          storagePath: paths[i],
+          originalName: files[i].name,
+          byteSize: files[i].size > 0 ? files[i].size : null,
+        )),
+      );
 
       final detail = await getExpenseClaimById(cid);
       if (detail == null) throw Exception('Could not load submitted claim');
@@ -1183,11 +1217,12 @@ class SupabaseService {
   }
 
   static Future<int> getPendingExpenseClaimCount() async {
-    final data = await client
+    final res = await client
         .from('expense_claims')
-        .select('id')
-        .eq('status', 'pending');
-    return (data as List).length;
+        .select()
+        .eq('status', 'pending')
+        .count(CountOption.exact);
+    return res.count;
   }
 
   static Future<void> updateExpenseClaimStatus({
@@ -1222,11 +1257,12 @@ class SupabaseService {
   }
 
   static Future<int> getPendingLeaveRequestCount() async {
-    final data = await client
+    final res = await client
         .from('leave_requests')
-        .select('id')
-        .eq('status', 'pending');
-    return (data as List).length;
+        .select()
+        .eq('status', 'pending')
+        .count(CountOption.exact);
+    return res.count;
   }
 
   static Future<List<LeaveRequest>> getApprovedLeavesByMonth(
@@ -1445,12 +1481,13 @@ class SupabaseService {
   }
 
   static Future<int> getUnreadNotificationCount(String userId) async {
-    final data = await client
+    final res = await client
         .from('app_notifications')
-        .select('id')
+        .select()
         .eq('user_id', userId)
-        .eq('is_read', false);
-    return data.length;
+        .eq('is_read', false)
+        .count(CountOption.exact);
+    return res.count;
   }
 
   static Future<void> markNotificationRead(String notificationId) async {
@@ -1491,12 +1528,12 @@ class SupabaseService {
   static Future<int> getCompanyAnnouncementCountAfter(
     DateTime? afterUtc,
   ) async {
-    var query = client.from('company_announcements').select('id');
+    var query = client.from('company_announcements').select();
     if (afterUtc != null) {
       query = query.gt('created_at', afterUtc.toUtc().toIso8601String());
     }
-    final data = await query;
-    return data.length;
+    final res = await query.count(CountOption.exact);
+    return res.count;
   }
 
   static Future<CompanyAnnouncement> createCompanyAnnouncement({

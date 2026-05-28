@@ -29,9 +29,9 @@ class ApplyLeaveScreen extends StatefulWidget {
     this.annualOnly = false,
     this.otherLeaveOnly = false,
   }) : assert(
-          !(annualOnly && otherLeaveOnly),
-          'Cannot set both annualOnly and otherLeaveOnly',
-        );
+         !(annualOnly && otherLeaveOnly),
+         'Cannot set both annualOnly and otherLeaveOnly',
+       );
 
   final bool annualOnly;
   final bool otherLeaveOnly;
@@ -135,25 +135,25 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     });
   }
 
-  List<DropdownMenuItem<String>> get _otherLeaveMenuItems =>
-      LeaveCatalog.orderedOtherTypes
-          .map(
-            (t) => DropdownMenuItem<String>(
-              value: t,
-              child: Text(LeaveCatalog.displayName(t)),
-            ),
-          )
-          .toList();
+  List<DropdownMenuItem<String>> get _otherLeaveMenuItems => LeaveCatalog
+      .orderedOtherTypes
+      .map(
+        (t) => DropdownMenuItem<String>(
+          value: t,
+          child: Text(LeaveCatalog.displayName(t)),
+        ),
+      )
+      .toList();
 
-  List<DropdownMenuItem<String>> get _allLeaveMenuItems =>
-      LeaveCatalog.orderedAllTypes
-          .map(
-            (t) => DropdownMenuItem<String>(
-              value: t,
-              child: Text(LeaveCatalog.displayName(t)),
-            ),
-          )
-          .toList();
+  List<DropdownMenuItem<String>> get _allLeaveMenuItems => LeaveCatalog
+      .orderedAllTypes
+      .map(
+        (t) => DropdownMenuItem<String>(
+          value: t,
+          child: Text(LeaveCatalog.displayName(t)),
+        ),
+      )
+      .toList();
 
   Future<void> _pickDate({required bool isStart}) async {
     final now = AppTime.malaysiaNow();
@@ -258,12 +258,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       );
       final filtered = result
           .where(
-            (c) => LeaveTimeConflict.conflictsWith(
-              _leaveType,
-              start,
-              end,
-              c,
-            ),
+            (c) => LeaveTimeConflict.conflictsWith(_leaveType, start, end, c),
           )
           .toList();
       if (!mounted) return;
@@ -367,10 +362,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       if (balErr != null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(balErr),
-            backgroundColor: AppColors.danger,
-          ),
+          SnackBar(content: Text(balErr), backgroundColor: AppColors.danger),
         );
         return;
       }
@@ -436,8 +428,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
           _annualOnly
               ? 'Apply for annual leave'
               : _otherLeaveOnly
-                  ? 'Apply for other leave'
-                  : 'Apply for leave',
+              ? 'Apply for other leave'
+              : 'Apply for leave',
         ),
       ),
       body: SingleChildScrollView(
@@ -523,7 +515,10 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                           ButtonSegment(
                             value: _AnnualLeaveKind.full,
                             label: Text('Full day'),
-                            icon: Icon(Icons.event_available_outlined, size: 18),
+                            icon: Icon(
+                              Icons.event_available_outlined,
+                              size: 18,
+                            ),
                           ),
                           ButtonSegment(
                             value: _AnnualLeaveKind.halfAm,
@@ -758,13 +753,16 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
               FilledButton(
                 onPressed: _submitting ? null : _submit,
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
+                  backgroundColor: AppColors.teal,
+                  foregroundColor: AppColors.onBrand,
+                  minimumSize: const Size.fromHeight(44),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
                 child: _submitting
@@ -880,7 +878,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                           fontSize: 12.5,
                           height: 1.35,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary.withValues(alpha: 0.95),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.95,
+                          ),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -890,11 +890,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(
-                                e.$1,
-                                size: 18,
-                                color: AppColors.primary,
-                              ),
+                              Icon(e.$1, size: 18, color: AppColors.primary),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -958,8 +954,12 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
           ...years.map((y) {
             final s = _summaryByYear[y];
             if (s == null) return const SizedBox.shrink();
-            final need =
-                LeaveCatalog.annualCreditInYear(_leaveType, start, end, y);
+            final need = LeaveCatalog.annualCreditInYear(
+              _leaveType,
+              start,
+              end,
+              y,
+            );
             if (need <= 0) return const SizedBox.shrink();
             final ok = need <= s.remaining + 1e-6;
             final needLabel = fmt(need);
@@ -1182,8 +1182,11 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         children: [
           Row(
             children: [
-              const Icon(Icons.warning_amber_rounded,
-                  size: 18, color: AppColors.danger),
+              const Icon(
+                Icons.warning_amber_rounded,
+                size: 18,
+                color: AppColors.danger,
+              ),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
@@ -1217,10 +1220,13 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('• ',
-                      style: TextStyle(
-                          color: AppColors.danger,
-                          fontWeight: FontWeight.w700)),
+                  const Text(
+                    '• ',
+                    style: TextStyle(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                   Expanded(
                     child: Text(
                       '${c.leaveTypeDisplay} — $range ($statusLabel)',

@@ -232,51 +232,43 @@ class _LeaveTabState extends State<LeaveTab> {
         title: const Text('Leave'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: Tooltip(
-              message: _section == _LeaveHomeSection.annual
-                  ? 'Apply for annual leave'
-                  : 'Apply for other leave',
-              child: FilledButton.icon(
-                onPressed: _loading ? null : _openApply,
-                icon: const Icon(
-                  Icons.add_rounded,
-                  size: 16,
-                  color: AppColors.onBrand,
-                ),
-                label: Text(
-                  _section == _LeaveHomeSection.annual
-                      ? 'Apply annual'
-                      : 'Apply other',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                    color: AppColors.onBrand,
-                  ),
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primaryDark,
-                  foregroundColor: AppColors.onBrand,
-                  disabledBackgroundColor: AppColors.primaryDark.withValues(
-                    alpha: 0.45,
-                  ),
-                  disabledForegroundColor: AppColors.onBrand.withValues(
-                    alpha: 0.7,
-                  ),
-                  elevation: 0,
-                  shadowColor: Colors.transparent,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.only(
-                    left: 8,
-                    right: 10,
-                    top: 5,
-                    bottom: 5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+            padding: const EdgeInsets.only(right: 12),
+            child: Center(
+              child: Tooltip(
+                message: _section == _LeaveHomeSection.annual
+                    ? 'Apply for annual leave'
+                    : 'Apply for other leave',
+                child: SizedBox(
+                  height: 32,
+                  child: FilledButton.icon(
+                    onPressed: _loading ? null : _openApply,
+                    icon: const Icon(Icons.add_rounded, size: 14),
+                    label: const Text(
+                      'Apply',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.1,
+                      ),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.teal,
+                      foregroundColor: AppColors.onBrand,
+                      disabledBackgroundColor: AppColors.teal.withValues(
+                        alpha: 0.75,
+                      ),
+                      disabledForegroundColor: AppColors.onBrand,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      minimumSize: Size.zero,
+                      fixedSize: const Size(72, 32),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -876,7 +868,7 @@ class _LeaveTabState extends State<LeaveTab> {
     final s = _summary;
     final used = s?.used;
     final ent = s?.entitlement;
-    final usedHeroStr = used == null
+    final usedStr = used == null
         ? '—'
         : used == used.roundToDouble()
         ? '${used.round()}'
@@ -906,13 +898,13 @@ class _LeaveTabState extends State<LeaveTab> {
         : null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.divider),
           boxShadow: AppElevation.cardOnSurface,
         ),
@@ -920,77 +912,66 @@ class _LeaveTabState extends State<LeaveTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    gradient: AppGradients.sky,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.sky.withValues(alpha: 0.25),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.beach_access_rounded,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: usedHeroStr,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                height: 1.05,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            TextSpan(
-                              text: ' / $entStr',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                height: 1.05,
-                                color: AppColors.textPrimary.withValues(
-                                  alpha: 0.88,
-                                ),
-                              ),
-                            ),
-                            const TextSpan(
-                              text: ' days',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
+                      Text(
+                        'Annual leave balance',
+                        style: AppTypography.employeeCardOverline(
+                          AppColors.textSecondary.withValues(alpha: 0.8),
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 6),
                       Text(
-                        'Used / entitlement · Rem $remStr · Pend $pendStr',
+                        'Leave year $_leaveYear',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          height: 1.16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.35,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withValues(alpha: 0.58),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        remStr,
+                        style: const TextStyle(
+                          fontSize: 23,
+                          height: 1,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.8,
+                          color: AppColors.primaryDark,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'left',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary.withValues(
-                            alpha: 0.95,
-                          ),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryDark.withValues(alpha: 0.78),
                         ),
                       ),
                     ],
@@ -999,7 +980,7 @@ class _LeaveTabState extends State<LeaveTab> {
               ],
             ),
             if (usedRatio != null) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
@@ -1010,12 +991,32 @@ class _LeaveTabState extends State<LeaveTab> {
                 ),
               ),
             ],
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _detailTag(
+                  icon: Icons.assignment_turned_in_outlined,
+                  label: '$usedStr used',
+                ),
+                _detailTag(
+                  icon: Icons.event_available_outlined,
+                  label: '$entStr entitlement',
+                ),
+                _detailTag(
+                  icon: Icons.hourglass_top_rounded,
+                  label: '$pendStr pending',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Text(
-              'Leave year $_leaveYear (Malaysia calendar)',
+              'Balances update after HR approval.',
               style: TextStyle(
-                fontSize: 10.5,
-                color: AppColors.textHint.withValues(alpha: 0.95),
+                fontSize: 11.5,
+                height: 1.3,
+                color: AppColors.textSecondary.withValues(alpha: 0.9),
                 fontWeight: FontWeight.w600,
               ),
             ),

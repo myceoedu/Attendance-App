@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../constants/app_theme.dart';
 
-/// Premium grid shortcut: equal-height cells, centered label, soft icon well.
+/// Centered-portrait shortcut card — icon on top, label below.
+/// Designed for a 3-column grid so the whole workspace section fits on-screen.
 class EmployeeQuickAccessTile extends StatelessWidget {
   const EmployeeQuickAccessTile({
     super.key,
@@ -12,20 +12,21 @@ class EmployeeQuickAccessTile extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.accentColor = AppColors.primary,
+    this.subLabel = '',
     this.badgeCount,
   });
 
   final String label;
+  final String subLabel;
   final String semanticAction;
   final IconData icon;
   final VoidCallback onTap;
   final Color accentColor;
-  /// If non-null and positive, a small red count is drawn on the icon.
+
+  /// If non-null and positive, a small red badge is drawn on the icon.
   final int? badgeCount;
 
-  static const double _radius = 18;
-
-  Color get _iconColor => Color.lerp(accentColor, AppColors.textPrimary, 0.2)!;
+  static const double _radius = 16;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +34,12 @@ class EmployeeQuickAccessTile extends StatelessWidget {
     final semanticLabel = bc > 0
         ? '$label, $bc new. $semanticAction'
         : '$label. $semanticAction';
+
+    final iconEnd = Color.lerp(accentColor, Colors.white, 0.25)!;
+    final cardBg = Color.alphaBlend(
+      accentColor.withValues(alpha: 0.07),
+      Colors.white,
+    );
 
     return Semantics(
       button: true,
@@ -45,61 +52,81 @@ class EmployeeQuickAccessTile extends StatelessWidget {
           clipBehavior: Clip.none,
           borderRadius: BorderRadius.circular(_radius),
           child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
+            onTap: onTap,
             borderRadius: BorderRadius.circular(_radius),
-            splashColor: accentColor.withValues(alpha: 0.09),
-            highlightColor: accentColor.withValues(alpha: 0.04),
+            splashColor: accentColor.withValues(alpha: 0.12),
+            highlightColor: accentColor.withValues(alpha: 0.05),
             child: Ink(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: cardBg,
                 borderRadius: BorderRadius.circular(_radius),
                 border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.08),
+                  color: accentColor.withValues(alpha: 0.2),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryDark.withValues(alpha: 0.06),
-                    blurRadius: 20,
-                    offset: const Offset(0, 6),
-                    spreadRadius: -8,
+                    color: accentColor.withValues(alpha: 0.16),
+                    blurRadius: 18,
+                    offset: const Offset(0, 5),
+                    spreadRadius: -5,
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 10, 6, 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
+                    // ── Gradient icon well + badge ─────────────────────
                     Stack(
+                      alignment: Alignment.center,
                       clipBehavior: Clip.none,
                       children: [
                         Container(
-                          width: 44,
-                          height: 44,
+                          width: 42,
+                          height: 42,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(12),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [accentColor, iconEnd],
+                            ),
+                            borderRadius: BorderRadius.circular(13),
+                            boxShadow: [
+                              BoxShadow(
+                                color: accentColor.withValues(alpha: 0.42),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                                spreadRadius: -4,
+                              ),
+                            ],
                           ),
                           child: Icon(
                             icon,
-                            color: _iconColor,
-                            size: 24,
+                            color: Colors.white,
+                            size: 21,
                           ),
                         ),
                         if (bc > 0)
                           Positioned(
-                            right: 2,
-                            top: 2,
+                            right: -4,
+                            top: -4,
                             child: Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 5,
                                 vertical: 1,
                               ),
-                              constraints: const BoxConstraints(minWidth: 17),
+                              constraints: const BoxConstraints(minWidth: 18),
                               decoration: BoxDecoration(
                                 color: Colors.red,
                                 borderRadius: BorderRadius.circular(999),
@@ -122,18 +149,36 @@ class EmployeeQuickAccessTile extends StatelessWidget {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Expanded(
-                      child: Center(
-                        child: Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.quickAccessTileLabel(),
-                        ),
+                    const SizedBox(height: 10),
+                    // ── Label ─────────────────────────────────────────
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
+                        height: 1.1,
                       ),
                     ),
+                    if (subLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textHint,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

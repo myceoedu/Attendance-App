@@ -83,33 +83,21 @@ class _EmployeeShellState extends State<EmployeeShell> {
             child: _pages[_index],
           ),
         ),
-        bottomNavigationBar: DecoratedBox(
-          decoration: BoxDecoration(
-            color: AppColors.navigationBarBackground,
-            border: Border(
-              top: BorderSide(color: AppColors.navigationBarTopLine),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.4),
-                blurRadius: 18,
-                offset: const Offset(0, -4),
-                spreadRadius: -2,
-              ),
-            ],
-          ),
-          child: _EmployeeBottomNavBar(
-            currentIndex: _index,
-            onChanged: _goToTab,
-          ),
+        bottomNavigationBar: _EmployeeBottomNavBar(
+          currentIndex: _index,
+          onChanged: _goToTab,
         ),
       ),
     );
   }
 }
 
-/// [NavigationBar] shared by all platforms — matches [AdminShell] and avoids
-/// gradient/shadow compositing issues on Android emulators and Flutter web.
+/// Custom bottom navigation bar — fully hand-drawn to avoid NavigationBar
+/// compositing glitches while still matching the brand.
+///
+/// Layout: [Home] [Clock (elevated)] [Profile]
+/// The Clock button floats above the bar with a teal gradient disc so it
+/// stands out as the primary action.
 class _EmployeeBottomNavBar extends StatelessWidget {
   const _EmployeeBottomNavBar({
     required this.currentIndex,
@@ -119,104 +107,163 @@ class _EmployeeBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onChanged;
 
+  static const _items = ['Home', 'Clock', 'Profile'];
+  static const _icons = [
+    Icons.dashboard_outlined,
+    Icons.punch_clock_outlined,
+    Icons.person_outline_rounded,
+  ];
+  static const _selectedIcons = [
+    Icons.dashboard_rounded,
+    Icons.punch_clock_rounded,
+    Icons.person_rounded,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final base = Theme.of(context);
-    return Theme(
-      data: base.copyWith(
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: AppColors.navigationBarBackground,
-          indicatorColor: AppColors.brandIndicator,
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          height: AppLayout.navBarHeight,
-          shadowColor: Colors.transparent,
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return TextStyle(
-              fontSize: 11,
-              letterSpacing: 0.15,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppColors.onBrand : AppColors.onBrandMuted,
-            );
-          }),
-          iconTheme: WidgetStateProperty.resolveWith((states) {
-            final selected = states.contains(WidgetState.selected);
-            return IconThemeData(
-              color: selected ? AppColors.onBrand : AppColors.onBrandFaint,
-              size: 24,
-            );
-          }),
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F2255),
+        border: Border(
+          top: BorderSide(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
         ),
-      ),
-      child: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: onChanged,
-        backgroundColor: AppColors.navigationBarBackground,
-        surfaceTintColor: Colors.transparent,
-        indicatorColor: AppColors.brandIndicator,
-        shadowColor: Colors.transparent,
-        elevation: 0,
-        height: AppLayout.navBarHeight,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: const _EmployeeClockNavIcon(selected: false),
-            selectedIcon: const _EmployeeClockNavIcon(selected: true),
-            label: 'Clock',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F2255).withValues(alpha: 0.5),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
+            spreadRadius: -2,
           ),
         ],
       ),
-    );
-  }
-}
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: AppLayout.navBarHeight - bottomInset,
+          child: Row(
+            children: List.generate(_items.length, (i) {
+              final selected = currentIndex == i;
+              final isClock = i == 1;
 
-/// Center tab on brand bar: outlined when idle; selected = white disc + primary icon.
-class _EmployeeClockNavIcon extends StatelessWidget {
-  const _EmployeeClockNavIcon({required this.selected});
+              if (isClock) {
+                // Elevated teal Clock button
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => onChanged(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Color(0xFF2DD4BF),
+                                Color(0xFF0D9488),
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF0D9488).withValues(
+                                  alpha: 0.55,
+                                ),
+                                blurRadius: 18,
+                                offset: const Offset(0, 4),
+                                spreadRadius: -2,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            selected
+                                ? Icons.punch_clock_rounded
+                                : Icons.punch_clock_outlined,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Clock',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: selected
+                                ? const Color(0xFF2DD4BF)
+                                : Colors.white.withValues(alpha: 0.6),
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
 
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 50,
-      height: 50,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? AppColors.onBrand : Colors.transparent,
-        border: Border.all(
-          color: selected
-              ? AppColors.onBrand
-              : AppColors.onBrand.withValues(alpha: 0.35),
-          width: 1.35,
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.22),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                  spreadRadius: -2,
+              // Home & Profile tabs
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => onChanged(i),
+                  behavior: HitTestBehavior.opaque,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: selected ? 44 : 40,
+                        height: selected ? 32 : 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? Colors.white.withValues(alpha: 0.14)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          selected ? _selectedIcons[i] : _icons[i],
+                          color: selected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.5),
+                          size: selected ? 23 : 22,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _items[i],
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: selected
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.5),
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ]
-            : null,
-      ),
-      child: Icon(
-        selected ? Icons.punch_clock_rounded : Icons.punch_clock_outlined,
-        color: selected ? AppColors.primaryDark : AppColors.onBrand,
-        size: selected ? 26 : 24,
+              );
+            }),
+          ),
+        ),
       ),
     );
   }
