@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -110,7 +111,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
             tooltip: 'Monthly summary',
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
+                AppRoute(
                   builder: (_) => const MonthlyAttendanceScreen(),
                 ),
               );
@@ -121,7 +122,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
             tooltip: 'Employee calendar',
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
+                AppRoute(
                   builder: (_) => const EmployeeAttendanceCalendarScreen(),
                 ),
               );

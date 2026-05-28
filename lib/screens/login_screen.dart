@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/app_route.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
@@ -787,7 +788,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                       Navigator.of(
                                                         context,
                                                       ).push(
-                                                        MaterialPageRoute<void>(
+                                                        AppRoute(
                                                           builder: (_) =>
                                                               const ForgotPasswordScreen(),
                                                         ),
@@ -861,7 +862,7 @@ class _LoginScreenState extends State<LoginScreen>
                                                 ? null
                                                 : () {
                                                     Navigator.of(context).push(
-                                                      MaterialPageRoute<void>(
+                                                      AppRoute(
                                                         builder: (_) =>
                                                             const RegisterScreen(),
                                                       ),

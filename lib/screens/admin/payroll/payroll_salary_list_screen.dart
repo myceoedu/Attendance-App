@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/app_route.dart';
 
 import '../../../constants/app_theme.dart';
 import '../../../models/app_user.dart';
@@ -131,7 +132,7 @@ class _PayrollSalaryListScreenState extends State<PayrollSalaryListScreen> {
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () async {
                           await Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
+                            AppRoute(
                               builder: (_) => PayrollSalaryEditScreen(
                                 user: u,
                                 existing: s,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_route.dart';
 import 'package:flutter/services.dart';
 
 import '../../constants/app_theme.dart';
@@ -62,7 +63,7 @@ class AdminLeaveHubScreen extends StatelessWidget {
                   'annual leave balance in one place.',
               onTap: () {
                 Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
+                  AppRoute(
                     builder: (_) => const AdminLeaveEmployeePickerScreen(),
                   ),
                 );
@@ -81,7 +82,7 @@ class AdminLeaveHubScreen extends StatelessWidget {
                   'person. Ideal for approvals and triage.',
               onTap: () {
                 Navigator.of(context).push<void>(
-                  MaterialPageRoute<void>(
+                  AppRoute(
                     builder: (_) => const LeaveManagementScreen(),
                   ),
                 );

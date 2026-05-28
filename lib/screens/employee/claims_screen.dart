@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -99,7 +100,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
           await Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const SubmitClaimScreen()),
+            AppRoute(builder: (_) => const SubmitClaimScreen()),
           );
           if (mounted) _load(showSpinner: false);
         },
@@ -181,7 +182,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                                       borderRadius: BorderRadius.circular(16),
                                       onTap: () {
                                         Navigator.of(context).push<void>(
-                                          MaterialPageRoute<void>(
+                                          AppRoute(
                                             builder: (_) => ClaimDetailScreen(
                                               claimId: c.id,
                                             ),

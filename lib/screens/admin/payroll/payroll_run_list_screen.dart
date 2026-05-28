@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/app_route.dart';
 import 'package:intl/intl.dart';
 
 import '../../../constants/app_theme.dart';
@@ -160,7 +161,7 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
       if (existing != null) {
         if (!mounted) return;
         await Navigator.of(context).push<void>(
-          MaterialPageRoute<void>(
+          AppRoute(
             builder: (_) => PayrollRunDetailScreen(runId: existing.id),
           ),
         );
@@ -175,7 +176,7 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
       );
       if (!mounted) return;
       await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
+        AppRoute(
           builder: (_) => PayrollRunDetailScreen(runId: run.id),
         ),
       );
@@ -305,7 +306,7 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                                       Icons.chevron_right_rounded),
                                   onTap: () async {
                                     await Navigator.of(context).push<void>(
-                                      MaterialPageRoute<void>(
+                                      AppRoute(
                                         builder: (_) => PayrollRunDetailScreen(
                                           runId: r.id,
                                         ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_route.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -867,7 +868,7 @@ class _ProfileTabState extends State<ProfileTab> {
                         ),
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute<void>(
+                            AppRoute(
                               builder: (_) =>
                                   const EmployeePayrollHistoryScreen(),
                             ),
@@ -890,7 +891,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     onCancel: () => _cancelEdit(user),
                     onHelpSupport: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => HelpSupportScreen(
                             adminView: user.isAdmin,
                           ),
@@ -899,7 +900,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     },
                     onChangePassword: () {
                       Navigator.of(context).push(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => const ChangePasswordScreen(),
                         ),
                       );

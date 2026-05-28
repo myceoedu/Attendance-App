@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -366,7 +367,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                   tooltip: 'History',
                   onPressed: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(
+                      AppRoute(
                         builder: (_) => const AttendanceHistoryScreen(),
                       ),
                     );
@@ -848,7 +849,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       child: InkWell(
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute<void>(
+            AppRoute(
               builder: (_) => const EmployeeAttendanceLogScreen(),
             ),
           );

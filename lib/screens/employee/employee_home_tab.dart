@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -623,7 +624,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                     child: InkWell(
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute<void>(
+                          AppRoute(
                             builder: (_) => const EmployeeAttendanceLogScreen(),
                           ),
                         );
@@ -972,7 +973,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   icon: Icons.event_available_rounded,
                   accentColor: AppColors.teal,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const LeaveTab(),
                     ),
                   ),
@@ -984,7 +985,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   icon: Icons.receipt_long_rounded,
                   accentColor: AppColors.orange,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const ClaimsScreen(),
                     ),
                   ),
@@ -997,7 +998,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   icon: Icons.payments_rounded,
                   accentColor: AppColors.violet,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const EmployeePayrollHistoryScreen(),
                     ),
                   ),
@@ -1013,7 +1014,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       _announcementUnread > 0 ? _announcementUnread : null,
                   onTap: () async {
                     await Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
+                      AppRoute(
                         builder: (_) => const AnnouncementsScreen(),
                       ),
                     );
@@ -1027,7 +1028,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   icon: Icons.calendar_month_rounded,
                   accentColor: AppColors.indigo,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const AttendanceHistoryScreen(),
                     ),
                   ),
@@ -1040,7 +1041,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   icon: Icons.support_agent_rounded,
                   accentColor: AppColors.sky,
                   onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const HelpSupportScreen(),
                     ),
                   ),

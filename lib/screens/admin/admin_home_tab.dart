@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -635,7 +636,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 showDot: pendingLeaves > 0,
                 onTap: () {
                   Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const AdminLeaveHubScreen(),
                     ),
                   );
@@ -653,7 +654,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGlowColor: AppColors.indigo,
                 onTap: () {
                   Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const PayrollHubScreen(),
                     ),
                   );
@@ -704,7 +705,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 showDot: pendingClaims > 0,
                 onTap: () {
                   Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const ClaimManagementScreen(),
                     ),
                   );
@@ -722,7 +723,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGlowColor: AppColors.violet,
                 onTap: () {
                   Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const AdminAnnouncementsScreen(),
                     ),
                   );
@@ -744,7 +745,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGlowColor: AppColors.sky,
                 onTap: () {
                   Navigator.of(context).push<void>(
-                    MaterialPageRoute<void>(
+                    AppRoute(
                       builder: (_) => const HelpSupportScreen(adminView: true),
                     ),
                   );

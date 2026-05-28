@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -213,7 +214,7 @@ class _LeaveTabState extends State<LeaveTab> {
   Future<void> _openApply() async {
     await Navigator.push<void>(
       context,
-      MaterialPageRoute<void>(
+      AppRoute(
         builder: (_) => _section == _LeaveHomeSection.annual
             ? const ApplyLeaveScreen(annualOnly: true)
             : const ApplyLeaveScreen(otherLeaveOnly: true),

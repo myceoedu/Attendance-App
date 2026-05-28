@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -71,7 +72,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
         IconButton(
           onPressed: () async {
             await Navigator.of(context).push(
-              MaterialPageRoute<void>(
+              AppRoute(
                 builder: (_) => const NotificationsScreen(),
               ),
             );

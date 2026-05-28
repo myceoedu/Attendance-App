@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_route.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/app_user.dart';
@@ -73,7 +74,7 @@ class _AdminLeaveEmployeePickerScreenState
 
   void _onSelect(AppUser employee) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
+      AppRoute(
         builder: (_) =>
             LeaveManagementScreen(initialEmployeeId: employee.id),
       ),

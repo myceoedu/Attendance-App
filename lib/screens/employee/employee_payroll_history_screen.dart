@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_route.dart';
 import 'package:intl/intl.dart';
 
 import '../../constants/app_theme.dart';
@@ -133,7 +134,7 @@ class _EmployeePayrollHistoryScreenState
                               child: InkWell(
                                 onTap: () {
                                   Navigator.of(context).push<void>(
-                                    MaterialPageRoute<void>(
+                                    AppRoute(
                                       builder: (_) =>
                                           EmployeePayslipDetailScreen(
                                         run: e.run,

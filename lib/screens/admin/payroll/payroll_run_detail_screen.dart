@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/app_route.dart';
 import 'package:intl/intl.dart';
 
 import '../../../constants/app_theme.dart';
@@ -310,7 +311,7 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () async {
                     await Navigator.of(context).push<void>(
-                      MaterialPageRoute<void>(
+                      AppRoute(
                         builder: (_) => PayrollItemDetailScreen(itemId: e.id, run: run),
                       ),
                     );

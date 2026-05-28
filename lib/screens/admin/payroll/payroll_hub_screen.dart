@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/app_route.dart';
 import 'package:intl/intl.dart';
 
 import '../../../constants/app_theme.dart';
@@ -117,7 +118,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     subtitle: 'Create period, calculate, approve, mark paid',
                     onTap: () async {
                       await Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => const PayrollRunListScreen(),
                         ),
                       );
@@ -131,7 +132,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     subtitle: 'Basic pay, allowances, bank & statutory flags',
                     onTap: () async {
                       await Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => const PayrollSalaryListScreen(),
                         ),
                       );
@@ -145,7 +146,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     subtitle: 'EPF, SOCSO, EIS — effective-dated',
                     onTap: () async {
                       await Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => const PayrollStatutoryScreen(),
                         ),
                       );
@@ -158,7 +159,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     subtitle: 'Liabilities, totals, export',
                     onTap: () {
                       Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
+                        AppRoute(
                           builder: (_) => const PayrollReportsScreen(),
                         ),
                       );

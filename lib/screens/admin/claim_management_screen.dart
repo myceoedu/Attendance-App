@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -240,7 +241,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
                                         borderRadius: BorderRadius.circular(16),
                                         onTap: () {
                                           Navigator.of(context).push<void>(
-                                            MaterialPageRoute<void>(
+                                            AppRoute(
                                               builder: (_) => ClaimDetailScreen(
                                                 claimId: c.id,
                                               ),
