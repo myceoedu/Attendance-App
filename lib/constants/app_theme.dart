@@ -185,6 +185,18 @@ abstract class AppGradients {
     end: Alignment.bottomRight,
   );
 
+  /// Login / register screens — deep navy → brand blue.
+  static const LinearGradient authBackground = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [
+      Color(0xFF0B1D4A),
+      Color(0xFF0F2255),
+      Color(0xFF1A3A8F),
+    ],
+    stops: [0.0, 0.45, 1.0],
+  );
+
   /// Admin dashboard header — indigo / violet (not employee [brandHeader] blue).
   static const LinearGradient adminBrandHeader = LinearGradient(
     begin: Alignment.topLeft,

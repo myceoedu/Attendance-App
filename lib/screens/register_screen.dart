@@ -81,11 +81,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF1E3A8A), Color(0xFF1A56DB), Color(0xFF3B82F6)],
-          ),
+          gradient: AppGradients.authBackground,
         ),
         child: SafeArea(
           child: Column(

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io' show File;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/app_notification.dart';
 import '../models/app_user.dart';
@@ -762,29 +763,13 @@ class SupabaseService {
     final safe = _sanitizeFileName(name);
     final objectPath = '$userId/${DateTime.now().millisecondsSinceEpoch}_$safe';
 
-    if (file.bytes != null) {
-      if (file.bytes!.length > _maxAttachmentBytes) {
-        throw Exception('File too large (max 5 MB)');
-      }
-      await client.storage
-          .from(_leaveAttachmentsBucket)
-          .uploadBinary(
-            objectPath,
-            file.bytes!,
-            fileOptions: const FileOptions(upsert: false),
-          );
-    } else if (file.path != null) {
-      final f = File(file.path!);
-      final len = await f.length();
-      if (len > _maxAttachmentBytes) {
-        throw Exception('File too large (max 5 MB)');
-      }
-      await client.storage
-          .from(_leaveAttachmentsBucket)
-          .upload(objectPath, f, fileOptions: const FileOptions(upsert: false));
-    } else {
-      throw Exception('Could not read the file. Pick again.');
-    }
+    await _uploadPlatformFileToBucket(
+      bucket: _leaveAttachmentsBucket,
+      objectPath: objectPath,
+      file: file,
+      maxBytes: _maxAttachmentBytes,
+      sizeErrorMessage: 'File too large (max 5 MB)',
+    );
 
     return objectPath;
   }
@@ -808,6 +793,54 @@ class SupabaseService {
   static String _sanitizeFileName(String name) {
     final base = name.replaceAll('\\', '/').split('/').last;
     return base.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  }
+
+  /// On web, [PlatformFile.path] must never be read — use [PlatformFile.bytes].
+  static bool _platformFileHasData(PlatformFile file) {
+    if (file.bytes != null) return true;
+    if (kIsWeb) return false;
+    return file.path != null;
+  }
+
+  static Future<void> _uploadPlatformFileToBucket({
+    required String bucket,
+    required String objectPath,
+    required PlatformFile file,
+    required int maxBytes,
+    required String sizeErrorMessage,
+  }) async {
+    final bytes = file.bytes;
+    if (bytes != null) {
+      if (bytes.length > maxBytes) {
+        throw Exception(sizeErrorMessage);
+      }
+      await client.storage.from(bucket).uploadBinary(
+            objectPath,
+            bytes,
+            fileOptions: const FileOptions(upsert: false),
+          );
+      return;
+    }
+
+    if (kIsWeb) {
+      throw Exception('Could not read the file. Pick again with data enabled.');
+    }
+
+    final path = file.path;
+    if (path == null) {
+      throw Exception('Could not read the file. Pick again.');
+    }
+
+    final f = File(path);
+    final fileLen = await f.length();
+    if (fileLen > maxBytes) {
+      throw Exception(sizeErrorMessage);
+    }
+    await client.storage.from(bucket).upload(
+          objectPath,
+          f,
+          fileOptions: const FileOptions(upsert: false),
+        );
   }
 
   static Future<LeaveRequest> applyLeave({
@@ -987,11 +1020,8 @@ class SupabaseService {
     } else if (len > 0 && len > maxClaimAttachmentBytes) {
       throw Exception('Each file must be 10 MB or smaller');
     }
-    if (file.bytes == null && file.path == null) {
+    if (!_platformFileHasData(file)) {
       throw Exception('Could not read the file. Pick again with data enabled.');
-    }
-    if (file.path != null && file.bytes == null) {
-      // Size from picker may be 0 on some platforms — actual check happens in upload.
     }
   }
 
@@ -1007,29 +1037,13 @@ class SupabaseService {
     final objectPath =
         '$userId/$claimId/${DateTime.now().millisecondsSinceEpoch}_$safe';
 
-    if (file.bytes != null) {
-      if (file.bytes!.length > maxClaimAttachmentBytes) {
-        throw Exception('Each file must be 10 MB or smaller');
-      }
-      await client.storage
-          .from(_claimAttachmentsBucket)
-          .uploadBinary(
-            objectPath,
-            file.bytes!,
-            fileOptions: const FileOptions(upsert: false),
-          );
-    } else if (file.path != null) {
-      final f = File(file.path!);
-      final fileLen = await f.length();
-      if (fileLen > maxClaimAttachmentBytes) {
-        throw Exception('Each file must be 10 MB or smaller');
-      }
-      await client.storage
-          .from(_claimAttachmentsBucket)
-          .upload(objectPath, f, fileOptions: const FileOptions(upsert: false));
-    } else {
-      throw Exception('Could not read the file. Pick again.');
-    }
+    await _uploadPlatformFileToBucket(
+      bucket: _claimAttachmentsBucket,
+      objectPath: objectPath,
+      file: file,
+      maxBytes: maxClaimAttachmentBytes,
+      sizeErrorMessage: 'Each file must be 10 MB or smaller',
+    );
 
     return objectPath;
   }

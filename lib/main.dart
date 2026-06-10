@@ -52,7 +52,7 @@ class _SupabaseBootstrapAppState extends State<_SupabaseBootstrapApp> {
 
   Future<void> _initSupabase() async {
     try {
-      await Supabase.initialize(
+       await Supabase.initialize(
         url: AppConfig.supabaseUrl,
         anonKey: AppConfig.supabaseAnonKey,
       );
