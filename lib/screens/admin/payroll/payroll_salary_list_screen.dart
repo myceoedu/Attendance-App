@@ -131,15 +131,14 @@ class _PayrollSalaryListScreenState extends State<PayrollSalaryListScreen> {
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () async {
-                          await Navigator.of(context).push<void>(
-                            AppRoute(
-                              builder: (_) => PayrollSalaryEditScreen(
-                                user: u,
-                                existing: s,
-                              ),
+                          await pushAppPage(
+                            context,
+                            PayrollSalaryEditScreen(
+                              user: u,
+                              existing: s,
                             ),
                           );
-                          _load();
+                          if (mounted) _load();
                         },
                       ),
                     ),

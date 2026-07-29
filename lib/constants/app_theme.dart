@@ -466,6 +466,18 @@ ThemeData buildAppTheme() {
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.surface,
     canvasColor: AppColors.surface,
+    // Instant transitions for any MaterialPageRoute leftovers (AppRoute
+    // already uses zero-duration on web).
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: _InstantPageTransitionsBuilder(),
+        TargetPlatform.iOS: _InstantPageTransitionsBuilder(),
+        TargetPlatform.linux: _InstantPageTransitionsBuilder(),
+        TargetPlatform.macOS: _InstantPageTransitionsBuilder(),
+        TargetPlatform.windows: _InstantPageTransitionsBuilder(),
+        TargetPlatform.fuchsia: _InstantPageTransitionsBuilder(),
+      },
+    ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: AppColors.primary,
       circularTrackColor: AppColors.divider.withValues(alpha: 0.6),
@@ -554,4 +566,20 @@ ThemeData buildAppTheme() {
       actionTextColor: AppColors.primaryLight,
     ),
   );
+}
+
+/// No animation — keeps Back / system pops from hitching while pages dispose.
+class _InstantPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _InstantPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
+  }
 }

@@ -310,12 +310,11 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
                   subtitle: Text('Net ${money.format(e.netSalary)}'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () async {
-                    await Navigator.of(context).push<void>(
-                      AppRoute(
-                        builder: (_) => PayrollItemDetailScreen(itemId: e.id, run: run),
-                      ),
+                    await pushAppPage(
+                      context,
+                      PayrollItemDetailScreen(itemId: e.id, run: run),
                     );
-                    _load();
+                    if (mounted) _load();
                   },
                 ),
               ),

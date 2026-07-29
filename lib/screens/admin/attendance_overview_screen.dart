@@ -115,22 +115,14 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
         actions: [
           IconButton(
             tooltip: 'Monthly summary',
-            onPressed: () {
-              Navigator.of(
-                context,
-              ).push(AppRoute(builder: (_) => const MonthlyAttendanceScreen()));
-            },
+            onPressed: () =>
+                pushAppPage(context, const MonthlyAttendanceScreen()),
             icon: const Icon(Icons.calendar_month_outlined),
           ),
           IconButton(
             tooltip: 'Employee calendar',
-            onPressed: () {
-              Navigator.of(context).push(
-                AppRoute(
-                  builder: (_) => const EmployeeAttendanceCalendarScreen(),
-                ),
-              );
-            },
+            onPressed: () =>
+                pushAppPage(context, const EmployeeAttendanceCalendarScreen()),
             icon: const Icon(Icons.calendar_view_month_outlined),
           ),
         ],

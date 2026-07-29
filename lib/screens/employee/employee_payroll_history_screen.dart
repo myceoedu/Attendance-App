@@ -133,13 +133,11 @@ class _EmployeePayrollHistoryScreenState
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
                                 onTap: () {
-                                  Navigator.of(context).push<void>(
-                                    AppRoute(
-                                      builder: (_) =>
-                                          EmployeePayslipDetailScreen(
-                                        run: e.run,
-                                        item: e.item,
-                                      ),
+                                  pushAppPage(
+                                    context,
+                                    EmployeePayslipDetailScreen(
+                                      run: e.run,
+                                      item: e.item,
                                     ),
                                   );
                                 },

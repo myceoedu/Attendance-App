@@ -160,12 +160,11 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
       final existing = await SupabaseService.getPayrollRunForPeriod(y, m);
       if (existing != null) {
         if (!mounted) return;
-        await Navigator.of(context).push<void>(
-          AppRoute(
-            builder: (_) => PayrollRunDetailScreen(runId: existing.id),
-          ),
+        await pushAppPage(
+          context,
+          PayrollRunDetailScreen(runId: existing.id),
         );
-        _load();
+        if (mounted) _load();
         return;
       }
       final stat = await SupabaseService.getLatestPayrollStatutoryConfig();
@@ -175,12 +174,11 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
         statutoryConfigId: stat?.id,
       );
       if (!mounted) return;
-      await Navigator.of(context).push<void>(
-        AppRoute(
-          builder: (_) => PayrollRunDetailScreen(runId: run.id),
-        ),
+      await pushAppPage(
+        context,
+        PayrollRunDetailScreen(runId: run.id),
       );
-      _load();
+      if (mounted) _load();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -305,14 +303,11 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                                   trailing: const Icon(
                                       Icons.chevron_right_rounded),
                                   onTap: () async {
-                                    await Navigator.of(context).push<void>(
-                                      AppRoute(
-                                        builder: (_) => PayrollRunDetailScreen(
-                                          runId: r.id,
-                                        ),
-                                      ),
+                                    await pushAppPage(
+                                      context,
+                                      PayrollRunDetailScreen(runId: r.id),
                                     );
-                                    _load();
+                                    if (mounted) _load();
                                   },
                                 ),
                               );

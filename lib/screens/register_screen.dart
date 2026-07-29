@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../constants/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../utils/app_route.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -89,7 +90,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => popApp(context),
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
                 ),
               ),
@@ -141,7 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
                                 decoration: const InputDecoration(
-                                  hintText: 'you@company.com',
+                                  hintText: 'you@gmail.com',
                                   prefixIcon:
                                       Icon(Icons.email_outlined, size: 20),
                                 ),
@@ -165,7 +166,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 textInputAction: TextInputAction.next,
                                 autocorrect: false,
                                 decoration: const InputDecoration(
-                                  hintText: 'e.g. AHMAD FAIZ',
+                                  hintText: 'e.g. your.name',
                                   prefixIcon:
                                       Icon(Icons.alternate_email, size: 20),
                                 ),

@@ -338,7 +338,7 @@ class _FormCard extends StatelessWidget {
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
                   decoration: const InputDecoration(
-                    hintText: 'AHMAD FAIZ or you@company.com',
+                    hintText: 'you@gmail.com or username',
                     prefixIcon: Icon(
                       Icons.person_outline_rounded,
                       size: 18,

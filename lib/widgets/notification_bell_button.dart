@@ -71,12 +71,8 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
       children: [
         IconButton(
           onPressed: () async {
-            await Navigator.of(context).push(
-              AppRoute(
-                builder: (_) => const NotificationsScreen(),
-              ),
-            );
-            _load();
+            await pushAppPage(context, const NotificationsScreen());
+            if (mounted) _load();
           },
           icon: Icon(Icons.notifications_none, color: widget.iconColor),
           tooltip: 'Notifications',

@@ -395,11 +395,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               actions: [
                 IconButton(
                   tooltip: 'History',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      AppRoute(builder: (_) => const AttendanceHistoryScreen()),
-                    );
-                  },
+                  onPressed: () =>
+                      pushAppPage(context, const AttendanceHistoryScreen()),
                   icon: const Icon(Icons.history),
                 ),
                 const SizedBox(width: 4),
@@ -883,11 +880,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          Navigator.of(
-            context,
-          ).push(AppRoute(builder: (_) => const EmployeeAttendanceLogScreen()));
-        },
+        onTap: () =>
+            pushAppPage(context, const EmployeeAttendanceLogScreen()),
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(

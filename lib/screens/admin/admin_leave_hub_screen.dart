@@ -61,13 +61,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
               subtitle:
                   'Pick someone from the directory. See their requests and '
                   'annual leave balance in one place.',
-              onTap: () {
-                Navigator.of(context).push<void>(
-                  AppRoute(
-                    builder: (_) => const AdminLeaveEmployeePickerScreen(),
-                  ),
-                );
-              },
+              onTap: () =>
+                  pushAppPage(context, const AdminLeaveEmployeePickerScreen()),
             ),
             const SizedBox(height: 14),
             _HubPathCard(
@@ -80,13 +75,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
               subtitle:
                   'Every employee in one inbox — filter by status, type, or '
                   'person. Ideal for approvals and triage.',
-              onTap: () {
-                Navigator.of(context).push<void>(
-                  AppRoute(
-                    builder: (_) => const LeaveManagementScreen(),
-                  ),
-                );
-              },
+              onTap: () =>
+                  pushAppPage(context, const LeaveManagementScreen()),
             ),
           ],
         ),

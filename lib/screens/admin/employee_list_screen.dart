@@ -67,8 +67,9 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
   }
 
   Future<void> _openEditor(AppUser e) async {
-    final ok = await Navigator.of(context).push<bool>(
-      AppRoute<bool>(builder: (_) => AdminEmployeeEditScreen(employee: e)),
+    final ok = await pushAppPage<bool>(
+      context,
+      AdminEmployeeEditScreen(employee: e),
     );
     if (ok == true && mounted) {
       setState(() => _loading = true);

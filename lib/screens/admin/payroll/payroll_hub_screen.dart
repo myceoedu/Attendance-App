@@ -117,12 +117,8 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     title: 'Payroll runs',
                     subtitle: 'Create period, calculate, approve, mark paid',
                     onTap: () async {
-                      await Navigator.of(context).push<void>(
-                        AppRoute(
-                          builder: (_) => const PayrollRunListScreen(),
-                        ),
-                      );
-                      _load();
+                      await pushAppPage(context, const PayrollRunListScreen());
+                      if (mounted) _load();
                     },
                   ),
                   _actionTile(
@@ -131,12 +127,11 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     title: 'Employee salaries',
                     subtitle: 'Basic pay, allowances, bank & statutory flags',
                     onTap: () async {
-                      await Navigator.of(context).push<void>(
-                        AppRoute(
-                          builder: (_) => const PayrollSalaryListScreen(),
-                        ),
+                      await pushAppPage(
+                        context,
+                        const PayrollSalaryListScreen(),
                       );
-                      _load();
+                      if (mounted) _load();
                     },
                   ),
                   _actionTile(
@@ -145,10 +140,9 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     title: 'Statutory rates',
                     subtitle: 'EPF, SOCSO, EIS — effective-dated',
                     onTap: () async {
-                      await Navigator.of(context).push<void>(
-                        AppRoute(
-                          builder: (_) => const PayrollStatutoryScreen(),
-                        ),
+                      await pushAppPage(
+                        context,
+                        const PayrollStatutoryScreen(),
                       );
                     },
                   ),
@@ -158,11 +152,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     title: 'Reports',
                     subtitle: 'Liabilities, totals, export',
                     onTap: () {
-                      Navigator.of(context).push<void>(
-                        AppRoute(
-                          builder: (_) => const PayrollReportsScreen(),
-                        ),
-                      );
+                      pushAppPage(context, const PayrollReportsScreen());
                     },
                   ),
                   const SizedBox(height: 24),

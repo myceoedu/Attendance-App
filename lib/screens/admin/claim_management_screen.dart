@@ -242,12 +242,9 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
                                       child: InkWell(
                                         borderRadius: BorderRadius.circular(16),
                                         onTap: () {
-                                          Navigator.of(context).push<void>(
-                                            AppRoute(
-                                              builder: (_) => ClaimDetailScreen(
-                                                claimId: c.id,
-                                              ),
-                                            ),
+                                          pushAppPage(
+                                            context,
+                                            ClaimDetailScreen(claimId: c.id),
                                           );
                                         },
                                         child: Padding(

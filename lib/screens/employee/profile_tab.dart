@@ -866,14 +866,10 @@ class _ProfileTabState extends State<ProfileTab> {
                           color:
                               AppColors.textHint.withValues(alpha: 0.85),
                         ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            AppRoute(
-                              builder: (_) =>
-                                  const EmployeePayrollHistoryScreen(),
-                            ),
-                          );
-                        },
+                        onTap: () => pushAppPage(
+                          context,
+                          const EmployeePayrollHistoryScreen(),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -890,20 +886,13 @@ class _ProfileTabState extends State<ProfileTab> {
                     onSave: _save,
                     onCancel: () => _cancelEdit(user),
                     onHelpSupport: () {
-                      Navigator.of(context).push(
-                        AppRoute(
-                          builder: (_) => HelpSupportScreen(
-                            adminView: user.isAdmin,
-                          ),
-                        ),
+                      pushAppPage(
+                        context,
+                        HelpSupportScreen(adminView: user.isAdmin),
                       );
                     },
                     onChangePassword: () {
-                      Navigator.of(context).push(
-                        AppRoute(
-                          builder: (_) => const ChangePasswordScreen(),
-                        ),
-                      );
+                      pushAppPage(context, const ChangePasswordScreen());
                     },
                     onDownloadPdf: () => _exportPdf(user),
                     onSignOut: () =>
