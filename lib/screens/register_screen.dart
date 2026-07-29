@@ -31,13 +31,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   static String? _validateUsername(String? v) {
-    if (v == null || v.trim().length < 3) {
-      return 'At least 3 characters';
-    }
-    if (v.length > 24) return 'Max 24 characters';
-    final re = RegExp(r'^[a-zA-Z0-9_]+$');
-    if (!re.hasMatch(v.trim())) {
-      return 'Letters, numbers, underscore only';
+    final t = (v ?? '').trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (t.length < 3) return 'At least 3 characters';
+    if (t.length > 64) return 'Max 64 characters';
+    // Letters (any language), numbers, spaces, and common name punctuation.
+    if (!RegExp(r"^[\p{L}\p{N} .'_\-]+$", unicode: true).hasMatch(t)) {
+      return 'Use letters, numbers, spaces, or . \' - _';
     }
     return null;
   }
@@ -166,7 +165,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 textInputAction: TextInputAction.next,
                                 autocorrect: false,
                                 decoration: const InputDecoration(
-                                  hintText: 'e.g. Putra_Muhaimin',
+                                  hintText: 'e.g. AHMAD FAIZ',
                                   prefixIcon:
                                       Icon(Icons.alternate_email, size: 20),
                                 ),

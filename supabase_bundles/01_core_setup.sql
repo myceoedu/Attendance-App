@@ -1,6 +1,20 @@
 -- ============================================================
+-- BUNDLE 1 — Core setup
+-- Bundle for NEW Supabase project setup
+-- Run order step: 1 of 7
+-- Source files (in order):
+--   - supabase_setup.sql
+-- Idempotent where possible (safe to re-run after a partial failure).
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- BEGIN: supabase_setup.sql
+-- ------------------------------------------------------------
+
+-- ============================================================
 -- SUPABASE DATABASE SETUP
--- Run this in Supabase Dashboard → SQL Editor → New Query
+-- Run this in Supabase Dashboard â†’ SQL Editor â†’ New Query
 -- ============================================================
 
 -- 1. USERS TABLE (profile data, linked to auth.users)
@@ -150,7 +164,7 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
 
 
 -- ============================================================
--- USERNAME LOGIN (resolve username → email for Supabase Auth)
+-- USERNAME LOGIN (resolve username â†’ email for Supabase Auth)
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.get_email_for_login(p_username text)
 RETURNS text
@@ -186,8 +200,8 @@ GRANT EXECUTE ON FUNCTION public.is_username_available(text) TO anon, authentica
 
 
 -- ============================================================
--- STORAGE: Leave attachments (MC / doctor notes — PDF or images)
--- Dashboard → Storage → Create bucket "leave-attachments" (private) if INSERT fails.
+-- STORAGE: Leave attachments (MC / doctor notes â€” PDF or images)
+-- Dashboard â†’ Storage â†’ Create bucket "leave-attachments" (private) if INSERT fails.
 -- ============================================================
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('leave-attachments', 'leave-attachments', false)
@@ -582,7 +596,7 @@ BEGIN
 END
 $pub$;
 
--- Alternative: Dashboard → Database → Publications → supabase_realtime → add tables.
+-- Alternative: Dashboard â†’ Database â†’ Publications â†’ supabase_realtime â†’ add tables.
 
 
 -- ============================================================
@@ -590,3 +604,9 @@ $pub$;
 -- Replace 'YOUR_ADMIN_USER_UUID' with the actual auth user id
 -- ============================================================
 -- UPDATE public.users SET role = 'admin' WHERE id = 'YOUR_ADMIN_USER_UUID';
+
+
+-- ------------------------------------------------------------
+-- END: supabase_setup.sql
+-- ------------------------------------------------------------
+

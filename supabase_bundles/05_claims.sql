@@ -1,4 +1,18 @@
 -- ============================================================
+-- BUNDLE 5 — Expense claims
+-- Bundle for NEW Supabase project setup
+-- Run order step: 5 of 7
+-- Source files (in order):
+--   - supabase_migration_expense_claims.sql
+-- Idempotent where possible (safe to re-run after a partial failure).
+-- ============================================================
+
+
+-- ------------------------------------------------------------
+-- BEGIN: supabase_migration_expense_claims.sql
+-- ------------------------------------------------------------
+
+-- ============================================================
 -- MIGRATION: Expense claims + attachments + Storage bucket
 -- Run in Supabase SQL Editor after core setup.
 -- ============================================================
@@ -146,3 +160,9 @@ BEGIN
   END IF;
 END
 $pub$;
+
+
+-- ------------------------------------------------------------
+-- END: supabase_migration_expense_claims.sql
+-- ------------------------------------------------------------
+

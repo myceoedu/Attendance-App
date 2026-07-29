@@ -9,6 +9,7 @@ import '../../models/attendance.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
+import '../../utils/async_load_guard.dart';
 import '../../utils/debouncer.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/status_chip.dart';
@@ -32,6 +33,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   RealtimeChannel? _attendanceChannel;
   final TextEditingController _searchCtrl = TextEditingController();
   final Debouncer _searchDebounce = Debouncer();
+  final _loadGuard = AsyncLoadGuard();
   String _statusFilter = 'all';
 
   @override
@@ -45,6 +47,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
 
   @override
   void dispose() {
+    _loadGuard.invalidate();
     _searchDebounce.dispose();
     _searchCtrl.dispose();
     _realtimeDebounce?.cancel();
@@ -65,17 +68,18 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final data = await SupabaseService.getTodayAllAttendance();
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _records = data;
         _loading = false;
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _loading = false;
         _error = 'Failed to load: $e';
@@ -112,11 +116,9 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
           IconButton(
             tooltip: 'Monthly summary',
             onPressed: () {
-              Navigator.of(context).push(
-                AppRoute(
-                  builder: (_) => const MonthlyAttendanceScreen(),
-                ),
-              );
+              Navigator.of(
+                context,
+              ).push(AppRoute(builder: (_) => const MonthlyAttendanceScreen()));
             },
             icon: const Icon(Icons.calendar_month_outlined),
           ),

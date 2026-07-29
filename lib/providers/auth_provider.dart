@@ -77,33 +77,42 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    _authSub = SupabaseService.client.auth.onAuthStateChange.listen((event) async {
+    _authSub = SupabaseService.client.auth.onAuthStateChange.listen((
+      event,
+    ) async {
       switch (event.event) {
         case AuthChangeEvent.signedIn:
         case AuthChangeEvent.userUpdated:
         case AuthChangeEvent.passwordRecovery:
-          _user = await SupabaseService.getCurrentUserProfile();
+          final fresh = await SupabaseService.getCurrentUserProfile();
+          final previous = _user;
+          _user = fresh;
           if (_user != null) {
             await SessionProfileCache.save(_user!);
           } else {
             await SessionProfileCache.clear();
           }
+          if (!_sameVisibleProfile(previous, _user)) {
+            notifyListeners();
+          }
           break;
         case AuthChangeEvent.tokenRefreshed:
           // Token silently refreshed — user identity unchanged.
           // Only fetch profile (and notify) if we somehow have no user yet.
-          if (_user != null) return; // nothing changed; skip rebuild
+          if (_user != null) return;
           _user = await SupabaseService.getCurrentUserProfile();
           if (_user != null) await SessionProfileCache.save(_user!);
+          notifyListeners();
           break;
         case AuthChangeEvent.signedOut:
+          if (_user == null) return;
           _user = null;
           await SessionProfileCache.clear();
+          notifyListeners();
           break;
         default:
           break;
       }
-      notifyListeners();
     });
 
     if (session != null && usedCache) {
@@ -117,12 +126,31 @@ class AuthProvider extends ChangeNotifier {
     if (fresh == null) {
       _user = null;
       await SessionProfileCache.clear();
-    } else {
-      _user = fresh;
-      await SessionProfileCache.save(fresh);
+      notifyListeners();
+      if (kDebugMode) StartupTiming.mark('auth_profile_refresh_done');
+      return;
     }
-    notifyListeners();
+    final previous = _user;
+    _user = fresh;
+    await SessionProfileCache.save(fresh);
+    if (!_sameVisibleProfile(previous, fresh)) {
+      notifyListeners();
+    }
     if (kDebugMode) StartupTiming.mark('auth_profile_refresh_done');
+  }
+
+  static bool _sameVisibleProfile(AppUser? a, AppUser? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    return a.id == b.id &&
+        a.role == b.role &&
+        a.name == b.name &&
+        a.email == b.email &&
+        a.username == b.username &&
+        a.phone == b.phone &&
+        a.jobTitle == b.jobTitle &&
+        a.department == b.department &&
+        a.employeeCode == b.employeeCode;
   }
 
   /// [identifier] is **username** or **email** (if it contains `@`).
@@ -181,7 +209,7 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         password: password,
         normalizedUsername: norm,
-        displayName: username.trim(),
+        displayName: norm,
       );
       if (res.session != null) {
         _user = await SupabaseService.getCurrentUserProfile();
@@ -215,10 +243,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> updateProfile({
-    required String name,
-    String? phone,
-  }) async {
+  Future<String?> updateProfile({required String name, String? phone}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return 'Name cannot be empty';
     try {

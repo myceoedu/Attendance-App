@@ -22,14 +22,20 @@ CREATE UNIQUE INDEX users_username_lower_idx
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_username text := lower(trim(COALESCE(NEW.raw_user_meta_data->>'username', '')));
+  -- Keep display form (spaces/case). Uniqueness is via lower(trim(username)).
+  v_username text := trim(both FROM regexp_replace(
+    COALESCE(NEW.raw_user_meta_data->>'username', ''),
+    '\s+',
+    ' ',
+    'g'
+  ));
   v_name text := COALESCE(
     NULLIF(trim(NEW.raw_user_meta_data->>'name'), ''),
     NULLIF(trim(NEW.raw_user_meta_data->>'username'), ''),
     ''
   );
 BEGIN
-  IF length(v_username) < 2 THEN
+  IF length(v_username) < 3 THEN
     RAISE EXCEPTION 'username required in user metadata';
   END IF;
   INSERT INTO public.users (id, email, name, username, role)

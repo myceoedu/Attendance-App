@@ -7,17 +7,13 @@ import 'attendance_overview_screen.dart';
 
 /// Lets [AdminHomeTab] jump to Attendance or Employees tabs.
 class AdminTabScope extends InheritedWidget {
-  const AdminTabScope({
-    super.key,
-    required this.goToTab,
-    required super.child,
-  });
+  const AdminTabScope({super.key, required this.goToTab, required super.child});
 
   final void Function(int index) goToTab;
 
   static void goToTabOf(BuildContext context, int index) {
-    final element =
-        context.getElementForInheritedWidgetOfExactType<AdminTabScope>();
+    final element = context
+        .getElementForInheritedWidgetOfExactType<AdminTabScope>();
     final scope = element?.widget as AdminTabScope?;
     scope?.goToTab(index);
   }
@@ -41,18 +37,29 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
+  final Set<int> _visited = {0};
+  final Map<int, Widget> _pages = {};
 
-  late final List<Widget> _pages = [
-    RepaintBoundary(child: const AdminHomeTab()),
-    RepaintBoundary(child: const AttendanceOverviewScreen()),
-    RepaintBoundary(child: const EmployeeListScreen()),
-  ];
+  Widget _pageFor(int i) {
+    switch (i) {
+      case 0:
+        return const RepaintBoundary(child: AdminHomeTab());
+      case 1:
+        return const RepaintBoundary(child: AttendanceOverviewScreen());
+      default:
+        return const RepaintBoundary(child: EmployeeListScreen());
+    }
+  }
+
+  Widget _ensurePage(int i) => _pages.putIfAbsent(i, () => _pageFor(i));
 
   void _goToTab(int raw) {
-    final next = raw < 0
-        ? 0
-        : (raw >= _pages.length ? _pages.length - 1 : raw);
-    setState(() => _index = next);
+    final next = raw < 0 ? 0 : (raw > 2 ? 2 : raw);
+    if (next == _index) return;
+    setState(() {
+      _visited.add(next);
+      _index = next;
+    });
   }
 
   @override
@@ -62,17 +69,21 @@ class _AdminShellState extends State<AdminShell> {
       goToTab: _goToTab,
       child: Scaffold(
         backgroundColor: AppColors.surface,
-        body: KeyedSubtree(
-          key: ValueKey<int>(_index),
-          child: _pages[_index],
+        body: IndexedStack(
+          index: _index,
+          sizing: StackFit.expand,
+          children: List<Widget>.generate(3, (i) {
+            if (!_visited.contains(i)) {
+              return const SizedBox.shrink();
+            }
+            return _ensurePage(i);
+          }),
         ),
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.adminNavBackground,
             border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.12),
-              ),
+              top: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
             ),
             boxShadow: [
               BoxShadow(
@@ -98,13 +109,17 @@ class _AdminShellState extends State<AdminShell> {
                     fontSize: 11,
                     letterSpacing: 0.15,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected ? AppColors.onBrand : AppColors.onBrandMuted,
+                    color: selected
+                        ? AppColors.onBrand
+                        : AppColors.onBrandMuted,
                   );
                 }),
                 iconTheme: WidgetStateProperty.resolveWith((states) {
                   final selected = states.contains(WidgetState.selected);
                   return IconThemeData(
-                    color: selected ? AppColors.onBrand : AppColors.onBrandFaint,
+                    color: selected
+                        ? AppColors.onBrand
+                        : AppColors.onBrandFaint,
                     size: 24,
                   );
                 }),

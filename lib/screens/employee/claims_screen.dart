@@ -1,5 +1,4 @@
 import 'dart:async';
-import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +10,8 @@ import '../../models/expense_claim.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/app_route.dart';
+import '../../utils/async_load_guard.dart';
 import '../../utils/error_messages.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/status_chip.dart';
@@ -33,6 +34,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
   String _statusFilter = 'all';
   Timer? _debounce;
   RealtimeChannel? _channel;
+  final _loadGuard = AsyncLoadGuard();
 
   @override
   void initState() {
@@ -45,6 +47,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
 
   @override
   void dispose() {
+    _loadGuard.invalidate();
     _debounce?.cancel();
     AppRealtime.disposeChannel(_channel);
     super.dispose();
@@ -66,18 +69,19 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final uid = context.read<AuthProvider>().user!.id;
       final data = await SupabaseService.getMyExpenseClaims(uid);
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _claims = data;
         _loading = false;
         _error = null;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _loading = false;
         _error = friendlyClaimError(e);
@@ -101,9 +105,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
       appBar: AppBar(title: const Text('Expense claims')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
-          await Navigator.of(context).push<void>(
-            AppRoute(builder: (_) => const SubmitClaimScreen()),
-          );
+          await pushAppPage(context, const SubmitClaimScreen());
           if (mounted) _load(showSpinner: false);
         },
         icon: const Icon(Icons.add),
@@ -182,15 +184,10 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                                     ),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(16),
-                                      onTap: () {
-                                        Navigator.of(context).push<void>(
-                                          AppRoute(
-                                            builder: (_) => ClaimDetailScreen(
-                                              claimId: c.id,
-                                            ),
-                                          ),
-                                        );
-                                      },
+                                      onTap: () => pushAppPage(
+                                        context,
+                                        ClaimDetailScreen(claimId: c.id),
+                                      ),
                                       child: Padding(
                                         padding: const EdgeInsets.all(16),
                                         child: Column(

@@ -1,6 +1,5 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/company_announcement.dart';
+import '../utils/prefs_cache.dart';
 import 'supabase_service.dart';
 
 /// Tracks the newest `created_at` the employee has **seen** in
@@ -28,12 +27,12 @@ class AnnouncementBadgeService {
           .map((e) => e.createdAt.toUtc())
           .reduce((a, b) => a.isAfter(b) ? a : b);
     }
-    final p = await SharedPreferences.getInstance();
+    final p = await PrefsCache.instance();
     await p.setInt(_prefsKey(userId), utc.microsecondsSinceEpoch);
   }
 
   static Future<DateTime?> _newestSeenCursorUtc(String userId) async {
-    final p = await SharedPreferences.getInstance();
+    final p = await PrefsCache.instance();
     final us = p.getInt(_prefsKey(userId));
     if (us == null) return null;
     return DateTime.fromMicrosecondsSinceEpoch(us, isUtc: true);

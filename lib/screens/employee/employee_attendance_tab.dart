@@ -14,6 +14,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
+import '../../utils/async_load_guard.dart';
 import '../../utils/error_messages.dart';
 import 'attendance_history_screen.dart';
 import 'employee_attendance_log_screen.dart';
@@ -42,18 +43,19 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   Attendance? _today;
   LeaveRequest? _todayApprovedLeave;
   bool _loading = true;
-  late Timer _ticker;
+  Timer? _ticker;
   Timer? _realtimeDebounce;
   RealtimeChannel? _channel;
   RealtimeChannel? _leaveChannel;
-  DateTime _now = AppTime.malaysiaNow();
+  final _loadGuard = AsyncLoadGuard();
+  late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
+    AppTime.malaysiaNow(),
+  );
 
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = AppTime.malaysiaNow());
-    });
+    _syncTicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
       _attachRealtime();
@@ -62,11 +64,25 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
 
   @override
   void dispose() {
-    _ticker.cancel();
+    _loadGuard.invalidate();
+    _ticker?.cancel();
     _realtimeDebounce?.cancel();
     AppRealtime.disposeChannel(_channel);
     AppRealtime.disposeChannel(_leaveChannel);
+    _now.dispose();
     super.dispose();
+  }
+
+  /// Live clock only while working (1s). Otherwise refresh once a minute.
+  void _syncTicker() {
+    _ticker?.cancel();
+    final working = _state == _AttendanceState.working;
+    _ticker = Timer.periodic(
+      working ? const Duration(seconds: 1) : const Duration(minutes: 1),
+      (_) {
+        if (mounted) _now.value = AppTime.malaysiaNow();
+      },
+    );
   }
 
   // ──────────────────────────────────────────────
@@ -108,6 +124,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final uid = context.read<AuthProvider>().user!.id;
@@ -115,14 +132,15 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
         SupabaseService.getTodayAttendance(uid),
         SupabaseService.getApprovedLeaveForDate(uid, AppTime.malaysiaNow()),
       ]);
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         final fetched = results[0] as Attendance?;
         final leave = results[1] as LeaveRequest?;
 
         if (fetched != null) {
           final cur = _today;
-          final staleWhileClockOut = cur != null &&
+          final staleWhileClockOut =
+              cur != null &&
               cur.id == fetched.id &&
               cur.clockOutTime != null &&
               fetched.clockOutTime == null &&
@@ -138,8 +156,10 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
         _todayApprovedLeave = leave;
         _loading = false;
       });
+      _now.value = AppTime.malaysiaNow();
+      _syncTicker();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() => _loading = false);
       _showError('Failed to load attendance: $e');
     }
@@ -165,7 +185,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       }
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
+          accuracy: LocationAccuracy.low,
+          timeLimit: Duration(seconds: 4),
         ),
       );
       return '${pos.latitude},${pos.longitude}';
@@ -194,8 +215,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     final nowUtc = DateTime.now().toUtc();
     final cal = AppTime.malaysiaNow();
     final optimistic = Attendance(
-      id:
-          '${Attendance.pendingLocalIdPrefix}${nowUtc.microsecondsSinceEpoch}',
+      id: '${Attendance.pendingLocalIdPrefix}${nowUtc.microsecondsSinceEpoch}',
       userId: uid,
       clockInTime: nowUtc,
       clockOutTime: null,
@@ -205,6 +225,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
 
     setState(() => _today = optimistic);
+    _now.value = AppTime.malaysiaNow();
+    _syncTicker();
     _showSuccess('Clocked in at ${_fmtTime(nowUtc)}');
 
     try {
@@ -214,9 +236,11 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       final record = await SupabaseService.clockIn(uid, location: location);
       if (!mounted) return;
       setState(() => _today = record);
+      _syncTicker();
     } catch (e) {
       if (!mounted) return;
       setState(() => _today = null);
+      _syncTicker();
       _showError(friendlyLeaveError(e));
     }
   }
@@ -250,15 +274,19 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
 
     setState(() => _today = optimistic);
+    _now.value = AppTime.malaysiaNow();
+    _syncTicker();
     _showSuccess('Clocked out at ${_fmtTime(nowUtc)}');
 
     try {
       final record = await SupabaseService.clockOut(snapshot.id);
       if (!mounted) return;
       setState(() => _today = record);
+      _syncTicker();
     } catch (e) {
       if (!mounted) return;
       setState(() => _today = snapshot);
+      _syncTicker();
       _showError(friendlyLeaveError(e));
     }
   }
@@ -267,10 +295,10 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   // Helpers
   // ──────────────────────────────────────────────
 
-  Duration _elapsed() {
+  Duration _elapsed([DateTime? now]) {
     final inTime = _today?.clockInTime;
     if (inTime == null) return Duration.zero;
-    final end = _today?.clockOutTime ?? DateTime.now().toUtc();
+    final end = _today?.clockOutTime ?? (now ?? DateTime.now().toUtc());
     return end.difference(inTime);
   }
 
@@ -369,9 +397,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                   tooltip: 'History',
                   onPressed: () {
                     Navigator.of(context).push(
-                      AppRoute(
-                        builder: (_) => const AttendanceHistoryScreen(),
-                      ),
+                      AppRoute(builder: (_) => const AttendanceHistoryScreen()),
                     );
                   },
                   icon: const Icon(Icons.history),
@@ -394,15 +420,25 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                             label: const Text('Refresh'),
                           ),
                         ),
-                        Text(
-                          dateFmt.format(_now),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                          ),
+                        ValueListenableBuilder<DateTime>(
+                          valueListenable: _now,
+                          builder: (context, now, _) {
+                            return Text(
+                              dateFmt.format(now),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(height: 14),
-                        _clockCard(timeFmt),
+                        ValueListenableBuilder<DateTime>(
+                          valueListenable: _now,
+                          builder: (context, now, _) {
+                            return _clockCard(timeFmt, now);
+                          },
+                        ),
                         const SizedBox(height: 18),
                         _stepIndicator(),
                         const SizedBox(height: 22),
@@ -418,9 +454,9 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
   }
 
-  Widget _clockCard(DateFormat timeFmt) {
+  Widget _clockCard(DateFormat timeFmt, DateTime now) {
     final state = _state;
-    final timeNow = timeFmt.format(_now);
+    final timeNow = timeFmt.format(now);
 
     final (String label, Color labelFg, Color labelBg) = switch (state) {
       _AttendanceState.blocked => (
@@ -478,9 +514,9 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               color: labelBg,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: labelFg.withValues(alpha: state == _AttendanceState.idle
-                    ? 0.35
-                    : 0.22),
+                color: labelFg.withValues(
+                  alpha: state == _AttendanceState.idle ? 0.35 : 0.22,
+                ),
               ),
             ),
             child: Text(
@@ -559,9 +595,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.22),
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -574,8 +608,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                   const SizedBox(width: 6),
                   Text(
                     state == _AttendanceState.done
-                        ? 'Worked: ${_fmtDuration(_elapsed())}'
-                        : 'Elapsed: ${_fmtDuration(_elapsed())}',
+                        ? 'Worked: ${_fmtDuration(_elapsed(now.toUtc()))}'
+                        : 'Elapsed: ${_fmtDuration(_elapsed(now.toUtc()))}',
                     style: const TextStyle(
                       color: AppColors.onBrand,
                       fontSize: 13,
@@ -850,11 +884,9 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          Navigator.of(context).push(
-            AppRoute(
-              builder: (_) => const EmployeeAttendanceLogScreen(),
-            ),
-          );
+          Navigator.of(
+            context,
+          ).push(AppRoute(builder: (_) => const EmployeeAttendanceLogScreen()));
         },
         borderRadius: BorderRadius.circular(18),
         child: Ink(
@@ -914,7 +946,9 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                         'View past clock-ins and clock-outs. Filter by date and status.',
                         style: TextStyle(
                           fontSize: 12.5,
-                          color: AppColors.textSecondary.withValues(alpha: 0.95),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.95,
+                          ),
                           height: 1.35,
                         ),
                       ),

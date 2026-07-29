@@ -34,8 +34,10 @@ class SupabaseService {
     return client.auth.signInWithPassword(email: email, password: password);
   }
 
-  /// Normalizes username for storage / lookup (lowercase, trimmed).
-  static String normalizeUsername(String raw) => raw.trim().toLowerCase();
+  /// Trims and collapses internal whitespace. Preserves case/spaces for display
+  /// (e.g. `AHMAD FAIZ`). Login RPCs match case-insensitively.
+  static String normalizeUsername(String raw) =>
+      raw.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   /// Login with **email** (if [identifier] contains `@`) or **username** (RPC → email).
   static Future<AuthResponse> signInWithIdentifier(
@@ -89,7 +91,10 @@ class SupabaseService {
     );
   }
 
-  static Future<void> signOut() => client.auth.signOut();
+  static Future<void> signOut() async {
+    _invalidateEmployeesCache();
+    await client.auth.signOut();
+  }
 
   static Future<void> sendPasswordResetEmail(String email) {
     return client.auth.resetPasswordForEmail(email.trim());
@@ -110,13 +115,26 @@ class SupabaseService {
       'emergency_contact_name,emergency_contact_relationship,'
       'emergency_contact_phone';
 
+  /// List/directory views do not need full HR columns — smaller payloads.
+  static const _appUserListSelect =
+      'id,username,name,email,role,phone,created_at,employment_start_date,'
+      'job_title,department,employee_code';
+
   static const _employeeCacheTtl = Duration(seconds: 45);
   static List<AppUser>? _employeesCache;
   static DateTime? _employeesCacheAt;
+  static Future<List<AppUser>>? _employeesInFlight;
+  static int? _employeeCountCache;
+  static DateTime? _employeeCountCacheAt;
+  static Future<int>? _employeeCountInFlight;
 
   static void _invalidateEmployeesCache() {
     _employeesCache = null;
     _employeesCacheAt = null;
+    _employeesInFlight = null;
+    _employeeCountCache = null;
+    _employeeCountCacheAt = null;
+    _employeeCountInFlight = null;
   }
 
   // ──────────────────────────────────────────────
@@ -146,15 +164,75 @@ class SupabaseService {
       if (fresh) return List<AppUser>.unmodifiable(cached);
     }
 
-    final data = await client
-        .from('users')
-        .select(_appUserSelect)
-        .eq('role', 'employee')
-        .order('name');
-    final employees = data.map<AppUser>((e) => AppUser.fromMap(e)).toList();
-    _employeesCache = employees;
-    _employeesCacheAt = DateTime.now();
-    return List<AppUser>.unmodifiable(employees);
+    final inFlight = _employeesInFlight;
+    if (!forceRefresh && inFlight != null) {
+      return inFlight;
+    }
+
+    final future = () async {
+      final data = await client
+          .from('users')
+          .select(_appUserListSelect)
+          .eq('role', 'employee')
+          .order('name');
+      final employees = data.map<AppUser>((e) => AppUser.fromMap(e)).toList();
+      _employeesCache = employees;
+      _employeesCacheAt = DateTime.now();
+      _employeeCountCache = employees.length;
+      _employeeCountCacheAt = _employeesCacheAt;
+      return List<AppUser>.unmodifiable(employees);
+    }();
+
+    _employeesInFlight = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_employeesInFlight, future)) {
+        _employeesInFlight = null;
+      }
+    }
+  }
+
+  /// Lightweight head-count for dashboards (avoids shipping full employee rows).
+  static Future<int> getEmployeeCount({bool forceRefresh = false}) async {
+    final cached = _employeeCountCache;
+    final cachedAt = _employeeCountCacheAt;
+    if (!forceRefresh && cached != null && cachedAt != null) {
+      final fresh = DateTime.now().difference(cachedAt) < _employeeCacheTtl;
+      if (fresh) return cached;
+    }
+
+    final employeesCached = _employeesCache;
+    final employeesCachedAt = _employeesCacheAt;
+    if (!forceRefresh &&
+        employeesCached != null &&
+        employeesCachedAt != null &&
+        DateTime.now().difference(employeesCachedAt) < _employeeCacheTtl) {
+      return employeesCached.length;
+    }
+
+    final inFlight = _employeeCountInFlight;
+    if (!forceRefresh && inFlight != null) return inFlight;
+
+    final future = () async {
+      final res = await client
+          .from('users')
+          .select('id')
+          .eq('role', 'employee')
+          .count(CountOption.exact);
+      _employeeCountCache = res.count;
+      _employeeCountCacheAt = DateTime.now();
+      return res.count;
+    }();
+
+    _employeeCountInFlight = future;
+    try {
+      return await future;
+    } finally {
+      if (identical(_employeeCountInFlight, future)) {
+        _employeeCountInFlight = null;
+      }
+    }
   }
 
   static Future<List<AppUser>> getAllUsers() async {
@@ -814,7 +892,9 @@ class SupabaseService {
       if (bytes.length > maxBytes) {
         throw Exception(sizeErrorMessage);
       }
-      await client.storage.from(bucket).uploadBinary(
+      await client.storage
+          .from(bucket)
+          .uploadBinary(
             objectPath,
             bytes,
             fileOptions: const FileOptions(upsert: false),
@@ -836,11 +916,9 @@ class SupabaseService {
     if (fileLen > maxBytes) {
       throw Exception(sizeErrorMessage);
     }
-    await client.storage.from(bucket).upload(
-          objectPath,
-          f,
-          fileOptions: const FileOptions(upsert: false),
-        );
+    await client.storage
+        .from(bucket)
+        .upload(objectPath, f, fileOptions: const FileOptions(upsert: false));
   }
 
   static Future<LeaveRequest> applyLeave({
@@ -905,7 +983,7 @@ class SupabaseService {
   static Future<int> getPendingLeaveCountForUser(String userId) async {
     final res = await client
         .from('leave_requests')
-        .select()
+        .select('id')
         .eq('user_id', userId)
         .eq('status', 'pending')
         .count(CountOption.exact);
@@ -1145,20 +1223,22 @@ class SupabaseService {
 
       // Upload all attachments in parallel then insert their DB rows.
       final paths = await Future.wait(
-        files.map((file) => uploadClaimAttachment(
-          userId: userId,
-          claimId: cid,
-          file: file,
-        )),
+        files.map(
+          (file) =>
+              uploadClaimAttachment(userId: userId, claimId: cid, file: file),
+        ),
       );
       uploadedPaths.addAll(paths);
       await Future.wait(
-        List.generate(files.length, (i) => insertClaimAttachmentRow(
-          claimId: cid,
-          storagePath: paths[i],
-          originalName: files[i].name,
-          byteSize: files[i].size > 0 ? files[i].size : null,
-        )),
+        List.generate(
+          files.length,
+          (i) => insertClaimAttachmentRow(
+            claimId: cid,
+            storagePath: paths[i],
+            originalName: files[i].name,
+            byteSize: files[i].size > 0 ? files[i].size : null,
+          ),
+        ),
       );
 
       final detail = await getExpenseClaimById(cid);
@@ -1233,7 +1313,7 @@ class SupabaseService {
   static Future<int> getPendingExpenseClaimCount() async {
     final res = await client
         .from('expense_claims')
-        .select()
+        .select('id')
         .eq('status', 'pending')
         .count(CountOption.exact);
     return res.count;
@@ -1273,7 +1353,7 @@ class SupabaseService {
   static Future<int> getPendingLeaveRequestCount() async {
     final res = await client
         .from('leave_requests')
-        .select()
+        .select('id')
         .eq('status', 'pending')
         .count(CountOption.exact);
     return res.count;
@@ -1497,7 +1577,7 @@ class SupabaseService {
   static Future<int> getUnreadNotificationCount(String userId) async {
     final res = await client
         .from('app_notifications')
-        .select()
+        .select('id')
         .eq('user_id', userId)
         .eq('is_read', false)
         .count(CountOption.exact);
@@ -1542,7 +1622,7 @@ class SupabaseService {
   static Future<int> getCompanyAnnouncementCountAfter(
     DateTime? afterUtc,
   ) async {
-    var query = client.from('company_announcements').select();
+    var query = client.from('company_announcements').select('id');
     if (afterUtc != null) {
       query = query.gt('created_at', afterUtc.toUtc().toIso8601String());
     }

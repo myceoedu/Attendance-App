@@ -12,10 +12,14 @@ import 'startup_timing.dart';
 import 'screens/login_screen.dart';
 import 'screens/employee/employee_shell.dart';
 import 'screens/admin/admin_shell.dart';
+import 'utils/web_url_cleanup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   StartupTiming.mark('binding_ready');
+
+  // Drop expired email-link error params before first paint (web).
+  clearAuthErrorQueryFromUrl();
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,

@@ -16,8 +16,8 @@ class EmployeeTabScope extends InheritedWidget {
   final void Function(int index) goToTab;
 
   static void goToTabOf(BuildContext context, int index) {
-    final element =
-        context.getElementForInheritedWidgetOfExactType<EmployeeTabScope>();
+    final element = context
+        .getElementForInheritedWidgetOfExactType<EmployeeTabScope>();
     final scope = element?.widget as EmployeeTabScope?;
     scope?.goToTab(index);
   }
@@ -31,12 +31,8 @@ class EmployeeTabScope extends InheritedWidget {
 /// in this route. Tab widgets must **not** nest another [Scaffold] (that layout
 /// breaks badly: full-viewport blue / empty body on many devices).
 ///
-/// Only the **active** tab is mounted (see [KeyedSubtree]) so inactive tabs do not
-/// keep timers, realtime channels, or heavy subtrees alive — better CPU and memory.
-///
-/// Bottom navigation is always [NavigationBar] (like [AdminShell]). A custom gradient
-/// bar with heavy shadows correlated with a full-viewport blue compositing glitch
-/// on some Android emulators and on Chrome; [NavigationBar] avoids that.
+/// Visited tabs stay mounted in an [IndexedStack] so switching back is instant
+/// (no reload spinner). Tabs are created lazily on first visit.
 class EmployeeShell extends StatefulWidget {
   const EmployeeShell({super.key});
 
@@ -51,22 +47,39 @@ class EmployeeShell extends StatefulWidget {
 
 class _EmployeeShellState extends State<EmployeeShell> {
   int _index = 0;
+  final Set<int> _visited = {0};
+  final Map<int, Widget> _pages = {};
 
   static const _homeKey = ValueKey<String>('employee_shell_home');
   static const _attendanceKey = ValueKey<String>('employee_shell_attendance');
   static const _profileKey = ValueKey<String>('employee_shell_profile');
 
-  late final List<Widget> _pages = [
-    RepaintBoundary(child: const EmployeeHomeTab(key: _homeKey)),
-    RepaintBoundary(child: const EmployeeAttendanceTab(key: _attendanceKey)),
-    RepaintBoundary(child: const ProfileTab(key: _profileKey)),
-  ];
+  Widget _pageFor(int i) {
+    switch (i) {
+      case 0:
+        return const RepaintBoundary(
+          child: EmployeeHomeTab(key: _homeKey),
+        );
+      case 1:
+        return const RepaintBoundary(
+          child: EmployeeAttendanceTab(key: _attendanceKey),
+        );
+      default:
+        return const RepaintBoundary(
+          child: ProfileTab(key: _profileKey),
+        );
+    }
+  }
+
+  Widget _ensurePage(int i) => _pages.putIfAbsent(i, () => _pageFor(i));
 
   void _goToTab(int raw) {
-    final next = raw < 0
-        ? 0
-        : (raw >= _pages.length ? _pages.length - 1 : raw);
-    setState(() => _index = next);
+    final next = raw < 0 ? 0 : (raw > 2 ? 2 : raw);
+    if (next == _index) return;
+    setState(() {
+      _visited.add(next);
+      _index = next;
+    });
   }
 
   @override
@@ -78,9 +91,15 @@ class _EmployeeShellState extends State<EmployeeShell> {
         backgroundColor: AppColors.surface,
         body: ColoredBox(
           color: AppColors.surface,
-          child: KeyedSubtree(
-            key: ValueKey<int>(_index),
-            child: _pages[_index],
+          child: IndexedStack(
+            index: _index,
+            sizing: StackFit.expand,
+            children: List<Widget>.generate(3, (i) {
+              if (!_visited.contains(i)) {
+                return const SizedBox.shrink();
+              }
+              return _ensurePage(i);
+            }),
           ),
         ),
         bottomNavigationBar: _EmployeeBottomNavBar(
@@ -127,9 +146,7 @@ class _EmployeeBottomNavBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF0F2255),
         border: Border(
-          top: BorderSide(
-            color: Colors.white.withValues(alpha: 0.1),
-          ),
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
         boxShadow: [
           BoxShadow(
@@ -152,65 +169,65 @@ class _EmployeeBottomNavBar extends StatelessWidget {
               if (isClock) {
                 // Elevated teal Clock button
                 return Expanded(
-                  child: GestureDetector(
-                    onTap: () => onChanged(i),
-                    behavior: HitTestBehavior.opaque,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: const LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Color(0xFF2DD4BF),
-                                Color(0xFF0D9488),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => onChanged(i),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF0D9488,
+                                  ).withValues(alpha: 0.55),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 4),
+                                  spreadRadius: -2,
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
                               ],
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF0D9488).withValues(
-                                  alpha: 0.55,
-                                ),
-                                blurRadius: 18,
-                                offset: const Offset(0, 4),
-                                spreadRadius: -2,
-                              ),
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            child: Icon(
+                              selected
+                                  ? Icons.punch_clock_rounded
+                                  : Icons.punch_clock_outlined,
+                              color: Colors.white,
+                              size: 26,
+                            ),
                           ),
-                          child: Icon(
-                            selected
-                                ? Icons.punch_clock_rounded
-                                : Icons.punch_clock_outlined,
-                            color: Colors.white,
-                            size: 26,
+                          const SizedBox(height: 4),
+                          Text(
+                            'Clock',
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              color: selected
+                                  ? const Color(0xFF2DD4BF)
+                                  : Colors.white.withValues(alpha: 0.6),
+                              letterSpacing: 0.1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Clock',
-                          style: TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.w500,
-                            color: selected
-                                ? const Color(0xFF2DD4BF)
-                                : Colors.white.withValues(alpha: 0.6),
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -218,46 +235,49 @@ class _EmployeeBottomNavBar extends StatelessWidget {
 
               // Home & Profile tabs
               return Expanded(
-                child: GestureDetector(
-                  onTap: () => onChanged(i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: selected ? 44 : 40,
-                        height: selected ? 32 : 32,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? Colors.white.withValues(alpha: 0.14)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => onChanged(i),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: selected ? 44 : 40,
+                          height: selected ? 32 : 32,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: selected
+                                ? Colors.white.withValues(alpha: 0.14)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            selected ? _selectedIcons[i] : _icons[i],
+                            color: selected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            size: selected ? 23 : 22,
+                          ),
                         ),
-                        child: Icon(
-                          selected ? _selectedIcons[i] : _icons[i],
-                          color: selected
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
-                          size: selected ? 23 : 22,
+                        const SizedBox(height: 4),
+                        Text(
+                          _items[i],
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: selected
+                                ? Colors.white
+                                : Colors.white.withValues(alpha: 0.5),
+                            letterSpacing: 0.1,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _items[i],
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: selected
-                              ? Colors.white
-                              : Colors.white.withValues(alpha: 0.5),
-                          letterSpacing: 0.1,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               );

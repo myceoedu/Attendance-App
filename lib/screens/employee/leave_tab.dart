@@ -12,6 +12,7 @@ import '../../models/leave_request.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
+import '../../utils/async_load_guard.dart';
 import '../../utils/leave_catalog.dart';
 import '../../widgets/status_chip.dart';
 import '../../widgets/empty_state.dart';
@@ -48,6 +49,7 @@ class _LeaveTabState extends State<LeaveTab> {
   _LeaveHomeSection _section = _LeaveHomeSection.annual;
   String _otherTypeFilter = 'all';
   late final ScrollController _listScrollController;
+  final _loadGuard = AsyncLoadGuard();
 
   List<String> get _queryLeaveTypes {
     if (_section == _LeaveHomeSection.annual) {
@@ -76,6 +78,7 @@ class _LeaveTabState extends State<LeaveTab> {
 
   @override
   void dispose() {
+    _loadGuard.invalidate();
     _listScrollController.removeListener(_onLeaveListScroll);
     _listScrollController.dispose();
     _realtimeDebounce?.cancel();
@@ -177,6 +180,7 @@ class _LeaveTabState extends State<LeaveTab> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final uid = context.read<AuthProvider>().user!.id;
@@ -192,7 +196,7 @@ class _LeaveTabState extends State<LeaveTab> {
           statusEquals: _statusFilter == 'all' ? null : _statusFilter,
         ),
       ]);
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       final page = results[1] as List<LeaveRequest>;
       setState(() {
         _summary = results[0] as AnnualLeaveSummary?;
@@ -205,7 +209,7 @@ class _LeaveTabState extends State<LeaveTab> {
       });
       _tryFillLeaveViewport();
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _loading = false;
         _error = 'Failed to load: $e';
@@ -214,13 +218,11 @@ class _LeaveTabState extends State<LeaveTab> {
   }
 
   Future<void> _openApply() async {
-    await Navigator.push<void>(
+    await pushAppPage(
       context,
-      AppRoute(
-        builder: (_) => _section == _LeaveHomeSection.annual
-            ? const ApplyLeaveScreen(annualOnly: true)
-            : const ApplyLeaveScreen(otherLeaveOnly: true),
-      ),
+      _section == _LeaveHomeSection.annual
+          ? const ApplyLeaveScreen(annualOnly: true)
+          : const ApplyLeaveScreen(otherLeaveOnly: true),
     );
     if (mounted) _load(showSpinner: true);
   }

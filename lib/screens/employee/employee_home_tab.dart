@@ -16,6 +16,7 @@ import '../../services/announcement_badge_service.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
+import '../../utils/async_load_guard.dart';
 import '../../widgets/employee_quick_access_tile.dart';
 import '../../widgets/notification_bell_button.dart';
 import '../announcements_screen.dart';
@@ -54,6 +55,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   RealtimeChannel? _attendanceChannel;
   RealtimeChannel? _leaveChannel;
   RealtimeChannel? _announcementsChannel;
+  final _loadGuard = AsyncLoadGuard();
 
   late final ValueNotifier<DateTime> _clockNow = ValueNotifier<DateTime>(
     AppTime.malaysiaNow(),
@@ -79,6 +81,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
 
   @override
   void dispose() {
+    _loadGuard.invalidate();
     _clockTicker.cancel();
     _clockNow.dispose();
     _realtimeDebounce?.cancel();
@@ -130,10 +133,10 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     if (uid == null) return;
     try {
       final n = await AnnouncementBadgeService.unreadCountForUser(uid);
-      if (!mounted) return;
+      if (!mounted || n == _announcementUnread) return;
       setState(() => _announcementUnread = n);
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || _announcementUnread == 0) return;
       setState(() => _announcementUnread = 0);
     }
   }
@@ -146,11 +149,14 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final uid = context.read<AuthProvider>().user?.id;
       if (uid == null) {
-        if (mounted) setState(() => _loading = false);
+        if (mounted && _loadGuard.isCurrent(gen)) {
+          setState(() => _loading = false);
+        }
         return;
       }
       final today = AppTime.malaysiaNow();
@@ -161,7 +167,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         SupabaseService.getPendingLeaveCountForUser(uid),
         AnnouncementBadgeService.unreadCountForUser(uid),
       ]);
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         _today = results[0] as Attendance?;
         _todayLeave = results[1] as LeaveRequest?;
@@ -171,7 +177,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       });
       _clockNow.value = AppTime.malaysiaNow();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() => _loading = false);
     }
   }
@@ -232,11 +238,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
               // Hero header + attendance card rebuild every minute (clock).
               ValueListenableBuilder<DateTime>(
                 valueListenable: _clockNow,
-                builder: (context, now, _) => _heroHeader(
-                  displayName,
-                  _dateFmt.format(now),
-                  now,
-                ),
+                builder: (context, now, _) =>
+                    _heroHeader(displayName, _dateFmt.format(now), now),
               ),
               // Quick access rebuilds ONLY on data change (_load / realtime).
               // It is intentionally outside the ValueListenableBuilder so the
@@ -264,11 +267,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0F2255),
-              Color(0xFF1A3A8F),
-              Color(0xFF1A56DB),
-            ],
+            colors: [Color(0xFF0F2255), Color(0xFF1A3A8F), Color(0xFF1A56DB)],
             stops: [0.0, 0.48, 1.0],
           ),
           borderRadius: const BorderRadius.vertical(
@@ -306,9 +305,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                         borderRadius: BorderRadius.circular(15),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0D9488).withValues(
-                              alpha: 0.4,
-                            ),
+                            color: const Color(
+                              0xFF0D9488,
+                            ).withValues(alpha: 0.4),
                             blurRadius: 14,
                             offset: const Offset(0, 5),
                           ),
@@ -622,13 +621,10 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   child: Tooltip(
                     message: 'Open attendance log',
                     child: InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          AppRoute(
-                            builder: (_) => const EmployeeAttendanceLogScreen(),
-                          ),
-                        );
-                      },
+                      onTap: () => pushAppPage(
+                        context,
+                        const EmployeeAttendanceLogScreen(),
+                      ),
                       borderRadius: BorderRadius.circular(13),
                       child: Ink(
                         padding: const EdgeInsets.symmetric(
@@ -639,10 +635,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                           gradient: const LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF0F2255),
-                              Color(0xFF1A56DB),
-                            ],
+                            colors: [Color(0xFF0F2255), Color(0xFF1A56DB)],
                           ),
                           borderRadius: BorderRadius.circular(13),
                         ),
@@ -892,8 +885,12 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           ),
           stat(
             icon: Icons.event_note_rounded,
-            color: _pendingLeaveCount > 0 ? AppColors.warning : AppColors.success,
-            value: _pendingLeaveCount == 0 ? 'None' : '$_pendingLeaveCount pending',
+            color: _pendingLeaveCount > 0
+                ? AppColors.warning
+                : AppColors.success,
+            value: _pendingLeaveCount == 0
+                ? 'None'
+                : '$_pendingLeaveCount pending',
             caption: 'Leave',
           ),
           Container(
@@ -906,7 +903,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
             color: _announcementUnread > 0
                 ? AppColors.accent
                 : AppColors.textHint,
-            value: _announcementUnread == 0 ? 'All read' : '$_announcementUnread new',
+            value: _announcementUnread == 0
+                ? 'All read'
+                : '$_announcementUnread new',
             caption: 'Notices',
           ),
         ],
@@ -972,11 +971,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       'Opens leave — annual balance, sick leave, and emergency leave.',
                   icon: Icons.event_available_rounded,
                   accentColor: AppColors.teal,
-                  onTap: () => Navigator.of(context).push(
-                    AppRoute(
-                      builder: (_) => const LeaveTab(),
-                    ),
-                  ),
+                  onTap: () => pushAppPage(context, const LeaveTab()),
                 ),
                 EmployeeQuickAccessTile(
                   label: 'Claim',
@@ -984,11 +979,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   semanticAction: 'Opens expense claims and receipt uploads.',
                   icon: Icons.receipt_long_rounded,
                   accentColor: AppColors.orange,
-                  onTap: () => Navigator.of(context).push(
-                    AppRoute(
-                      builder: (_) => const ClaimsScreen(),
-                    ),
-                  ),
+                  onTap: () => pushAppPage(context, const ClaimsScreen()),
                 ),
                 EmployeeQuickAccessTile(
                   label: 'Payroll',
@@ -997,11 +988,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       'Opens your payslip history and PDF downloads.',
                   icon: Icons.payments_rounded,
                   accentColor: AppColors.violet,
-                  onTap: () => Navigator.of(context).push(
-                    AppRoute(
-                      builder: (_) => const EmployeePayrollHistoryScreen(),
-                    ),
-                  ),
+                  onTap: () =>
+                      pushAppPage(context, const EmployeePayrollHistoryScreen()),
                 ),
                 EmployeeQuickAccessTile(
                   label: 'Notices',
@@ -1010,14 +998,11 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       'Company-wide notices posted by administrators.',
                   icon: Icons.campaign_rounded,
                   accentColor: AppColors.accent,
-                  badgeCount:
-                      _announcementUnread > 0 ? _announcementUnread : null,
+                  badgeCount: _announcementUnread > 0
+                      ? _announcementUnread
+                      : null,
                   onTap: () async {
-                    await Navigator.of(context).push<void>(
-                      AppRoute(
-                        builder: (_) => const AnnouncementsScreen(),
-                      ),
-                    );
+                    await pushAppPage(context, const AnnouncementsScreen());
                     if (mounted) await _refreshAnnouncementBadge();
                   },
                 ),
@@ -1027,11 +1012,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                   semanticAction: 'Opens your attendance calendar.',
                   icon: Icons.calendar_month_rounded,
                   accentColor: AppColors.indigo,
-                  onTap: () => Navigator.of(context).push(
-                    AppRoute(
-                      builder: (_) => const AttendanceHistoryScreen(),
-                    ),
-                  ),
+                  onTap: () =>
+                      pushAppPage(context, const AttendanceHistoryScreen()),
                 ),
                 EmployeeQuickAccessTile(
                   label: 'Help',
@@ -1040,11 +1022,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       'Opens help topics, contact HR or IT, and copy diagnostics.',
                   icon: Icons.support_agent_rounded,
                   accentColor: AppColors.sky,
-                  onTap: () => Navigator.of(context).push(
-                    AppRoute(
-                      builder: (_) => const HelpSupportScreen(),
-                    ),
-                  ),
+                  onTap: () =>
+                      pushAppPage(context, const HelpSupportScreen()),
                 ),
               ],
             ),

@@ -46,8 +46,13 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (!mounted) return;
-    setState(() => _busy = false);
-    if (err != null) setState(() => _error = err);
+    // On success AuthGate replaces this screen — keep busy until disposed.
+    if (err != null) {
+      setState(() {
+        _busy = false;
+        _error = err;
+      });
+    }
   }
 
   @override
@@ -87,18 +92,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   setState(() => _obscure = !_obscure),
                               onSubmit: _submit,
                               onForgotPassword: () =>
-                                  Navigator.of(context).push(
-                                AppRoute(
-                                  builder: (_) =>
-                                      const ForgotPasswordScreen(),
-                                ),
-                              ),
+                                  pushAppPage(
+                                    context,
+                                    const ForgotPasswordScreen(),
+                                  ),
                               onCreateAccount: () =>
-                                  Navigator.of(context).push(
-                                AppRoute(
-                                  builder: (_) => const RegisterScreen(),
-                                ),
-                              ),
+                                  pushAppPage(
+                                    context,
+                                    const RegisterScreen(),
+                                  ),
                             ),
                             const SizedBox(height: 28),
                             Text(
@@ -336,7 +338,7 @@ class _FormCard extends StatelessWidget {
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
                   decoration: const InputDecoration(
-                    hintText: 'you@company.com',
+                    hintText: 'AHMAD FAIZ or you@company.com',
                     prefixIcon: Icon(
                       Icons.person_outline_rounded,
                       size: 18,
@@ -360,20 +362,26 @@ class _FormCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const _Label('Password'),
-                    GestureDetector(
-                      onTap: busy ? null : onForgotPassword,
-                      behavior: HitTestBehavior.opaque,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
-                        child: Text(
-                          'Forgot password?',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: busy
-                                ? AppColors.textHint
-                                : AppColors.teal,
+                    const Flexible(child: _Label('Password')),
+                    Flexible(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: GestureDetector(
+                          onTap: busy ? null : onForgotPassword,
+                          behavior: HitTestBehavior.opaque,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(
+                              'Forgot password?',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: busy
+                                    ? AppColors.textHint
+                                    : AppColors.teal,
+                              ),
+                            ),
                           ),
                         ),
                       ),

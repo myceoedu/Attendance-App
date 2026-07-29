@@ -354,4 +354,16 @@ $$;
 REVOKE ALL ON FUNCTION public.clock_in_if_allowed(UUID, TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.clock_in_if_allowed(UUID, TEXT) TO authenticated;
 
-ALTER PUBLICATION supabase_realtime ADD TABLE public.app_notifications;
+-- Idempotent: 01_core / setup may already have added this table.
+DO $pub$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'app_notifications'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.app_notifications';
+  END IF;
+END
+$pub$;

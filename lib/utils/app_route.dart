@@ -1,22 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart';
 
 /// Platform-aware navigation route used everywhere in the app.
 ///
-/// **iOS / macOS**
-/// * Push is **instant** (zero transition duration) — the screen appears the
-///   moment you tap, exactly like switching a footer tab.
-/// * Pop (back button) slides out in 350 ms with native Cupertino easing.
-/// * Swipe-back follows the finger with full iOS parallax on the screen below.
-/// * [allowSnapshotting] pre-rasterises both routes before the back animation,
-///   so heavy screens (gradients, lists) move as textures instead of repainting
-///   every frame.
-///
-/// **Android / Web**
-/// * 220 ms fade with [allowSnapshotting] — Flutter pre-rasterises both
-///   screens before the animation starts, removing the first-frame hitch.
+/// **iOS / macOS** — instant push, Cupertino pop / swipe-back.
+/// **Web** — near-instant push (avoids fade hitch while building pages).
+/// **Android / desktop** — short fade with snapshotting.
 ///
 /// Usage — identical to [MaterialPageRoute]:
 /// ```dart
@@ -35,43 +30,66 @@ Route<T> AppRoute<T>({
     return _AppIOSRoute<T>(builder: wrappedBuilder, settings: settings);
   }
 
-  // Android / Web: fast fade, pre-rasterised on both enter and exit.
+  // Web: zero-duration enter so taps feel instant; short fade on pop only.
+  // Android/desktop: short fade with pre-rasterisation.
+  final enter =
+      kIsWeb ? Duration.zero : const Duration(milliseconds: 160);
+  final exit =
+      kIsWeb ? const Duration(milliseconds: 120) : const Duration(milliseconds: 140);
+
   return PageRouteBuilder<T>(
     settings: settings,
     pageBuilder: (ctx, _, __) => wrappedBuilder(ctx),
-    transitionDuration: const Duration(milliseconds: 220),
-    reverseTransitionDuration: const Duration(milliseconds: 180),
+    transitionDuration: enter,
+    reverseTransitionDuration: exit,
     allowSnapshotting: true,
-    transitionsBuilder: (ctx, animation, _, child) => FadeTransition(
-      opacity: CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      ),
-      child: child,
-    ),
+    transitionsBuilder: (ctx, animation, _, child) {
+      if (enter == Duration.zero &&
+          animation.status != AnimationStatus.reverse) {
+        return child;
+      }
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        ),
+        child: child,
+      );
+    },
   );
 }
 
-/// Subclass of [CupertinoPageRoute] tuned for myRekod:
-///
-/// 1. **`transitionDuration: Duration.zero`** — push is instant (no slide-in).
-/// 2. **`reverseTransitionDuration: 350 ms`** — native iOS pop timing.
-/// 3. **`allowSnapshotting: true`** — both routes are rasterised before back
-///    transitions, keeping swipe-back at 60 fps even on gradient-heavy screens.
-/// 4. **Default secondary animation** — underlying screen parallax + dimming
-///    restored for native iOS feel (no frozen background).
+/// Pushes [page] after the current frame so InkWell/ripple can paint first.
+/// Prefer this from grid tiles and dashboard shortcuts for smoother taps.
+Future<T?> pushAppPage<T>(
+  BuildContext context,
+  Widget page, {
+  bool haptic = true,
+}) {
+  if (haptic) HapticFeedback.selectionClick();
+  final nav = Navigator.of(context);
+  final completer = Completer<T?>();
+  SchedulerBinding.instance.scheduleFrameCallback((_) {
+    if (!context.mounted) {
+      if (!completer.isCompleted) completer.complete(null);
+      return;
+    }
+    completer.complete(nav.push<T>(AppRoute(builder: (_) => page)));
+  });
+  SchedulerBinding.instance.scheduleFrame();
+  return completer.future;
+}
+
+/// Subclass of [CupertinoPageRoute] tuned for myRekod.
 class _AppIOSRoute<T> extends CupertinoPageRoute<T> {
   _AppIOSRoute({required super.builder, super.settings});
 
-  /// Instant push — animation jumps to completed on frame 1.
   @override
   Duration get transitionDuration => Duration.zero;
 
-  /// Native iOS pop slide-out (tap-back or swipe-commit).
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 350);
 
-  /// Pre-rasterise route content before back/swipe transitions.
   @override
   bool get allowSnapshotting => true;
 }

@@ -60,7 +60,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
     final uid = context.read<AuthProvider>().user?.id;
     if (uid == null) return;
     final count = await SupabaseService.getUnreadNotificationCount(uid);
-    if (!mounted) return;
+    if (!mounted || count == _count) return;
     setState(() => _count = count);
   }
 

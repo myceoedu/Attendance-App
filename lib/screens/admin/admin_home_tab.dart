@@ -14,6 +14,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
+import '../../utils/async_load_guard.dart';
 import '../../widgets/notification_bell_button.dart';
 import 'admin_shell.dart';
 import 'admin_announcements_screen.dart';
@@ -32,7 +33,7 @@ class AdminHomeTab extends StatefulWidget {
 
 class _AdminHomeTabState extends State<AdminHomeTab> {
   bool _loading = true;
-  List<AppUser> _employees = [];
+  int _employeeCount = 0;
   List<Attendance> _todayAttendance = [];
   int _pendingLeaveCount = 0;
   int _pendingClaimCount = 0;
@@ -40,6 +41,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   RealtimeChannel? _attendanceChannel;
   RealtimeChannel? _leaveChannel;
   RealtimeChannel? _claimChannel;
+  final _loadGuard = AsyncLoadGuard();
 
   late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
     AppTime.malaysiaNow(),
@@ -60,6 +62,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
 
   @override
   void dispose() {
+    _loadGuard.invalidate();
     _clockTicker?.cancel();
     _realtimeDebounce?.cancel();
     AppRealtime.disposeChannel(_attendanceChannel);
@@ -92,17 +95,18 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   }
 
   Future<void> _load({bool showSpinner = true}) async {
+    final gen = _loadGuard.begin();
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
       final results = await Future.wait([
-        SupabaseService.getAllEmployees(),
+        SupabaseService.getEmployeeCount(),
         SupabaseService.getTodayAllAttendance(),
         SupabaseService.getPendingLeaveRequestCount(),
         SupabaseService.getPendingExpenseClaimCount(),
       ]);
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
-        _employees = results[0] as List<AppUser>;
+        _employeeCount = results[0] as int;
         _todayAttendance = results[1] as List<Attendance>;
         _pendingLeaveCount = results[2] as int;
         _pendingClaimCount = results[3] as int;
@@ -110,7 +114,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
       });
       _now.value = AppTime.malaysiaNow();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() => _loading = false);
     }
   }
@@ -193,7 +197,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                   0,
                 ),
                 child: _todayPulseCard(
-                  teamCount: _employees.length,
+                  teamCount: _employeeCount,
                   checkedIn: checkedIn,
                   completed: completed,
                   pendingApprovals: pendingTotal,
@@ -636,13 +640,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGradient: AppGradients.teal,
                 iconGlowColor: AppColors.teal,
                 showDot: pendingLeaves > 0,
-                onTap: () {
-                  Navigator.of(context).push<void>(
-                    AppRoute(
-                      builder: (_) => const AdminLeaveHubScreen(),
-                    ),
-                  );
-                },
+                onTap: () =>
+                    pushAppPage(context, const AdminLeaveHubScreen(), haptic: false),
               ),
             ),
             const SizedBox(width: 10),
@@ -654,13 +653,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 icon: Icons.payments_rounded,
                 iconGradient: AppGradients.primary,
                 iconGlowColor: AppColors.indigo,
-                onTap: () {
-                  Navigator.of(context).push<void>(
-                    AppRoute(
-                      builder: (_) => const PayrollHubScreen(),
-                    ),
-                  );
-                },
+                onTap: () =>
+                    pushAppPage(context, const PayrollHubScreen(), haptic: false),
               ),
             ),
           ],
@@ -705,13 +699,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGradient: AppGradients.sunset,
                 iconGlowColor: AppColors.orange,
                 showDot: pendingClaims > 0,
-                onTap: () {
-                  Navigator.of(context).push<void>(
-                    AppRoute(
-                      builder: (_) => const ClaimManagementScreen(),
-                    ),
-                  );
-                },
+                onTap: () => pushAppPage(
+                  context,
+                  const ClaimManagementScreen(),
+                  haptic: false,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -723,13 +715,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 icon: Icons.campaign_rounded,
                 iconGradient: AppGradients.violet,
                 iconGlowColor: AppColors.violet,
-                onTap: () {
-                  Navigator.of(context).push<void>(
-                    AppRoute(
-                      builder: (_) => const AdminAnnouncementsScreen(),
-                    ),
-                  );
-                },
+                onTap: () => pushAppPage(
+                  context,
+                  const AdminAnnouncementsScreen(),
+                  haptic: false,
+                ),
               ),
             ),
           ],
@@ -745,13 +735,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 icon: Icons.support_agent_rounded,
                 iconGradient: AppGradients.sky,
                 iconGlowColor: AppColors.sky,
-                onTap: () {
-                  Navigator.of(context).push<void>(
-                    AppRoute(
-                      builder: (_) => const HelpSupportScreen(adminView: true),
-                    ),
-                  );
-                },
+                onTap: () => pushAppPage(
+                  context,
+                  const HelpSupportScreen(adminView: true),
+                  haptic: false,
+                ),
               ),
             ),
           ],
