@@ -2,10 +2,10 @@ final class AppConfig {
   AppConfig._();
 
   static const _defaultSupabaseUrl =
-      'https://sbbqyelozdedxonsxeem.supabase.co';
+      'https://dxsnvtiwqmexarqjbwdd.supabase.co';
 
   static const _defaultSupabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNiYnF5ZWxvemRlZHhvbnN4ZWVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyODQxOTcsImV4cCI6MjEwMDg2MDE5N30.0GE1bPYqziT9BN6UHKNwwLgKrINjjviEu8N9X7oOzsE';
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4c252dGl3cW1leGFycWpid2RkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3MDUzMjUsImV4cCI6MjEwMTI4MTMyNX0.l5bSZerm_nF6p1Rz7hcV0pMQIhle-CquJGOmnjDrFVQ';
 
   /// Placeholder anon key from Flutter template — treated as "not configured".
   static const _placeholderAnonKey =
