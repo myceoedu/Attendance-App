@@ -143,7 +143,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
 
   void _scheduleReload() {
     _realtimeDebounce?.cancel();
-    _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
+    _realtimeDebounce = Timer(const Duration(milliseconds: 550), () {
       if (mounted) _load(showSpinner: false);
     });
   }
@@ -168,11 +168,25 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         AnnouncementBadgeService.unreadCountForUser(uid),
       ]);
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
+      final nextToday = results[0] as Attendance?;
+      final nextLeave = results[1] as LeaveRequest?;
+      final nextPending = results[2] as int;
+      final nextUnread = results[3] as int;
+      final unchanged = !showSpinner &&
+          !_loading &&
+          _sameAttendance(_today, nextToday) &&
+          _todayLeave?.id == nextLeave?.id &&
+          _pendingLeaveCount == nextPending &&
+          _announcementUnread == nextUnread;
+      if (unchanged) {
+        _clockNow.value = AppTime.malaysiaNow();
+        return;
+      }
       setState(() {
-        _today = results[0] as Attendance?;
-        _todayLeave = results[1] as LeaveRequest?;
-        _pendingLeaveCount = results[2] as int;
-        _announcementUnread = results[3] as int;
+        _today = nextToday;
+        _todayLeave = nextLeave;
+        _pendingLeaveCount = nextPending;
+        _announcementUnread = nextUnread;
         _loading = false;
       });
       _clockNow.value = AppTime.malaysiaNow();
@@ -180,6 +194,15 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() => _loading = false);
     }
+  }
+
+  bool _sameAttendance(Attendance? a, Attendance? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return a == b;
+    return a.id == b.id &&
+        a.status == b.status &&
+        a.clockInTime == b.clockInTime &&
+        a.clockOutTime == b.clockOutTime;
   }
 
   String _greeting(DateTime now) {
@@ -217,10 +240,10 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     final displayName = user.name.isNotEmpty ? user.name : user.email;
 
     if (_loading) {
-      return SizedBox.expand(
+      return const SizedBox.expand(
         child: ColoredBox(
           color: AppColors.surface,
-          child: const Center(child: CircularProgressIndicator()),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -233,20 +256,23 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           onRefresh: () => _load(showSpinner: false),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
+            cacheExtent: 520,
             padding: EdgeInsets.only(bottom: bottomInset + 32),
             children: [
               // Hero header + attendance card rebuild every minute (clock).
-              ValueListenableBuilder<DateTime>(
-                valueListenable: _clockNow,
-                builder: (context, now, _) =>
-                    _heroHeader(displayName, _dateFmt.format(now), now),
+              RepaintBoundary(
+                child: ValueListenableBuilder<DateTime>(
+                  valueListenable: _clockNow,
+                  builder: (context, now, _) =>
+                      _heroHeader(displayName, _dateFmt.format(now), now),
+                ),
               ),
               // Quick access rebuilds ONLY on data change (_load / realtime).
-              // It is intentionally outside the ValueListenableBuilder so the
-              // stat strip + tile grid are NOT repainted every clock tick.
-              Padding(
-                padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 8),
-                child: _quickAccessSection(context),
+              RepaintBoundary(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 8),
+                  child: _quickAccessSection(context),
+                ),
               ),
             ],
           ),
@@ -276,7 +302,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           boxShadow: [
             BoxShadow(
               color: AppColors.primaryDark.withValues(alpha: 0.28),
-              blurRadius: 28,
+              blurRadius: 20,
               offset: const Offset(0, 10),
             ),
           ],
@@ -476,14 +502,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 28,
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 20,
             offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: AppColors.primaryDark.withValues(alpha: 0.1),
-            blurRadius: 12,
-            spreadRadius: -4,
           ),
         ],
       ),

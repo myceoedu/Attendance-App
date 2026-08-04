@@ -872,6 +872,26 @@ class SupabaseService {
     return data.map<Attendance>((e) => Attendance.fromMap(e)).toList();
   }
 
+  /// Lightweight pulse stats for admin home (no user join, HEAD counts only).
+  static Future<({int checkedIn, int completed})>
+      getTodayAttendancePulseCounts() async {
+    final today = _todayString();
+    final results = await Future.wait([
+      client
+          .from('attendance')
+          .select('id')
+          .eq('date', today)
+          .count(CountOption.exact),
+      client
+          .from('attendance')
+          .select('id')
+          .eq('date', today)
+          .eq('status', 'completed')
+          .count(CountOption.exact),
+    ]);
+    return (checkedIn: results[0].count, completed: results[1].count);
+  }
+
   static Future<List<Attendance>> getAttendanceByMonth(DateTime month) async {
     final monthStart = DateTime(month.year, month.month);
     final monthEnd = DateTime(month.year, month.month + 1);

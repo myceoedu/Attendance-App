@@ -2,13 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/work_site.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/geofence.dart';
+import '../../widgets/work_site_osm_map.dart';
+import 'work_site_map_picker_screen.dart';
 
 /// Admin configures the single workplace used for clock-in geofencing.
 class AdminWorkSiteScreen extends StatefulWidget {
@@ -27,6 +31,10 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
     text: '${Geofence.defaultRadiusMeters}',
   );
 
+  final _previewMapController = MapController();
+  Timer? _coordDebounce;
+  Timer? _radiusDebounce;
+
   bool _loading = true;
   bool _saving = false;
   bool _locating = false;
@@ -34,19 +42,86 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   WorkSite? _saved;
   String? _loadError;
 
+  /// Map pin / circle — updated deliberately (not on every keystroke).
+  LatLng? _pin;
+  int _previewRadius = Geofence.defaultRadiusMeters;
+
   @override
   void initState() {
     super.initState();
+    _latCtrl.addListener(_onCoordFieldsChanged);
+    _lngCtrl.addListener(_onCoordFieldsChanged);
+    _radiusCtrl.addListener(_onRadiusFieldChanged);
     _load();
   }
 
   @override
   void dispose() {
+    _coordDebounce?.cancel();
+    _radiusDebounce?.cancel();
+    _latCtrl.removeListener(_onCoordFieldsChanged);
+    _lngCtrl.removeListener(_onCoordFieldsChanged);
+    _radiusCtrl.removeListener(_onRadiusFieldChanged);
     _nameCtrl.dispose();
     _latCtrl.dispose();
     _lngCtrl.dispose();
     _radiusCtrl.dispose();
+    _previewMapController.dispose();
     super.dispose();
+  }
+
+  void _onCoordFieldsChanged() {
+    _coordDebounce?.cancel();
+    _coordDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      final lat = double.tryParse(_latCtrl.text.trim());
+      final lng = double.tryParse(_lngCtrl.text.trim());
+      if (lat == null || lng == null) return;
+      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
+      final next = LatLng(lat, lng);
+      if (_pin != null &&
+          (_pin!.latitude - next.latitude).abs() < 1e-7 &&
+          (_pin!.longitude - next.longitude).abs() < 1e-7) {
+        return;
+      }
+      setState(() => _pin = next);
+      _movePreview(next);
+    });
+  }
+
+  void _onRadiusFieldChanged() {
+    _radiusDebounce?.cancel();
+    _radiusDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final n = int.tryParse(_radiusCtrl.text.trim());
+      if (n == null) return;
+      final clamped = n.clamp(
+        Geofence.minRadiusMeters,
+        Geofence.maxRadiusMeters,
+      );
+      if (clamped == _previewRadius) return;
+      setState(() => _previewRadius = clamped);
+    });
+  }
+
+  void _applyPin(LatLng point, {bool moveCamera = true}) {
+    setState(() {
+      _pin = point;
+      _latCtrl.text = point.latitude.toStringAsFixed(6);
+      _lngCtrl.text = point.longitude.toStringAsFixed(6);
+    });
+    if (moveCamera) _movePreview(point);
+  }
+
+  void _movePreview(LatLng point) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        _previewMapController.move(point, 16);
+      } catch (_) {
+        // Map may not be ready yet on first frame.
+      }
+    });
   }
 
   Future<void> _load() async {
@@ -64,8 +139,14 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
         _lngCtrl.text = site.longitude.toStringAsFixed(6);
         _radiusCtrl.text = '${site.radiusMeters}';
         _isActive = site.isActive;
+        _pin = LatLng(site.latitude, site.longitude);
+        _previewRadius = site.radiusMeters.clamp(
+          Geofence.minRadiusMeters,
+          Geofence.maxRadiusMeters,
+        );
       }
       setState(() => _loading = false);
+      if (_pin != null) _movePreview(_pin!);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -74,6 +155,19 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
             'Could not load workplace settings. Run the work_site SQL migration if this is a new project.';
       });
     }
+  }
+
+  Future<void> _openMapPicker() async {
+    if (_saving) return;
+    final radius = int.tryParse(_radiusCtrl.text.trim()) ?? _previewRadius;
+    final picked = await openWorkSiteMapPicker(
+      context,
+      initialPin: _pin,
+      radiusMeters: radius,
+    );
+    if (!mounted || picked == null) return;
+    _applyPin(picked);
+    _snack('Pin updated from map. Save to apply.');
   }
 
   Future<void> _useMyLocation() async {
@@ -96,15 +190,12 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
         ),
       );
       if (!mounted) return;
-      setState(() {
-        _latCtrl.text = pos.latitude.toStringAsFixed(6);
-        _lngCtrl.text = pos.longitude.toStringAsFixed(6);
-      });
+      _applyPin(LatLng(pos.latitude, pos.longitude));
       _snack('Location captured. Save to apply.');
     } on TimeoutException {
-      _snack('Location timed out. Try again outdoors or with GPS on.', error: true);
+      _snack('Location timed out. Try the map picker instead.', error: true);
     } catch (_) {
-      _snack('Could not read GPS. Check browser/phone location settings.', error: true);
+      _snack('Could not read GPS. Use “Pick on map” instead.', error: true);
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -132,6 +223,8 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
       setState(() {
         _saved = site;
         _saving = false;
+        _pin = LatLng(site.latitude, site.longitude);
+        _previewRadius = site.radiusMeters;
       });
       _snack(
         _isActive
@@ -182,6 +275,38 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _InfoCard(saved: _saved, isActive: _isActive),
+                        const SizedBox(height: 16),
+                        _MapPreviewCard(
+                          pin: _pin,
+                          radiusMeters: _previewRadius,
+                          mapController: _previewMapController,
+                          onOpenPicker: _saving ? null : _openMapPicker,
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton.tonalIcon(
+                          onPressed: _saving ? null : _openMapPicker,
+                          icon: const Icon(Icons.map_outlined),
+                          label: const Text('Pick on OpenStreetMap'),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          onPressed:
+                              (_locating || _saving) ? null : _useMyLocation,
+                          icon: _locating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.gps_fixed_rounded),
+                          label: Text(
+                            _locating
+                                ? 'Getting location…'
+                                : 'Use my current location',
+                          ),
+                        ),
                         const SizedBox(height: 18),
                         TextFormField(
                           controller: _nameCtrl,
@@ -204,7 +329,8 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _latCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
                                   decimal: true,
                                   signed: true,
                                 ),
@@ -215,7 +341,8 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                                 ],
                                 decoration: const InputDecoration(
                                   labelText: 'Latitude',
-                                  prefixIcon: Icon(Icons.my_location_outlined),
+                                  prefixIcon:
+                                      Icon(Icons.my_location_outlined),
                                 ),
                                 validator: (v) {
                                   final n = double.tryParse((v ?? '').trim());
@@ -230,7 +357,8 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                             Expanded(
                               child: TextFormField(
                                 controller: _lngCtrl,
-                                keyboardType: const TextInputType.numberWithOptions(
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
                                   decimal: true,
                                   signed: true,
                                 ),
@@ -252,22 +380,6 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                               ),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton.icon(
-                          onPressed: (_locating || _saving) ? null : _useMyLocation,
-                          icon: _locating
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.gps_fixed_rounded),
-                          label: Text(
-                            _locating
-                                ? 'Getting location…'
-                                : 'Use my current location',
-                          ),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -332,6 +444,90 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   }
 }
 
+class _MapPreviewCard extends StatelessWidget {
+  const _MapPreviewCard({
+    required this.pin,
+    required this.radiusMeters,
+    required this.mapController,
+    required this.onOpenPicker,
+  });
+
+  final LatLng? pin;
+  final int radiusMeters;
+  final MapController mapController;
+  final VoidCallback? onOpenPicker;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Map preview',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary.withValues(alpha: 0.85),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 220,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Non-interactive — avoids scroll/gesture fights & lag on web.
+                WorkSiteOsmMap(
+                  mapController: mapController,
+                  pin: pin,
+                  radiusMeters: radiusMeters,
+                  interactive: false,
+                ),
+                Positioned.fill(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: onOpenPicker,
+                      child: pin == null
+                          ? ColoredBox(
+                              color: Colors.black.withValues(alpha: 0.18),
+                              child: const Center(
+                                child: Text(
+                                  'Tap to pick on map',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.expand(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          pin == null
+              ? 'No pin yet — open the map or use GPS.'
+              : 'Teal circle = clock-in radius ($radiusMeters m). Tap map to edit.',
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppColors.textHint,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.saved, required this.isActive});
 
@@ -376,8 +572,8 @@ class _InfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Stand at the office and tap “Use my current location”, set the radius '
-            '(e.g. 100 m), then turn on enforce and save. The pin is a fixed snapshot '
+            'Pick the office on OpenStreetMap (or use GPS), set the radius '
+            '(e.g. 100 m), turn on enforce, then save. The pin is a fixed snapshot '
             '— it does not follow your phone home.',
             style: TextStyle(
               fontSize: 13,

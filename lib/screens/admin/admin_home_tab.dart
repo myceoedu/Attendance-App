@@ -9,7 +9,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/app_user.dart';
-import '../../models/attendance.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
@@ -35,7 +34,8 @@ class AdminHomeTab extends StatefulWidget {
 class _AdminHomeTabState extends State<AdminHomeTab> {
   bool _loading = true;
   int _employeeCount = 0;
-  List<Attendance> _todayAttendance = [];
+  int _checkedIn = 0;
+  int _completed = 0;
   int _pendingLeaveCount = 0;
   int _pendingClaimCount = 0;
   Timer? _realtimeDebounce;
@@ -43,6 +43,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   RealtimeChannel? _leaveChannel;
   RealtimeChannel? _claimChannel;
   final _loadGuard = AsyncLoadGuard();
+
+  static final _dateFmt = DateFormat('EEEE, d MMMM yyyy');
 
   late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
     AppTime.malaysiaNow(),
@@ -90,7 +92,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
 
   void _onRealtimeEvent() {
     _realtimeDebounce?.cancel();
-    _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
+    _realtimeDebounce = Timer(const Duration(milliseconds: 550), () {
       if (mounted) _load(showSpinner: false);
     });
   }
@@ -101,16 +103,32 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     try {
       final results = await Future.wait([
         SupabaseService.getEmployeeCount(),
-        SupabaseService.getTodayAllAttendance(),
+        SupabaseService.getTodayAttendancePulseCounts(),
         SupabaseService.getPendingLeaveRequestCount(),
         SupabaseService.getPendingExpenseClaimCount(),
       ]);
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
+      final pulse = results[1] as ({int checkedIn, int completed});
+      final nextEmployees = results[0] as int;
+      final nextLeaves = results[2] as int;
+      final nextClaims = results[3] as int;
+      final unchanged = !showSpinner &&
+          !_loading &&
+          _employeeCount == nextEmployees &&
+          _checkedIn == pulse.checkedIn &&
+          _completed == pulse.completed &&
+          _pendingLeaveCount == nextLeaves &&
+          _pendingClaimCount == nextClaims;
+      if (unchanged) {
+        _now.value = AppTime.malaysiaNow();
+        return;
+      }
       setState(() {
-        _employeeCount = results[0] as int;
-        _todayAttendance = results[1] as List<Attendance>;
-        _pendingLeaveCount = results[2] as int;
-        _pendingClaimCount = results[3] as int;
+        _employeeCount = nextEmployees;
+        _checkedIn = pulse.checkedIn;
+        _completed = pulse.completed;
+        _pendingLeaveCount = nextLeaves;
+        _pendingClaimCount = nextClaims;
         _loading = false;
       });
       _now.value = AppTime.malaysiaNow();
@@ -156,21 +174,15 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     final user = context.select<AuthProvider, AppUser?>((a) => a.user);
     if (user == null) return const SizedBox.shrink();
 
-    final dateFmt = DateFormat('EEEE, d MMMM yyyy');
     final displayName = user.name.isNotEmpty ? user.name : 'Admin';
-
-    final checkedIn = _todayAttendance.length;
-    final completed = _todayAttendance
-        .where((a) => a.status == 'completed')
-        .length;
     final pendingClaims = _pendingClaimCount;
     final pendingTotal = _pendingLeaveCount + pendingClaims;
 
     if (_loading) {
-      return SizedBox.expand(
+      return const SizedBox.expand(
         child: ColoredBox(
           color: AppColors.surface,
-          child: const Center(child: CircularProgressIndicator()),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
@@ -182,39 +194,50 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
           onRefresh: () async => _load(showSpinner: true),
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
+            cacheExtent: 520,
             padding: EdgeInsets.zero,
             children: [
-              ValueListenableBuilder<DateTime>(
-                valueListenable: _now,
-                builder: (context, now, _) {
-                  return _heroHeader(displayName, dateFmt.format(now), now);
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppLayout.screenPaddingH,
-                  20,
-                  AppLayout.screenPaddingH,
-                  0,
-                ),
-                child: _todayPulseCard(
-                  teamCount: _employeeCount,
-                  checkedIn: checkedIn,
-                  completed: completed,
-                  pendingApprovals: pendingTotal,
+              RepaintBoundary(
+                child: ValueListenableBuilder<DateTime>(
+                  valueListenable: _now,
+                  builder: (context, now, _) {
+                    return _heroHeader(
+                      displayName,
+                      _dateFmt.format(now),
+                      now,
+                    );
+                  },
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppLayout.screenPaddingH,
-                  16,
-                  AppLayout.screenPaddingH,
-                  36,
+              RepaintBoundary(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppLayout.screenPaddingH,
+                    20,
+                    AppLayout.screenPaddingH,
+                    0,
+                  ),
+                  child: _todayPulseCard(
+                    teamCount: _employeeCount,
+                    checkedIn: _checkedIn,
+                    completed: _completed,
+                    pendingApprovals: pendingTotal,
+                  ),
                 ),
-                child: _quickAccessSection(
-                  context,
-                  pendingClaims: pendingClaims,
-                  pendingLeaves: _pendingLeaveCount,
+              ),
+              RepaintBoundary(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppLayout.screenPaddingH,
+                    16,
+                    AppLayout.screenPaddingH,
+                    36,
+                  ),
+                  child: _quickAccessSection(
+                    context,
+                    pendingClaims: pendingClaims,
+                    pendingLeaves: _pendingLeaveCount,
+                  ),
                 ),
               ),
             ],
@@ -240,7 +263,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
           boxShadow: [
             BoxShadow(
               color: AppColors.adminHeaderShadow,
-              blurRadius: 20,
+              blurRadius: 16,
               offset: const Offset(0, 10),
               spreadRadius: -6,
             ),
@@ -438,7 +461,14 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.divider),
-        boxShadow: AppElevation.cardOnSurface,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F0F172A),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+            spreadRadius: -3,
+          ),
+        ],
       ),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       child: Column(
@@ -819,6 +849,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                   glowColor: iconGlowColor,
                   size: 48,
                   iconSize: 23,
+                  softShadow: true,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
