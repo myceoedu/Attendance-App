@@ -6,10 +6,11 @@ abstract class HelpSupportConfig {
   static const String appVersionLabel = '1.0.0+1';
 
   /// Primary support inbox (opened with the device mail client).
-  static const String supportEmail = 'hr@yourcompany.com';
+  /// Empty hides the email contact shortcut.
+  static const String supportEmail = '';
 
   /// E.164 or local format; if empty, the "Call" shortcut is hidden.
-  static const String supportPhone = '';
+  static const String supportPhone = '+60 11-7078 7014';
 
   /// Shown under contact actions (optional copy).
   static const String officeHours =

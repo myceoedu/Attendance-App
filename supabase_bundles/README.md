@@ -21,7 +21,10 @@ Bundles follow the **same schema** as the existing app migrations (no new tables
 | 5 | `05_claims.sql` | Expense claims + attachments storage |
 | 6 | `06_payroll.sql` | Full payroll schema + RLS fixes |
 | 7 | `07_indexes.sql` | Performance indexes |
+| 8 | `09_work_site.sql` | One-site clock-in geofence (`work_site`) |
 | Optional | `08_seed_payroll_test_data_OPTIONAL.sql` | Test seed data only |
+
+Existing projects: run root file `supabase_migration_work_site_geofence.sql` once.
 
 ## If you already ran 01 + 02
 
@@ -33,7 +36,10 @@ Then continue with `04` → `07`.
 ## After SQL
 
 1. **Project settings → API** — copy Project URL + `anon` key into the Flutter app (`lib/config/app_config.dart` or `--dart-define`)
-2. **Authentication** — enable Email provider; set Site URL / redirect URLs
+2. **Authentication** — enable Email provider; set Site URL / redirect URLs.
+   For password reset, allow your app origin(s), e.g.
+   `http://localhost:**` / `https://attendance-app-peach-rho.vercel.app/**`
+   (reset emails use `?passwordReset=1` on that origin).
 3. **Storage** — confirm buckets `leave-attachments` and `claim-attachments` exist
 4. Register a user in the app, then promote an admin:
 

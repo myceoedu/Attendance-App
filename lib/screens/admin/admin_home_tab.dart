@@ -20,6 +20,7 @@ import 'admin_shell.dart';
 import 'admin_announcements_screen.dart';
 import 'admin_leave_hub_screen.dart';
 import '../help_support_screen.dart';
+import 'admin_work_site_screen.dart';
 import 'claim_management_screen.dart';
 import 'payroll/payroll_hub_screen.dart';
 
@@ -727,6 +728,22 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         const SizedBox(height: 10),
         Row(
           children: [
+            Expanded(
+              child: _bentoActionCard(
+                context,
+                label: 'Workplace location',
+                hint: 'Clock-in geofence (one site)',
+                icon: Icons.location_on_rounded,
+                iconGradient: AppGradients.teal,
+                iconGlowColor: AppColors.teal,
+                onTap: () => pushAppPage(
+                  context,
+                  const AdminWorkSiteScreen(),
+                  haptic: false,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: _bentoActionCard(
                 context,

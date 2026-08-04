@@ -7,6 +7,9 @@ import '../models/app_user.dart';
 import '../services/session_profile_cache.dart';
 import '../services/supabase_service.dart';
 import '../startup_timing.dart';
+import '../utils/auth_link_bootstrap.dart';
+import '../utils/auth_redirect.dart';
+import '../utils/web_url_cleanup.dart';
 
 class AuthProvider extends ChangeNotifier {
   /// `flutter run --dart-define=ATTENDANCE_SKIP_PROFILE_CACHE=true` forces a
@@ -18,12 +21,35 @@ class AuthProvider extends ChangeNotifier {
 
   AppUser? _user;
   bool _loading = true;
+  bool _passwordRecoveryPending = false;
+  String? _loginBanner;
+  bool _loginBannerIsError = false;
+  bool _completingPasswordReset = false;
   StreamSubscription<AuthState>? _authSub;
 
   AppUser? get user => _user;
   bool get loading => _loading;
   bool get isLoggedIn => _user != null;
   bool get isAdmin => _user?.isAdmin ?? false;
+  bool get passwordRecoveryPending => _passwordRecoveryPending;
+  String? get loginBanner => _loginBanner;
+  bool get loginBannerIsError => _loginBannerIsError;
+  bool get completingPasswordReset => _completingPasswordReset;
+
+  /// One-shot banner for LoginScreen (success or link error).
+  String? takeLoginBanner() {
+    final m = _loginBanner;
+    if (m == null) return null;
+    _loginBanner = null;
+    return m;
+  }
+
+  void _enterPasswordRecovery() {
+    if (_passwordRecoveryPending) return;
+    _passwordRecoveryPending = true;
+    clearAuthCallbackFromUrl();
+    notifyListeners();
+  }
 
   Future<void> init() async {
     if (kDebugMode) StartupTiming.mark('auth_init_start');
@@ -37,10 +63,29 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
+    // Expired / invalid email link → show on login (do not block recovery).
+    final bootError = AuthLinkBootstrap.linkError;
+    if (bootError != null && bootError.isNotEmpty) {
+      _loginBanner = bootError;
+      _loginBannerIsError = true;
+    }
+
     final session = SupabaseService.currentAuthUser;
     var usedCache = false;
 
-    if (session != null) {
+    // Recovery from email link (URL hint or session already established).
+    if (AuthLinkBootstrap.recoveryHint) {
+      if (session != null) {
+        _passwordRecoveryPending = true;
+        clearAuthCallbackFromUrl();
+      } else if (_loginBanner == null) {
+        _loginBanner =
+            'Could not open the reset link. Request a new one from Forgot password.';
+        _loginBannerIsError = true;
+      }
+    }
+
+    if (session != null && !_passwordRecoveryPending) {
       AppUser? resolved;
       if (!_skipProfileCache) {
         resolved = await SessionProfileCache.loadIfMatches(session.id);
@@ -54,6 +99,10 @@ class AuthProvider extends ChangeNotifier {
           await SessionProfileCache.save(_user!);
         }
       }
+    } else if (session != null && _passwordRecoveryPending) {
+      // Do not open the shell; load profile lightly in background if needed.
+      _user = null;
+      await SessionProfileCache.clear();
     } else {
       _user = null;
       await SessionProfileCache.clear();
@@ -63,7 +112,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     if (kDebugMode) {
-      if (usedCache) {
+      if (_passwordRecoveryPending) {
+        StartupTiming.mark('auth_interactive_guest');
+      } else if (usedCache) {
         StartupTiming.mark('auth_interactive_cached');
       } else if (session != null) {
         StartupTiming.mark('auth_interactive_network');
@@ -71,9 +122,10 @@ class AuthProvider extends ChangeNotifier {
         StartupTiming.mark('auth_interactive_guest');
       }
       StartupTiming.reportAuthPath(
-        hadSession: session != null,
+        hadSession: session != null && !_passwordRecoveryPending,
         usedCache: usedCache,
-        backgroundRefreshScheduled: session != null && usedCache,
+        backgroundRefreshScheduled:
+            session != null && usedCache && !_passwordRecoveryPending,
       );
     }
 
@@ -81,9 +133,19 @@ class AuthProvider extends ChangeNotifier {
       event,
     ) async {
       switch (event.event) {
+        case AuthChangeEvent.passwordRecovery:
+          _enterPasswordRecovery();
+          break;
         case AuthChangeEvent.signedIn:
         case AuthChangeEvent.userUpdated:
-        case AuthChangeEvent.passwordRecovery:
+          if (_passwordRecoveryPending || _completingPasswordReset) {
+            // Stay on set-password UI; ignore profile routing until done.
+            return;
+          }
+          if (AuthRedirect.isPasswordRecoveryUrl()) {
+            _enterPasswordRecovery();
+            return;
+          }
           final fresh = await SupabaseService.getCurrentUserProfile();
           final previous = _user;
           _user = fresh;
@@ -97,6 +159,7 @@ class AuthProvider extends ChangeNotifier {
           }
           break;
         case AuthChangeEvent.tokenRefreshed:
+          if (_passwordRecoveryPending || _completingPasswordReset) return;
           // Token silently refreshed — user identity unchanged.
           // Only fetch profile (and notify) if we somehow have no user yet.
           if (_user != null) return;
@@ -105,17 +168,19 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
           break;
         case AuthChangeEvent.signedOut:
-          if (_user == null) return;
+          final hadUser = _user != null;
+          final hadRecovery = _passwordRecoveryPending;
           _user = null;
+          _passwordRecoveryPending = false;
           await SessionProfileCache.clear();
-          notifyListeners();
+          if (hadUser || hadRecovery) notifyListeners();
           break;
         default:
           break;
       }
     });
 
-    if (session != null && usedCache) {
+    if (session != null && usedCache && !_passwordRecoveryPending) {
       unawaited(_refreshCachedProfile(session.id));
     }
   }
@@ -226,6 +291,9 @@ class AuthProvider extends ChangeNotifier {
       if (msg.contains('username required')) {
         return 'Registration failed. Update the app or database trigger.';
       }
+      if (msg.contains('429') || msg.toLowerCase().contains('too many')) {
+        return 'Too many sign-up attempts. Wait a few minutes, then try once.';
+      }
       return 'Sign up failed. Check your details and try again.';
     }
   }
@@ -236,10 +304,83 @@ class AuthProvider extends ChangeNotifier {
       return 'Enter a valid email address';
     }
     try {
-      await SupabaseService.sendPasswordResetEmail(trimmed);
+      await SupabaseService.sendPasswordResetEmail(
+        trimmed,
+        redirectTo: AuthRedirect.passwordResetRedirectUrl(),
+      );
       return null;
-    } catch (_) {
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('429') || msg.contains('too many')) {
+        return 'Too many reset attempts. Wait a few minutes, then try once.';
+      }
       return 'Could not send reset email. Try again.';
+    }
+  }
+
+  /// Completes email-link recovery: set password, end session, show login.
+  Future<String?> completePasswordRecovery(String newPassword) async {
+    if (!_passwordRecoveryPending) {
+      return 'Reset session expired. Request a new reset email.';
+    }
+    if (newPassword.length < 6) {
+      return 'Password must be at least 6 characters';
+    }
+    if (SupabaseService.currentAuthUser == null) {
+      _passwordRecoveryPending = false;
+      notifyListeners();
+      return 'Reset session expired. Request a new reset email.';
+    }
+
+    _completingPasswordReset = true;
+    try {
+      await SupabaseService.updatePassword(newPassword);
+      await SessionProfileCache.clear();
+      _user = null;
+      _passwordRecoveryPending = false;
+      _loginBanner = 'Password updated. Sign in with your new password.';
+      _loginBannerIsError = false;
+      try {
+        await SupabaseService.signOut();
+      } catch (_) {
+        // Local clear is enough to return to login.
+      }
+      clearAuthCallbackFromUrl();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('same_password') || msg.contains('same password')) {
+        return 'Choose a password different from your current one.';
+      }
+      if (msg.contains('session') || msg.contains('jwt') || msg.contains('401')) {
+        _passwordRecoveryPending = false;
+        notifyListeners();
+        return 'Reset session expired. Request a new reset email.';
+      }
+      return 'Could not update password. Try again.';
+    } finally {
+      _completingPasswordReset = false;
+    }
+  }
+
+  /// Leaves recovery without changing the password.
+  Future<void> cancelPasswordRecovery() async {
+    if (!_passwordRecoveryPending && SupabaseService.currentAuthUser == null) {
+      return;
+    }
+    _completingPasswordReset = true;
+    try {
+      _passwordRecoveryPending = false;
+      _user = null;
+      await SessionProfileCache.clear();
+      try {
+        await SupabaseService.signOut();
+      } catch (_) {}
+      clearAuthCallbackFromUrl();
+      notifyListeners();
+    } finally {
+      _completingPasswordReset = false;
     }
   }
 
@@ -327,6 +468,9 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> changePassword(String newPassword) async {
     if (newPassword.length < 6) return 'Password must be at least 6 characters';
+    if (_passwordRecoveryPending) {
+      return completePasswordRecovery(newPassword);
+    }
     try {
       await SupabaseService.updatePassword(newPassword);
       return null;
@@ -339,6 +483,7 @@ class AuthProvider extends ChangeNotifier {
     await SessionProfileCache.clear();
     await SupabaseService.signOut();
     _user = null;
+    _passwordRecoveryPending = false;
     notifyListeners();
   }
 

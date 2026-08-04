@@ -12,3 +12,23 @@ void clearAuthErrorQueryFromUrl() {
   final clean = uri.replace(queryParameters: <String, String>{}, fragment: '');
   web.window.history.replaceState(null, '', '${clean.origin}${clean.path}');
 }
+
+/// Removes auth tokens / query from the address bar after the session is loaded
+/// so a refresh does not re-process the recovery link.
+void clearAuthCallbackFromUrl() {
+  final uri = Uri.base;
+  final hasQueryAuth = uri.queryParameters.containsKey('code') ||
+      uri.queryParameters.containsKey('access_token') ||
+      uri.queryParameters.containsKey('type') ||
+      uri.queryParameters.containsKey('passwordReset') ||
+      uri.queryParameters.containsKey('error') ||
+      uri.queryParameters.containsKey('error_code');
+  final frag = uri.fragment;
+  final hasHashAuth = frag.contains('access_token') ||
+      frag.contains('refresh_token') ||
+      frag.contains('type=') ||
+      frag.contains('error=');
+  if (!hasQueryAuth && !hasHashAuth) return;
+
+  web.window.history.replaceState(null, '', '${uri.origin}${uri.path}');
+}

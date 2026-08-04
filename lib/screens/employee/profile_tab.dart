@@ -654,7 +654,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       children: [
                       if (!_editing) ...[
                         _viewRow(
-                          Icons.savings_outlined,
+                          Icons.account_balance_wallet_outlined,
                           'EPF number',
                           ProfileValidators.displayValue(user.epfNumber, editing: false),
                         ),
@@ -666,7 +666,7 @@ class _ProfileTabState extends State<ProfileTab> {
                       ] else ...[
                         TextFormField(
                           controller: _epfCtrl,
-                          decoration: _dec(Icons.savings_outlined, 'EPF number'),
+                          decoration: _dec(Icons.account_balance_wallet_outlined, 'EPF number'),
                         ),
                         const SizedBox(height: 12),
                         TextFormField(

@@ -26,6 +26,15 @@ String friendlyLeaveError(Object e) {
     if (msg.contains('approved leave already covers')) {
       return 'An approved leave already covers the selected dates.';
     }
+    if (msg.contains('outside workplace geofence')) {
+      return 'You are outside the workplace area. Move closer and try clock-in again.';
+    }
+    if (msg.contains('location required for workplace')) {
+      return 'Location is required to clock in. Allow GPS access and try again.';
+    }
+    if (msg.contains('invalid clock-in location')) {
+      return 'Could not verify your location. Try clock-in again.';
+    }
     if (msg.contains('attendance already exists')) {
       return 'An attendance record already exists for the selected date.';
     }
@@ -40,6 +49,12 @@ String friendlyLeaveError(Object e) {
   // Exception thrown by client-side checks.
   if (raw.contains('approved leave already covers today')) {
     return 'Approved leave already covers today. Clock-in is not allowed.';
+  }
+  if (raw.contains('outside workplace geofence')) {
+    return 'You are outside the workplace area. Move closer and try clock-in again.';
+  }
+  if (raw.contains('location required for workplace')) {
+    return 'Location is required to clock in. Allow GPS access and try again.';
   }
   if (raw.contains('pending or approved leave')) {
     return 'These dates overlap an existing leave request.\n'

@@ -15,14 +15,18 @@ class HelpSupportScreen extends StatelessWidget {
 
   final bool adminView;
 
-  static final Uri _emailUri = Uri(
-    scheme: 'mailto',
-    path: HelpSupportConfig.supportEmail,
-    queryParameters: <String, String>{
-      'subject': 'myRekod — Support request',
-      'body': 'Please describe your issue below:\n\n',
-    },
-  );
+  Uri? get _emailUri {
+    final raw = HelpSupportConfig.supportEmail.trim();
+    if (raw.isEmpty) return null;
+    return Uri(
+      scheme: 'mailto',
+      path: raw,
+      queryParameters: <String, String>{
+        'subject': 'myRekod — Support request',
+        'body': 'Please describe your issue below:\n\n',
+      },
+    );
+  }
 
   Uri? get _phoneUri {
     final raw = HelpSupportConfig.supportPhone.trim();
@@ -79,7 +83,7 @@ Platform: ${_platformLabel()}'''.trim();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Diagnostics copied — paste into your email to HR/IT.'),
+        content: Text('Diagnostics copied — share with HR/IT when you contact them.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -108,7 +112,7 @@ Platform: ${_platformLabel()}'''.trim();
       const _Faq(
         q: 'How do I clock in and out?',
         a:
-            'Use the centre Clock tab on the bottom bar. Clock in when you arrive and clock out when you leave. If location is required, allow location access when prompted so your check-in can be verified.',
+            'Use the centre Clock tab. Clock in when you arrive and clock out when you leave. If HR turned on workplace location, you must be inside the set radius and allow GPS. Clock-out does not need location.',
       ),
       const _Faq(
         q: 'Why is my leave or claim still pending?',
@@ -123,12 +127,12 @@ Platform: ${_platformLabel()}'''.trim();
       const _Faq(
         q: 'How do I change my password?',
         a:
-            'Go to Profile → Change password while signed in. If you cannot sign in, use your organisation’s password reset process or contact IT/HR — they can verify your account.',
+            'Signed in: Profile → Change password. Signed out: Login → Forgot password → open the email link → set and confirm a new password → sign in. Expired links need a new reset email. For account issues, call support.',
       ),
       const _Faq(
         q: 'The app feels slow or will not load',
         a:
-            'Check your internet connection first. Try closing other tabs or apps, then reopen this app. If problems persist, copy diagnostics below and email HR/IT with what you were doing.',
+            'Check your internet connection first. Try closing other tabs or apps, then reopen this app. If problems persist, copy diagnostics below and share them with HR/IT along with what you were doing.',
       ),
     ];
 
@@ -138,8 +142,10 @@ Platform: ${_platformLabel()}'''.trim();
 
   @override
   Widget build(BuildContext context) {
+    final email = _emailUri;
     final phone = _phoneUri;
     final faqItems = _faqs();
+    final hasContact = email != null || phone != null;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -152,33 +158,35 @@ Platform: ${_platformLabel()}'''.trim();
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _introCard(),
-            const SizedBox(height: 18),
-            Text(
-              'Contact',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary.withValues(alpha: 0.85),
-                letterSpacing: -0.1,
+            if (hasContact) ...[
+              const SizedBox(height: 18),
+              Text(
+                'Contact',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary.withValues(alpha: 0.85),
+                  letterSpacing: -0.1,
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            _contactTile(
-              context,
-              icon: Icons.mail_outline_rounded,
-              title: 'Email HR / IT',
-              subtitle: HelpSupportConfig.supportEmail,
-              onTap: () => _openUri(context, _emailUri),
-            ),
-            if (phone != null) ...[
-              const SizedBox(height: 8),
-              _contactTile(
-                context,
-                icon: Icons.phone_in_talk_rounded,
-                title: 'Call support',
-                subtitle: HelpSupportConfig.supportPhone.trim(),
-                onTap: () => _openUri(context, phone),
-              ),
+              const SizedBox(height: 10),
+              if (email != null)
+                _contactTile(
+                  context,
+                  icon: Icons.mail_outline_rounded,
+                  title: 'Email HR / IT',
+                  subtitle: HelpSupportConfig.supportEmail.trim(),
+                  onTap: () => _openUri(context, email),
+                ),
+              if (email != null && phone != null) const SizedBox(height: 8),
+              if (phone != null)
+                _contactTile(
+                  context,
+                  icon: Icons.phone_in_talk_rounded,
+                  title: 'Call support',
+                  subtitle: HelpSupportConfig.supportPhone.trim(),
+                  onTap: () => _openUri(context, phone),
+                ),
             ],
             const SizedBox(height: 12),
             Text(
@@ -346,7 +354,7 @@ Platform: ${_platformLabel()}'''.trim();
           Text(
             adminView
                 ? 'Quick answers for administrators, plus a direct line to HR or IT when you need backend or account help.'
-                : 'Find answers below, or reach HR / IT using email or phone. If something looks wrong, copy diagnostics and send it with your message — that speeds things up.',
+                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them when you reach out — that speeds things up.',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,

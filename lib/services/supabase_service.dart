@@ -20,7 +20,9 @@ import '../models/payroll_item.dart';
 import '../models/payroll_run.dart';
 import '../models/payroll_salary_setting.dart';
 import '../models/payroll_statutory_config.dart';
+import '../models/work_site.dart';
 import '../utils/app_time.dart';
+import '../utils/geofence.dart';
 import 'payroll_engine.dart';
 
 class SupabaseService {
@@ -93,11 +95,18 @@ class SupabaseService {
 
   static Future<void> signOut() async {
     _invalidateEmployeesCache();
+    _invalidateWorkSiteCache();
     await client.auth.signOut();
   }
 
-  static Future<void> sendPasswordResetEmail(String email) {
-    return client.auth.resetPasswordForEmail(email.trim());
+  static Future<void> sendPasswordResetEmail(
+    String email, {
+    required String redirectTo,
+  }) {
+    return client.auth.resetPasswordForEmail(
+      email.trim(),
+      redirectTo: redirectTo,
+    );
   }
 
   static Future<void> updatePassword(String newPassword) {
@@ -683,6 +692,110 @@ class SupabaseService {
         rethrow;
       }
     });
+  }
+
+  // ──────────────────────────────────────────────
+  // WORK SITE (one-site geofence)
+  // ──────────────────────────────────────────────
+
+  static const _workSiteSelect =
+      'id,name,latitude,longitude,radius_meters,is_active,updated_at';
+  static const _workSiteCacheTtl = Duration(seconds: 60);
+  static WorkSite? _workSiteCache;
+  static DateTime? _workSiteCacheAt;
+  static bool _workSiteCacheIsEmpty = false;
+  static Future<WorkSite?>? _workSiteInFlight;
+
+  static void _invalidateWorkSiteCache() {
+    _workSiteCache = null;
+    _workSiteCacheAt = null;
+    _workSiteCacheIsEmpty = false;
+    _workSiteInFlight = null;
+  }
+
+  /// Cached singleton site. `null` = not configured yet (geofence off).
+  static Future<WorkSite?> getWorkSite({bool forceRefresh = false}) {
+    if (!forceRefresh) {
+      final at = _workSiteCacheAt;
+      if (at != null &&
+          DateTime.now().difference(at) < _workSiteCacheTtl) {
+        if (_workSiteCacheIsEmpty) return Future.value(null);
+        final cached = _workSiteCache;
+        if (cached != null) return Future.value(cached);
+      }
+    }
+    return _workSiteInFlight ??= _fetchWorkSite().whenComplete(() {
+      _workSiteInFlight = null;
+    });
+  }
+
+  static Future<WorkSite?> _fetchWorkSite() async {
+    try {
+      final data = await client
+          .from('work_site')
+          .select(_workSiteSelect)
+          .eq('id', 1)
+          .maybeSingle();
+      _workSiteCacheAt = DateTime.now();
+      if (data == null) {
+        _workSiteCache = null;
+        _workSiteCacheIsEmpty = true;
+        return null;
+      }
+      final site = WorkSite.fromMap(Map<String, dynamic>.from(data));
+      _workSiteCache = site;
+      _workSiteCacheIsEmpty = false;
+      return site;
+    } on PostgrestException catch (e) {
+      // Table not migrated yet — treat as inactive / unset.
+      if (e.code == 'PGRST205' ||
+          e.message.toLowerCase().contains('work_site') ||
+          e.code == '42P01') {
+        _workSiteCacheAt = DateTime.now();
+        _workSiteCache = null;
+        _workSiteCacheIsEmpty = true;
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  /// Upsert the singleton workplace. Admin only (RLS).
+  static Future<WorkSite> saveWorkSite({
+    required String name,
+    required double latitude,
+    required double longitude,
+    required int radiusMeters,
+    required bool isActive,
+  }) async {
+    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+      throw Exception('Invalid coordinates');
+    }
+    final radius = radiusMeters.clamp(
+      Geofence.minRadiusMeters,
+      Geofence.maxRadiusMeters,
+    );
+    final trimmed = name.trim().isEmpty ? 'Workplace' : name.trim();
+    final payload = {
+      'id': 1,
+      'name': trimmed,
+      'latitude': latitude,
+      'longitude': longitude,
+      'radius_meters': radius,
+      'is_active': isActive,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_by': currentUserId,
+    };
+    final data = await client
+        .from('work_site')
+        .upsert(payload, onConflict: 'id')
+        .select(_workSiteSelect)
+        .single();
+    final site = WorkSite.fromMap(Map<String, dynamic>.from(data));
+    _workSiteCache = site;
+    _workSiteCacheAt = DateTime.now();
+    _workSiteCacheIsEmpty = false;
+    return site;
   }
 
   static Future<Attendance> _clockOutOnce(String attendanceId) async {

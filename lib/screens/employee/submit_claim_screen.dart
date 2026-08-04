@@ -26,7 +26,7 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
   final _amountCtrl = TextEditingController();
 
   String _category = 'meal';
-  String _currency = 'MYR';
+  static const _currency = 'MYR';
   DateTime? _expenseDate;
   final List<PlatformFile> _files = [];
   bool _submitting = false;
@@ -42,8 +42,6 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
     ('client_entertainment', 'Client entertainment'),
     ('other', 'Other'),
   ];
-
-  static const _currencies = ['MYR', 'USD', 'SGD'];
 
   final _dateFmt = DateFormat('d MMM yyyy');
 
@@ -251,49 +249,25 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
               },
             ),
             const SizedBox(height: 16),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _amountCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'[0-9.,]'),
-                      ),
-                    ],
-                    decoration: const InputDecoration(
-                      labelText: 'Amount',
-                      hintText: '0.00',
-                    ),
-                    validator: (v) {
-                      final raw = v?.trim().replaceAll(',', '') ?? '';
-                      final n = double.tryParse(raw);
-                      if (n == null || n <= 0) return 'Enter amount';
-                      return null;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    value: _currency, // ignore: deprecated_member_use
-                    decoration: const InputDecoration(labelText: 'Currency'),
-                    items: [
-                      for (final c in _currencies)
-                        DropdownMenuItem(value: c, child: Text(c)),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) setState(() => _currency = v);
-                    },
-                  ),
-                ),
+            TextFormField(
+              controller: _amountCtrl,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
               ],
+              decoration: const InputDecoration(
+                labelText: 'Amount (MYR)',
+                hintText: '0.00',
+                prefixText: 'RM ',
+              ),
+              validator: (v) {
+                final raw = v?.trim().replaceAll(',', '') ?? '';
+                final n = double.tryParse(raw);
+                if (n == null || n <= 0) return 'Enter amount';
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             InkWell(

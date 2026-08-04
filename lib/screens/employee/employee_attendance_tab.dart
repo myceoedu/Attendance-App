@@ -10,12 +10,14 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../constants/app_theme.dart';
 import '../../models/attendance.dart';
 import '../../models/leave_request.dart';
+import '../../models/work_site.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
 import '../../utils/async_load_guard.dart';
 import '../../utils/error_messages.dart';
+import '../../utils/geofence.dart';
 import 'attendance_history_screen.dart';
 import 'employee_attendance_log_screen.dart';
 
@@ -42,6 +44,10 @@ enum _AttendanceState { blocked, idle, working, done }
 class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   Attendance? _today;
   LeaveRequest? _todayApprovedLeave;
+  WorkSite? _workSite;
+  String? _rangeHint;
+  bool _rangeChecking = false;
+  bool _clockBusy = false;
   bool _loading = true;
   Timer? _ticker;
   Timer? _realtimeDebounce;
@@ -131,11 +137,13 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       final results = await Future.wait([
         SupabaseService.getTodayAttendance(uid),
         SupabaseService.getApprovedLeaveForDate(uid, AppTime.malaysiaNow()),
+        SupabaseService.getWorkSite(),
       ]);
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
         final fetched = results[0] as Attendance?;
         final leave = results[1] as LeaveRequest?;
+        _workSite = results[2] as WorkSite?;
 
         if (fetched != null) {
           final cur = _today;
@@ -158,10 +166,52 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       });
       _now.value = AppTime.malaysiaNow();
       _syncTicker();
+      // One light GPS sample for range hint — never blocks clock UI.
+      if (_state == _AttendanceState.idle &&
+          _workSite != null &&
+          _workSite!.isActive) {
+        unawaited(_refreshRangeHint());
+      } else if (_rangeHint != null && mounted) {
+        setState(() => _rangeHint = null);
+      }
     } catch (e) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() => _loading = false);
       _showError('Failed to load attendance: $e');
+    }
+  }
+
+  Future<void> _refreshRangeHint() async {
+    final site = _workSite;
+    if (site == null || !site.isActive) return;
+    if (_rangeChecking) return;
+    _rangeChecking = true;
+    try {
+      final raw = await _getLocationWithTimeout(const Duration(seconds: 4));
+      if (!mounted) return;
+      if (raw == null) {
+        setState(() => _rangeHint = 'Location needed to clock in here');
+        return;
+      }
+      final parsed = Geofence.parseLatLng(raw);
+      if (parsed == null) {
+        setState(() => _rangeHint = 'Location needed to clock in here');
+        return;
+      }
+      final metres = Geofence.distanceMeters(
+        lat1: site.latitude,
+        lng1: site.longitude,
+        lat2: parsed.lat,
+        lng2: parsed.lng,
+      );
+      final inside = metres <= site.radiusMeters;
+      setState(() {
+        _rangeHint = inside
+            ? 'In range · ${metres.round()} m from ${site.name}'
+            : 'About ${metres.round()} m away · need within ${site.radiusMeters} m';
+      });
+    } finally {
+      _rangeChecking = false;
     }
   }
 
@@ -200,7 +250,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   // ──────────────────────────────────────────────
 
   Future<void> _clockIn() async {
-    if (_state != _AttendanceState.idle) return;
+    if (_state != _AttendanceState.idle || _clockBusy) return;
     final ok = await _confirm(
       title: 'Clock In',
       message: 'Start your workday now?',
@@ -212,36 +262,85 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     if (!mounted) return;
 
     final uid = context.read<AuthProvider>().user!.id;
-    final nowUtc = DateTime.now().toUtc();
-    final cal = AppTime.malaysiaNow();
-    final optimistic = Attendance(
-      id: '${Attendance.pendingLocalIdPrefix}${nowUtc.microsecondsSinceEpoch}',
-      userId: uid,
-      clockInTime: nowUtc,
-      clockOutTime: null,
-      date: DateTime(cal.year, cal.month, cal.day),
-      status: 'in_progress',
-      location: null,
-    );
+    final site = _workSite ?? await SupabaseService.getWorkSite();
+    final activeSite = (site != null && site.isActive) ? site : null;
 
-    setState(() => _today = optimistic);
-    _now.value = AppTime.malaysiaNow();
-    _syncTicker();
-    _showSuccess('Clocked in at ${_fmtTime(nowUtc)}');
+    setState(() => _clockBusy = true);
 
     try {
-      final location = await _getLocationWithTimeout(
-        const Duration(seconds: 5),
-      );
+      // When geofence is on: require GPS + distance check before any UI change.
+      String? location;
+      if (activeSite != null) {
+        location = await _getLocationWithTimeout(const Duration(seconds: 6));
+        if (!mounted) return;
+        if (location == null) {
+          _showError(
+            'Location is required to clock in at ${activeSite.name}. '
+            'Allow location access and try again.',
+          );
+          return;
+        }
+        final parsed = Geofence.parseLatLng(location);
+        if (parsed == null) {
+          _showError('Could not read your GPS position. Try again.');
+          return;
+        }
+        final metres = Geofence.distanceMeters(
+          lat1: activeSite.latitude,
+          lng1: activeSite.longitude,
+          lat2: parsed.lat,
+          lng2: parsed.lng,
+        );
+        if (metres > activeSite.radiusMeters) {
+          _showError(
+            'You are about ${metres.round()} m from ${activeSite.name}. '
+            'Clock-in is only allowed within ${activeSite.radiusMeters} m.',
+          );
+          unawaited(_refreshRangeHint());
+          return;
+        }
+      } else {
+        location = await _getLocationWithTimeout(const Duration(seconds: 5));
+      }
+
+      if (activeSite == null) {
+        // Fast path when geofence is off — keep optimistic UI.
+        final nowUtc = DateTime.now().toUtc();
+        final cal = AppTime.malaysiaNow();
+        final optimistic = Attendance(
+          id: '${Attendance.pendingLocalIdPrefix}${nowUtc.microsecondsSinceEpoch}',
+          userId: uid,
+          clockInTime: nowUtc,
+          clockOutTime: null,
+          date: DateTime(cal.year, cal.month, cal.day),
+          status: 'in_progress',
+          location: location,
+        );
+        setState(() => _today = optimistic);
+        _now.value = AppTime.malaysiaNow();
+        _syncTicker();
+        _showSuccess('Clocked in at ${_fmtTime(nowUtc)}');
+      }
+
       final record = await SupabaseService.clockIn(uid, location: location);
       if (!mounted) return;
-      setState(() => _today = record);
+      setState(() {
+        _today = record;
+        _rangeHint = null;
+      });
+      _now.value = AppTime.malaysiaNow();
       _syncTicker();
+      if (activeSite != null && record.clockInTime != null) {
+        _showSuccess('Clocked in at ${_fmtTime(record.clockInTime!)}');
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _today = null);
       _syncTicker();
       _showError(friendlyLeaveError(e));
+      unawaited(_refreshRangeHint());
+    } finally {
+      if (mounted) setState(() => _clockBusy = false);
     }
   }
 
@@ -795,11 +894,25 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
           ),
         );
       case _AttendanceState.idle:
-        return _bigButton(
-          label: 'Clock In',
-          icon: Icons.login,
-          color: AppColors.primary,
-          onPressed: _clockIn,
+        final fenceOn = _workSite?.isActive == true;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (fenceOn) ...[
+              _GeofenceHint(
+                hint: _rangeHint,
+                checking: _rangeChecking,
+                onRefresh: _clockBusy ? null : _refreshRangeHint,
+              ),
+              const SizedBox(height: 12),
+            ],
+            _bigButton(
+              label: _clockBusy ? 'Clocking in…' : 'Clock In',
+              icon: Icons.login,
+              color: AppColors.primary,
+              onPressed: _clockBusy ? null : _clockIn,
+            ),
+          ],
         );
       case _AttendanceState.working:
         final pendingIn =
@@ -981,6 +1094,73 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
           backgroundColor: color,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GeofenceHint extends StatelessWidget {
+  const _GeofenceHint({
+    required this.hint,
+    required this.checking,
+    required this.onRefresh,
+  });
+
+  final String? hint;
+  final bool checking;
+  final VoidCallback? onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = checking
+        ? 'Checking distance to workplace…'
+        : (hint ?? 'Workplace geofence is on — stay in range to clock in');
+    final inRange = hint != null && hint!.startsWith('In range');
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onRefresh,
+        borderRadius: BorderRadius.circular(12),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: (inRange ? AppColors.success : AppColors.sky)
+                .withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: (inRange ? AppColors.success : AppColors.sky)
+                  .withValues(alpha: 0.28),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                inRange ? Icons.verified_rounded : Icons.location_on_outlined,
+                size: 18,
+                color: inRange ? AppColors.success : AppColors.sky,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                    color: AppColors.textPrimary.withValues(alpha: 0.88),
+                  ),
+                ),
+              ),
+              if (onRefresh != null)
+                Icon(
+                  Icons.refresh_rounded,
+                  size: 18,
+                  color: AppColors.textSecondary.withValues(alpha: 0.8),
+                ),
+            ],
           ),
         ),
       ),

@@ -24,6 +24,29 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscure = true;
   bool _busy = false;
   String? _error;
+  String? _info;
+  bool _infoIsError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      final isError = auth.loginBannerIsError;
+      final banner = auth.takeLoginBanner();
+      if (banner == null) return;
+      setState(() {
+        if (isError) {
+          _error = banner;
+          _info = null;
+        } else {
+          _info = banner;
+          _infoIsError = false;
+        }
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -88,6 +111,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               obscure: _obscure,
                               busy: _busy,
                               error: _error,
+                              info: _info,
+                              infoIsError: _infoIsError,
                               onToggleObscure: () =>
                                   setState(() => _obscure = !_obscure),
                               onSubmit: _submit,
@@ -217,6 +242,8 @@ class _FormCard extends StatelessWidget {
     required this.obscure,
     required this.busy,
     required this.error,
+    this.info,
+    this.infoIsError = false,
     required this.onToggleObscure,
     required this.onSubmit,
     required this.onForgotPassword,
@@ -229,6 +256,8 @@ class _FormCard extends StatelessWidget {
   final bool obscure;
   final bool busy;
   final String? error;
+  final String? info;
+  final bool infoIsError;
   final VoidCallback onToggleObscure;
   final VoidCallback onSubmit;
   final VoidCallback onForgotPassword;
@@ -418,6 +447,10 @@ class _FormCard extends StatelessWidget {
                 ),
 
                 // ── Error banner ────────────────────────────────────
+                if (info != null) ...[
+                  const SizedBox(height: 14),
+                  _InfoBanner(info!, isError: infoIsError),
+                ],
                 if (error != null) ...[
                   const SizedBox(height: 14),
                   _ErrorBanner(error!),
@@ -505,6 +538,49 @@ class _ErrorBanner extends StatelessWidget {
               message,
               style: const TextStyle(
                 color: AppColors.danger,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner(this.message, {this.isError = false});
+
+  final String message;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isError ? AppColors.danger : AppColors.success;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: color,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
                 height: 1.3,

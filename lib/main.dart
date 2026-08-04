@@ -12,12 +12,16 @@ import 'startup_timing.dart';
 import 'screens/login_screen.dart';
 import 'screens/employee/employee_shell.dart';
 import 'screens/admin/admin_shell.dart';
+import 'screens/set_new_password_screen.dart';
+import 'utils/auth_link_bootstrap.dart';
 import 'utils/web_url_cleanup.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   StartupTiming.mark('binding_ready');
 
+  // Capture recovery / error from the email link before cleaning the URL.
+  AuthLinkBootstrap.captureFromCurrentUrl();
   // Drop expired email-link error params before first paint (web).
   clearAuthErrorQueryFromUrl();
 
@@ -211,6 +215,11 @@ class _AuthGate extends StatelessWidget {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+
+    // Recovery session must not open the dashboard — set password first.
+    final recovery =
+        context.select<AuthProvider, bool>((a) => a.passwordRecoveryPending);
+    if (recovery) return const SetNewPasswordScreen();
 
     final loggedIn = context.select<AuthProvider, bool>((a) => a.isLoggedIn);
     if (!loggedIn) return const LoginScreen();

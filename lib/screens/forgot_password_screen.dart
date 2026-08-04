@@ -41,7 +41,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _busy = false;
       _success = result == null;
       _message = result ??
-          'Reset email sent. Check your inbox and follow the link to set a new password.';
+          'Reset email sent. Open the link in the email — you will set a new password, then sign in.';
     });
   }
 
@@ -82,11 +82,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Enter your account email and we will send you a reset link.',
+                    'Enter your account email. We send a link that opens a '
+                    'screen to choose a new password (then you sign in).',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,
+                      height: 1.35,
                     ),
                   ),
                   const SizedBox(height: 20),

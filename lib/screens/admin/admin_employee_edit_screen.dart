@@ -101,10 +101,17 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
   InputDecoration _dec(String label, [IconData? icon]) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: icon != null ? Icon(icon, size: 22) : null,
+      // Keep labels on the border so filled/empty fields look the same.
+      floatingLabelBehavior: FloatingLabelBehavior.always,
+      prefixIcon: icon != null
+          ? Icon(icon, size: 22, color: AppColors.textSecondary)
+          : null,
       alignLabelWithHint: true,
     );
   }
+
+  Widget _fieldIcon(IconData icon) =>
+      Icon(icon, size: 22, color: AppColors.textSecondary);
 
   Future<void> _pickDob() async {
     final now = AppTime.malaysiaNow();
@@ -263,14 +270,14 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             const Divider(height: 28),
             TextFormField(
               controller: _nameCtrl,
-              decoration: _dec('Full name', Icons.badge_outlined),
+              decoration: _dec('Full name', Icons.person_outline_rounded),
               validator: ProfileValidators.requiredName,
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: _role,
-              decoration: _dec('Role', Icons.shield_outlined),
+              decoration: _dec('Role', Icons.admin_panel_settings_outlined),
               items: const [
                 DropdownMenuItem(value: 'employee', child: Text('Employee')),
                 DropdownMenuItem(value: 'admin', child: Text('Admin')),
@@ -281,7 +288,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             TextFormField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: _dec('Phone', Icons.phone_iphone_rounded),
+              decoration: _dec('Phone', Icons.phone_rounded),
               validator: ProfileValidators.phoneMalaysia,
             ),
             const SizedBox(height: 12),
@@ -295,7 +302,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             DropdownButtonFormField<String>(
               key: ValueKey<String>('marital_$_maritalValue'),
               initialValue: _maritalValue.isEmpty ? '' : _maritalValue,
-              decoration: _dec('Marital status', Icons.favorite_outline),
+              decoration: _dec('Marital status', Icons.favorite_border_rounded),
               items: const [
                 DropdownMenuItem(value: '', child: Text('Not set')),
                 DropdownMenuItem(value: 'Single', child: Text('Single')),
@@ -308,13 +315,14 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             ),
             const SizedBox(height: 12),
             ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.cake_outlined),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              leading: _fieldIcon(Icons.cake_rounded),
               title: const Text('Date of birth'),
               subtitle: Text(
                 _dob == null ? 'Tap to select' : dateFmt.format(_dob!),
               ),
-              trailing: const Icon(Icons.edit_calendar_outlined),
+              trailing: _fieldIcon(Icons.chevron_right_rounded),
               onTap: _pickDob,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -324,7 +332,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _icCtrl,
-              decoration: _dec('IC / NRIC', Icons.credit_card_outlined),
+              decoration: _dec('IC / NRIC', Icons.contact_page_outlined),
               validator: ProfileValidators.icNumber,
             ),
             const Divider(height: 28),
@@ -335,29 +343,30 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _jobCtrl,
-              decoration: _dec('Job title', Icons.work_outline),
+              decoration: _dec('Job title', Icons.work_outline_rounded),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _deptCtrl,
-              decoration: _dec('Department', Icons.apartment_outlined),
+              decoration: _dec('Department', Icons.business_outlined),
             ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _empIdCtrl,
-              decoration: _dec('Employee ID', Icons.badge_outlined),
+              decoration: _dec('Employee ID', Icons.tag_rounded),
             ),
             const SizedBox(height: 12),
             ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.event_outlined),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              leading: _fieldIcon(Icons.event_outlined),
               title: const Text('Employment start'),
               subtitle: Text(
                 _employmentStart == null
                     ? 'Not set'
                     : dateFmt.format(_employmentStart!),
               ),
-              trailing: const Icon(Icons.edit_calendar_outlined),
+              trailing: _fieldIcon(Icons.chevron_right_rounded),
               onTap: _pickEmploymentStart,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -370,7 +379,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: _dec(
                 'Annual leave days override (optional)',
-                Icons.date_range_outlined,
+                Icons.event_available_outlined,
               ),
             ),
             const Text(
@@ -385,7 +394,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _epfCtrl,
-              decoration: _dec('EPF', Icons.savings_outlined),
+              decoration: _dec('EPF', Icons.account_balance_wallet_outlined),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -427,7 +436,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _emeNameCtrl,
-              decoration: _dec('Name', Icons.person_outline),
+              decoration: _dec('Name', Icons.person_outline_rounded),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -438,7 +447,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             TextFormField(
               controller: _emePhoneCtrl,
               keyboardType: TextInputType.phone,
-              decoration: _dec('Phone', Icons.phone_callback_outlined),
+              decoration: _dec('Phone', Icons.phone_rounded),
               validator: ProfileValidators.phoneMalaysia,
             ),
             const SizedBox(height: 24),
