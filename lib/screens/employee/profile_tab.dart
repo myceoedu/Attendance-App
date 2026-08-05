@@ -7,12 +7,10 @@ import 'package:provider/provider.dart';
 import '../../constants/app_theme.dart';
 import '../../models/app_user.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/employee_profile_pdf.dart';
 import '../../utils/app_time.dart';
 import '../../utils/profile_validators.dart';
 import '../change_password_screen.dart';
 import '../help_support_screen.dart';
-import 'employee_payroll_history_screen.dart';
 
 enum _ProfileSectionKey {
   personal,
@@ -85,7 +83,6 @@ class _ProfileTabState extends State<ProfileTab> {
   final _formKey = GlobalKey<FormState>();
   bool _editing = false;
   bool _saving = false;
-  bool _exportingPdf = false;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
@@ -340,21 +337,6 @@ class _ProfileTabState extends State<ProfileTab> {
           ..add(key);
       }
     });
-  }
-
-  Future<void> _exportPdf(AppUser u) async {
-    setState(() => _exportingPdf = true);
-    try {
-      await EmployeeProfilePdf.shareProfilePdf(u);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not create PDF: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _exportingPdf = false);
-    }
   }
 
   void _confirmLogout(BuildContext context, AuthProvider auth) {
@@ -831,53 +813,9 @@ class _ProfileTabState extends State<ProfileTab> {
                   ),
                 ),
                   const SizedBox(height: 20),
-                  if (!user.isAdmin) ...[
-                    Material(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      clipBehavior: Clip.antiAlias,
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        leading: CircleAvatar(
-                          backgroundColor:
-                              AppColors.violetLight.withValues(alpha: 0.85),
-                          child: Icon(
-                            Icons.receipt_long_rounded,
-                            color: AppColors.violet,
-                          ),
-                        ),
-                        title: const Text(
-                          'My payslips',
-                          style: TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Text(
-                          'Pay history and PDF downloads',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: AppColors.textSecondary
-                                .withValues(alpha: 0.92),
-                          ),
-                        ),
-                        trailing: Icon(
-                          Icons.chevron_right_rounded,
-                          color:
-                              AppColors.textHint.withValues(alpha: 0.85),
-                        ),
-                        onTap: () => pushAppPage(
-                          context,
-                          const EmployeePayrollHistoryScreen(),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
                   _QuickActions(
                     editing: _editing,
                     saving: _saving,
-                    exportingPdf: _exportingPdf,
                     onStartEdit: () => setState(() {
                       _editing = true;
                       _expandedSections =
@@ -894,7 +832,6 @@ class _ProfileTabState extends State<ProfileTab> {
                     onChangePassword: () {
                       pushAppPage(context, const ChangePasswordScreen());
                     },
-                    onDownloadPdf: () => _exportPdf(user),
                     onSignOut: () =>
                         _confirmLogout(context, context.read<AuthProvider>()),
                   ),
@@ -1328,25 +1265,21 @@ class _QuickActions extends StatelessWidget {
   const _QuickActions({
     required this.editing,
     required this.saving,
-    required this.exportingPdf,
     required this.onStartEdit,
     required this.onSave,
     required this.onCancel,
     required this.onHelpSupport,
     required this.onChangePassword,
-    required this.onDownloadPdf,
     required this.onSignOut,
   });
 
   final bool editing;
   final bool saving;
-  final bool exportingPdf;
   final VoidCallback onStartEdit;
   final VoidCallback onSave;
   final VoidCallback onCancel;
   final VoidCallback onHelpSupport;
   final VoidCallback onChangePassword;
-  final VoidCallback onDownloadPdf;
   final VoidCallback onSignOut;
 
   @override
@@ -1417,11 +1350,6 @@ class _QuickActions extends StatelessWidget {
           icon: Icons.lock_reset_rounded,
           label: 'Change password',
           onTap: onChangePassword,
-        ),
-        _actionTile(
-          icon: Icons.picture_as_pdf_outlined,
-          label: exportingPdf ? 'Preparing PDF…' : 'Download employee info (PDF)',
-          onTap: exportingPdf ? null : onDownloadPdf,
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(

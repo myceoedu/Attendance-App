@@ -53,3 +53,4 @@ WHERE email = 'your-admin@email.com';
 
 - Prefer an **empty** project for first-time setup.
 - Do **not** use the optional seed on a real production company database.
+- you need to run database file (01 - 09 except 08) if you create new supabase account.
