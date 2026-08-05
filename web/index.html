@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,7 +18,10 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <!-- Allow zoom for accessibility (PageSpeed / low-vision users). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="description" content="myRekod — workforce attendance, leave & claims.">
+  <meta name="theme-color" content="#1A56DB">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,16 +34,93 @@
 
   <title>myRekod</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Immediate first paint: branded splash so users (and Lighthouse) see content
+    before main.dart.js / CanvasKit finish loading.
+  -->
   <style>
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
-      background-color: #F8FAFC;
+      background: #0F2255;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    #splash {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      background: linear-gradient(160deg, #0F2255 0%, #1A3A8F 48%, #1A56DB 100%);
+      color: #fff;
+      transition: opacity 280ms ease, visibility 280ms ease;
+    }
+    #splash.hide {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #splash .mark {
+      width: 56px;
+      height: 56px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 20px;
+      letter-spacing: -0.4px;
+    }
+    #splash .title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      margin: 0;
+    }
+    #splash .sub {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.72;
+    }
+    #splash .spinner {
+      width: 28px;
+      height: 28px;
+      margin-top: 8px;
+      border: 3px solid rgba(255, 255, 255, 0.22);
+      border-top-color: #2DD4BF;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
+  <div id="splash" aria-busy="true" aria-live="polite">
+    <div class="mark" aria-hidden="true">mR</div>
+    <p class="title">myRekod</p>
+    <p class="sub">Workforce management</p>
+    <div class="spinner" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    // Hide splash once Flutter paints the first frame.
+    window.addEventListener('flutter-first-frame', function () {
+      var el = document.getElementById('splash');
+      if (!el) return;
+      el.classList.add('hide');
+      setTimeout(function () { el.remove(); }, 320);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

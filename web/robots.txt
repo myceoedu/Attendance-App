@@ -1,0 +1,6 @@
+# myRekod
+
+User-agent: *
+Allow: /
+
+Sitemap: https://attendance-app-peach-rho.vercel.app/

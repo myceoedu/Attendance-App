@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -227,24 +228,60 @@ abstract class AppChrome {
   );
 }
 
-/// Employee home typography — **Inter only**, three weights: 500 / 600 / 700.
+/// Employee home typography — **Inter** on native; system UI stack on web
+/// (avoids ~400KB+ Google Fonts CDN on first paint — PageSpeed).
 abstract class AppTypography {
+  static TextStyle _brand({
+    Color? color,
+    double? fontSize,
+    FontWeight? fontWeight,
+    double? height,
+    double? letterSpacing,
+    List<FontFeature>? fontFeatures,
+  }) {
+    if (kIsWeb) {
+      return TextStyle(
+        color: color,
+        fontSize: fontSize,
+        fontWeight: fontWeight,
+        height: height,
+        letterSpacing: letterSpacing,
+        fontFeatures: fontFeatures,
+        fontFamilyFallback: const [
+          'Segoe UI',
+          'Roboto',
+          'Helvetica Neue',
+          'Arial',
+          'sans-serif',
+        ],
+      );
+    }
+    return GoogleFonts.inter(
+      color: color,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      height: height,
+      letterSpacing: letterSpacing,
+      fontFeatures: fontFeatures,
+    );
+  }
+
   // --- Brand header (hero) -------------------------------------------------
-  static TextStyle employeeHeroAvatarInitial() => GoogleFonts.inter(
+  static TextStyle employeeHeroAvatarInitial() => _brand(
         color: AppColors.onBrand,
         fontSize: 18,
         fontWeight: FontWeight.w600,
         height: 1,
       );
 
-  static TextStyle employeeHeroGreeting(Color color) => GoogleFonts.inter(
+  static TextStyle employeeHeroGreeting(Color color) => _brand(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: color,
         height: 1.2,
       );
 
-  static TextStyle employeeHeroName(Color color) => GoogleFonts.inter(
+  static TextStyle employeeHeroName(Color color) => _brand(
         fontSize: 20,
         fontWeight: FontWeight.w600,
         color: color,
@@ -252,7 +289,7 @@ abstract class AppTypography {
         height: 1.2,
       );
 
-  static TextStyle employeeHeroDate(Color color) => GoogleFonts.inter(
+  static TextStyle employeeHeroDate(Color color) => _brand(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: color,
@@ -260,7 +297,7 @@ abstract class AppTypography {
       );
 
   // --- Section eyebrows (ATTENDANCE, QUICK ACTIONS): 12–13 medium, gray ----
-  static TextStyle employeeSectionEyebrow(Color color) => GoogleFonts.inter(
+  static TextStyle employeeSectionEyebrow(Color color) => _brand(
         fontSize: 12.5,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.45,
@@ -269,7 +306,7 @@ abstract class AppTypography {
       );
 
   /// Tight overline for dense cards (preferred over heavy ALL CAPS).
-  static TextStyle employeeCardOverline(Color color) => GoogleFonts.inter(
+  static TextStyle employeeCardOverline(Color color) => _brand(
         fontSize: 10.5,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.65,
@@ -278,7 +315,7 @@ abstract class AppTypography {
       );
 
   /// Card headings: "Today's times", "Self-service".
-  static TextStyle employeeSectionHeading(Color color) => GoogleFonts.inter(
+  static TextStyle employeeSectionHeading(Color color) => _brand(
         fontSize: 18,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
@@ -287,7 +324,7 @@ abstract class AppTypography {
       );
 
   /// Main status line: "You are clocked in".
-  static TextStyle employeeAttendanceStatus(Color color) => GoogleFonts.inter(
+  static TextStyle employeeAttendanceStatus(Color color) => _brand(
         fontSize: 19,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.15,
@@ -296,7 +333,7 @@ abstract class AppTypography {
       );
 
   /// Snapshot card headline — slightly tighter than [employeeAttendanceStatus].
-  static TextStyle employeeSnapshotHeadline(Color color) => GoogleFonts.inter(
+  static TextStyle employeeSnapshotHeadline(Color color) => _brand(
         fontSize: 17,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.38,
@@ -306,7 +343,7 @@ abstract class AppTypography {
       );
 
   /// Clock-in / clock-out row labels (sentence case, calm).
-  static TextStyle employeeTimeRowLabel(Color color) => GoogleFonts.inter(
+  static TextStyle employeeTimeRowLabel(Color color) => _brand(
         fontSize: 11,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.02,
@@ -315,7 +352,7 @@ abstract class AppTypography {
       );
 
   /// CLOCK-IN / CLOCK-OUT caps labels.
-  static TextStyle employeeTimeFieldLabel(Color color) => GoogleFonts.inter(
+  static TextStyle employeeTimeFieldLabel(Color color) => _brand(
         fontSize: 11.5,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.55,
@@ -324,7 +361,7 @@ abstract class AppTypography {
       );
 
   /// Clock times — boldest, 20–24.
-  static TextStyle employeeTimeNumeric(double layoutWidth) => GoogleFonts.inter(
+  static TextStyle employeeTimeNumeric(double layoutWidth) => _brand(
         fontSize: layoutWidth >= 400 ? 22 : 20,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.35,
@@ -334,7 +371,7 @@ abstract class AppTypography {
       );
 
   /// "In progress", em dash placeholder.
-  static TextStyle employeeTimeSecondary() => GoogleFonts.inter(
+  static TextStyle employeeTimeSecondary() => _brand(
         fontSize: 13.5,
         fontWeight: FontWeight.w500,
         letterSpacing: -0.05,
@@ -343,7 +380,7 @@ abstract class AppTypography {
       );
 
   /// Day shift / shift pill (muted secondary).
-  static TextStyle employeeShiftSecondary(Color color) => GoogleFonts.inter(
+  static TextStyle employeeShiftSecondary(Color color) => _brand(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         height: 1.2,
@@ -351,7 +388,7 @@ abstract class AppTypography {
       );
 
   /// Primary circular action (Clock In / Clock Out).
-  static TextStyle employeePrimaryActionLabel() => GoogleFonts.inter(
+  static TextStyle employeePrimaryActionLabel() => _brand(
         color: Colors.white,
         fontSize: 15,
         fontWeight: FontWeight.w500,
@@ -360,7 +397,7 @@ abstract class AppTypography {
       );
 
   /// Filled rectangular button (Attendance log).
-  static TextStyle employeeFilledButtonLabel() => GoogleFonts.inter(
+  static TextStyle employeeFilledButtonLabel() => _brand(
         color: Colors.white,
         fontSize: 14,
         fontWeight: FontWeight.w500,
@@ -369,7 +406,7 @@ abstract class AppTypography {
       );
 
   /// Right-rail primary action (compact).
-  static TextStyle employeeRailPrimaryLabel() => GoogleFonts.inter(
+  static TextStyle employeeRailPrimaryLabel() => _brand(
         color: Colors.white,
         fontSize: 12,
         fontWeight: FontWeight.w700,
@@ -377,7 +414,7 @@ abstract class AppTypography {
         letterSpacing: 0.06,
       );
 
-  static TextStyle employeeRailSecondaryLabel() => GoogleFonts.inter(
+  static TextStyle employeeRailSecondaryLabel() => _brand(
         color: Colors.white.withValues(alpha: 0.72),
         fontSize: 9.5,
         fontWeight: FontWeight.w500,
@@ -386,7 +423,7 @@ abstract class AppTypography {
       );
 
   /// Quick-access grid labels (same button weight class).
-  static TextStyle quickAccessTileLabel() => GoogleFonts.inter(
+  static TextStyle quickAccessTileLabel() => _brand(
         fontSize: 13,
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimary.withValues(alpha: 0.92),
@@ -451,7 +488,10 @@ ThemeData buildAppTheme() {
     colorScheme: scheme,
   );
 
-  final textTheme = GoogleFonts.interTextTheme(base.textTheme).apply(
+  final textTheme = (kIsWeb
+          ? base.textTheme
+          : GoogleFonts.interTextTheme(base.textTheme))
+      .apply(
     bodyColor: AppColors.textPrimary,
     displayColor: AppColors.textPrimary,
   );
@@ -482,11 +522,17 @@ ThemeData buildAppTheme() {
       scrolledUnderElevation: 0.5,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
-      titleTextStyle: GoogleFonts.inter(
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
-      ),
+      titleTextStyle: kIsWeb
+          ? const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            )
+          : GoogleFonts.inter(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
       iconTheme: const IconThemeData(color: AppColors.textPrimary),
     ),
     cardTheme: CardThemeData(

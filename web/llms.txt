@@ -1,0 +1,8 @@
+# myRekod
+
+myRekod is a workforce management web app for attendance, leave, claims, and payroll.
+
+## Links
+
+- [App](https://attendance-app-peach-rho.vercel.app/): Sign-in and employee / admin workspace
+- [Help](https://attendance-app-peach-rho.vercel.app/): In-app Help & support after sign-in

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'config/app_config.dart';
@@ -19,6 +20,11 @@ import 'utils/web_url_cleanup.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   StartupTiming.mark('binding_ready');
+
+  // Web: never pull Inter from fonts.gstatic.com (~400KB+ on cold load).
+  if (kIsWeb) {
+    GoogleFonts.config.allowRuntimeFetching = false;
+  }
 
   // Capture recovery / error from the email link before cleaning the URL.
   AuthLinkBootstrap.captureFromCurrentUrl();
