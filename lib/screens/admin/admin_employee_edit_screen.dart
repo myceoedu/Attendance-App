@@ -21,6 +21,11 @@ class AdminEmployeeEditScreen extends StatefulWidget {
 class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
+  bool _loadingProfile = true;
+  String? _loadError;
+
+  /// Full row from DB (list payload is incomplete — reload on open).
+  late AppUser _employee;
 
   late final TextEditingController _nameCtrl;
   late final TextEditingController _phoneCtrl;
@@ -48,32 +53,78 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
   @override
   void initState() {
     super.initState();
-    final e = widget.employee;
-    _nameCtrl = TextEditingController(text: e.name);
-    _phoneCtrl = TextEditingController(text: e.phone ?? '');
-    _addressCtrl = TextEditingController(text: e.address ?? '');
-    _icCtrl = TextEditingController(text: e.icNumber ?? '');
-    _jobCtrl = TextEditingController(text: e.jobTitle ?? '');
-    _deptCtrl = TextEditingController(text: e.department ?? '');
-    _empIdCtrl = TextEditingController(text: e.employeeCode ?? '');
-    _epfCtrl = TextEditingController(text: e.epfNumber ?? '');
-    _socsoCtrl = TextEditingController(text: e.socsoNumber ?? '');
-    _bankNameCtrl = TextEditingController(text: e.bankName ?? '');
-    _bankAcctCtrl = TextEditingController(text: e.bankAccountNumber ?? '');
-    _eduLevelCtrl = TextEditingController(text: e.educationLevel ?? '');
-    _eduInstCtrl = TextEditingController(text: e.educationInstitution ?? '');
-    _emeNameCtrl = TextEditingController(text: e.emergencyContactName ?? '');
-    _emeRelCtrl =
-        TextEditingController(text: e.emergencyContactRelationship ?? '');
-    _emePhoneCtrl =
-        TextEditingController(text: e.emergencyContactPhone ?? '');
-    _overrideCtrl = TextEditingController(
-      text: e.annualLeaveEntitlementOverride?.toString() ?? '',
-    );
+    _employee = widget.employee;
+    _nameCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
+    _addressCtrl = TextEditingController();
+    _icCtrl = TextEditingController();
+    _jobCtrl = TextEditingController();
+    _deptCtrl = TextEditingController();
+    _empIdCtrl = TextEditingController();
+    _epfCtrl = TextEditingController();
+    _socsoCtrl = TextEditingController();
+    _bankNameCtrl = TextEditingController();
+    _bankAcctCtrl = TextEditingController();
+    _eduLevelCtrl = TextEditingController();
+    _eduInstCtrl = TextEditingController();
+    _emeNameCtrl = TextEditingController();
+    _emeRelCtrl = TextEditingController();
+    _emePhoneCtrl = TextEditingController();
+    _overrideCtrl = TextEditingController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadFullProfile();
+    });
+  }
+
+  void _applyEmployee(AppUser e) {
+    _employee = e;
+    _nameCtrl.text = e.name;
+    _phoneCtrl.text = e.phone ?? '';
+    _addressCtrl.text = e.address ?? '';
+    _icCtrl.text = e.icNumber ?? '';
+    _jobCtrl.text = e.jobTitle ?? '';
+    _deptCtrl.text = e.department ?? '';
+    _empIdCtrl.text = e.employeeCode ?? '';
+    _epfCtrl.text = e.epfNumber ?? '';
+    _socsoCtrl.text = e.socsoNumber ?? '';
+    _bankNameCtrl.text = e.bankName ?? '';
+    _bankAcctCtrl.text = e.bankAccountNumber ?? '';
+    _eduLevelCtrl.text = e.educationLevel ?? '';
+    _eduInstCtrl.text = e.educationInstitution ?? '';
+    _emeNameCtrl.text = e.emergencyContactName ?? '';
+    _emeRelCtrl.text = e.emergencyContactRelationship ?? '';
+    _emePhoneCtrl.text = e.emergencyContactPhone ?? '';
+    _overrideCtrl.text = e.annualLeaveEntitlementOverride?.toString() ?? '';
     _role = e.role;
     _maritalValue = e.maritalStatus ?? '';
     _dob = e.dateOfBirth;
     _employmentStart = e.employmentStartDate;
+  }
+
+  Future<void> _loadFullProfile() async {
+    setState(() {
+      _loadingProfile = true;
+      _loadError = null;
+    });
+    try {
+      final full = await SupabaseService.getUserById(widget.employee.id);
+      if (!mounted) return;
+      if (full == null) {
+        setState(() {
+          _loadingProfile = false;
+          _loadError = 'Employee record not found.';
+        });
+        return;
+      }
+      _applyEmployee(full);
+      setState(() => _loadingProfile = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingProfile = false;
+        _loadError = 'Could not load employee details. Pull to retry.';
+      });
+    }
   }
 
   @override
@@ -154,7 +205,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
     double? parsedOv;
     var clearOv = false;
     if (rawOv.isEmpty) {
-      clearOv = widget.employee.annualLeaveEntitlementOverride != null;
+      clearOv = _employee.annualLeaveEntitlementOverride != null;
     } else {
       parsedOv = double.tryParse(rawOv.replaceAll(',', '.'));
       if (parsedOv == null || parsedOv < 0 || parsedOv > 99.9) {
@@ -171,7 +222,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
     setState(() => _saving = true);
     try {
       await SupabaseService.updateEmployeeAsAdmin(
-        userId: widget.employee.id,
+        userId: _employee.id,
         name: _nameCtrl.text,
         role: _role,
         phone: _phoneCtrl.text,
@@ -223,8 +274,9 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final e = widget.employee;
+    final e = _employee;
     final dateFmt = DateFormat('d MMM yyyy');
+    final canEdit = !_loadingProfile && _loadError == null;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -232,7 +284,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
         title: const Text('Edit employee'),
         actions: [
           TextButton(
-            onPressed: _saving ? null : _save,
+            onPressed: (_saving || !canEdit) ? null : _save,
             child: _saving
                 ? const SizedBox(
                     width: 20,
@@ -243,7 +295,30 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
           ),
         ],
       ),
-      body: Form(
+      body: _loadingProfile
+          ? const Center(child: CircularProgressIndicator())
+          : _loadError != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _loadError!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _loadFullProfile,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -452,7 +527,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
             ),
             const SizedBox(height: 24),
             FilledButton(
-              onPressed: _saving ? null : _save,
+              onPressed: (_saving || !canEdit) ? null : _save,
               child: Text(_saving ? 'Saving…' : 'Save changes'),
             ),
             const SizedBox(height: 24),

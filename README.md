@@ -1,16 +1,43 @@
-# attendance_app
+# myRekod (attendance_app)
 
-A new Flutter project.
+Flutter HR app for attendance, leave, claims, payroll, announcements, and workplace geofence.  
+Backend: **Supabase**.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## Documentation (start here)
 
-A few resources to get you started if this is your first Flutter project:
+All handover docs for **users** and **new developers** are in:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+### → [docs/README.md](docs/README.md)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+| Audience | Go to |
+|----------|--------|
+| Employees & admins | [docs/user/](docs/user/) |
+| Developers | [docs/developer/](docs/developer/) |
+| PDF manuals | [docs/pdf/](docs/pdf/) — User Manual + Developer Handover |
+
+---
+
+## Quick start (developers)
+
+```bash
+flutter pub get
+flutter run -d chrome
+```
+
+Configure Supabase in `lib/config/app_config.dart` or via:
+
+```bash
+--dart-define=SUPABASE_URL=...
+--dart-define=SUPABASE_ANON_KEY=...
+```
+
+Database setup: [supabase_bundles/README.md](supabase_bundles/README.md)
+
+---
+
+## Support (in-app)
+
+Phone: **+60 11-7078 7014**  
+Configured in `lib/constants/help_support_config.dart`

@@ -195,7 +195,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       }
       final parsed = Geofence.parseLatLng(raw);
       if (parsed == null) {
-        setState(() => _rangeHint = 'Location needed to clock in here');
+        setState(() => _rangeHint = 'Allow location access to clock in');
         return;
       }
       final metres = Geofence.distanceMeters(
@@ -208,7 +208,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       setState(() {
         _rangeHint = inside
             ? 'In range · ${metres.round()} m from ${site.name}'
-            : 'About ${metres.round()} m away · need within ${site.radiusMeters} m';
+            : '${metres.round()} m away · must be within ${site.radiusMeters} m';
       });
     } finally {
       _rangeChecking = false;
@@ -282,7 +282,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
         }
         final parsed = Geofence.parseLatLng(location);
         if (parsed == null) {
-          _showError('Could not read your GPS position. Try again.');
+          _showError('Could not read your location. Try again.');
           return;
         }
         final metres = Geofence.distanceMeters(
@@ -1115,8 +1115,8 @@ class _GeofenceHint extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = checking
-        ? 'Checking distance to workplace…'
-        : (hint ?? 'Workplace geofence is on — stay in range to clock in');
+        ? 'Checking distance to office…'
+        : (hint ?? 'Office location check is on — stay in range to clock in');
     final inRange = hint != null && hint!.startsWith('In range');
 
     return Material(

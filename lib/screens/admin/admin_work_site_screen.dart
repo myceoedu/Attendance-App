@@ -167,7 +167,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
     );
     if (!mounted || picked == null) return;
     _applyPin(picked);
-    _snack('Pin updated from map. Save to apply.');
+    _snack('Location updated from the map. Tap Save to apply.');
   }
 
   Future<void> _useMyLocation() async {
@@ -180,7 +180,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
-        _snack('Allow location access to set the workplace point.', error: true);
+        _snack('Allow location access to set the office location.', error: true);
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
@@ -191,11 +191,11 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
       );
       if (!mounted) return;
       _applyPin(LatLng(pos.latitude, pos.longitude));
-      _snack('Location captured. Save to apply.');
+      _snack('Current location captured. Tap Save to apply.');
     } on TimeoutException {
-      _snack('Location timed out. Try the map picker instead.', error: true);
+      _snack('Location timed out. Try Open on map instead.', error: true);
     } catch (_) {
-      _snack('Could not read GPS. Use “Pick on map” instead.', error: true);
+      _snack('Could not read location. Use Open on map instead.', error: true);
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -228,22 +228,22 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
       });
       _snack(
         _isActive
-            ? 'Workplace saved. Clock-in geofence is ON.'
-            : 'Workplace saved. Geofence is OFF (clock-in anywhere).',
+            ? 'Office location saved. Location check for clock-in is enabled.'
+            : 'Office location saved. Location check is disabled.',
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
       final msg = e.toString().toLowerCase();
       if (msg.contains('row-level security') || msg.contains('rls')) {
-        _snack('Only admins can save the workplace.', error: true);
+        _snack('Only administrators can save the office location.', error: true);
       } else if (msg.contains('work_site') || msg.contains('pgrst205')) {
         _snack(
-          'Database table missing. Run supabase_migration_work_site_geofence.sql.',
+          'Location settings are not available yet. Ask your developer to run the work site migration.',
           error: true,
         );
       } else {
-        _snack('Could not save. Check values and try again.', error: true);
+        _snack('Could not save. Check the details and try again.', error: true);
       }
     }
   }
@@ -262,7 +262,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(title: const Text('Workplace location')),
+      appBar: AppBar(title: const Text('Office location')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _loadError != null
@@ -286,7 +286,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                         FilledButton.tonalIcon(
                           onPressed: _saving ? null : _openMapPicker,
                           icon: const Icon(Icons.map_outlined),
-                          label: const Text('Pick on OpenStreetMap'),
+                          label: const Text('Open on map'),
                         ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
@@ -304,7 +304,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                           label: Text(
                             _locating
                                 ? 'Getting location…'
-                                : 'Use my current location',
+                                : 'Use current location',
                           ),
                         ),
                         const SizedBox(height: 18),
@@ -312,7 +312,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                           controller: _nameCtrl,
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
-                            labelText: 'Workplace name',
+                            labelText: 'Office name',
                             prefixIcon: Icon(Icons.apartment_outlined),
                           ),
                           validator: (v) {
@@ -389,9 +389,9 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                             FilteringTextInputFormatter.digitsOnly,
                           ],
                           decoration: const InputDecoration(
-                            labelText: 'Radius (metres)',
+                            labelText: 'Allowed radius (metres)',
                             helperText:
-                                'Clock-in allowed within this distance (20–5000 m).',
+                                'Employees may clock in within this distance (20–5000 m).',
                             prefixIcon: Icon(Icons.radar_outlined),
                           ),
                           validator: (v) {
@@ -399,7 +399,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                             if (n == null ||
                                 n < Geofence.minRadiusMeters ||
                                 n > Geofence.maxRadiusMeters) {
-                              return 'Use ${Geofence.minRadiusMeters}–${Geofence.maxRadiusMeters}';
+                              return 'Enter ${Geofence.minRadiusMeters}–${Geofence.maxRadiusMeters}';
                             }
                             return null;
                           },
@@ -408,13 +408,13 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                         SwitchListTile.adaptive(
                           contentPadding: EdgeInsets.zero,
                           title: const Text(
-                            'Enforce on clock-in',
+                            'Require location for clock-in',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
                             _isActive
                                 ? 'Employees must be inside the radius to clock in.'
-                                : 'Geofence off — clock-in works from anywhere.',
+                                : 'Location check is off — clock-in is allowed from anywhere.',
                             style: const TextStyle(fontSize: 13),
                           ),
                           value: _isActive,
@@ -434,7 +434,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text('Save workplace'),
+                              : const Text('Save location'),
                         ),
                       ],
                     ),
@@ -463,7 +463,7 @@ class _MapPreviewCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Map preview',
+          'Location preview',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w800,
@@ -495,7 +495,7 @@ class _MapPreviewCard extends StatelessWidget {
                               color: Colors.black.withValues(alpha: 0.18),
                               child: const Center(
                                 child: Text(
-                                  'Tap to pick on map',
+                                  'Tap to open on map',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w700,
@@ -515,8 +515,8 @@ class _MapPreviewCard extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           pin == null
-              ? 'No pin yet — open the map or use GPS.'
-              : 'Teal circle = clock-in radius ($radiusMeters m). Tap map to edit.',
+              ? 'No location set yet. Open the map or use current location.'
+              : 'Allowed clock-in area ($radiusMeters m). Tap to edit on map.',
           style: const TextStyle(
             fontSize: 12,
             color: AppColors.textHint,
@@ -560,7 +560,7 @@ class _InfoCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'One workplace for clock-in',
+                  'Office location for clock-in',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 15,
@@ -572,9 +572,10 @@ class _InfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Pick the office on OpenStreetMap (or use GPS), set the radius '
-            '(e.g. 100 m), turn on enforce, then save. The pin is a fixed snapshot '
-            '— it does not follow your phone home.',
+            'Set one office location for employee clock-in. Choose the location '
+            'on the map or use your current location, set the allowed radius '
+            '(for example 100 m), enable location check, then save. '
+            'The saved location stays fixed until you update it.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,

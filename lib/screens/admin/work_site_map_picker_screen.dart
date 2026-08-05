@@ -58,7 +58,7 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
-        _toast('Allow location access to use GPS.', error: true);
+        _toast('Allow location access to use your current location.', error: true);
         return;
       }
       final pos = await Geolocator.getCurrentPosition(
@@ -71,11 +71,11 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
       final point = LatLng(pos.latitude, pos.longitude);
       setState(() => _pin = point);
       _mapController.move(point, 17);
-      _toast('Pin moved to your GPS position.');
+      _toast('Marker moved to your current location.');
     } on TimeoutException {
-      _toast('GPS timed out. Tap the map instead.', error: true);
+      _toast('Location timed out. Tap the map instead.', error: true);
     } catch (_) {
-      _toast('Could not read GPS. Tap the map to place the pin.', error: true);
+      _toast('Could not read location. Tap the map to set the office.', error: true);
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -94,7 +94,7 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
   void _confirm() {
     final pin = _pin;
     if (pin == null) {
-      _toast('Tap the map to place the workplace pin first.', error: true);
+      _toast('Tap the map to set the office location first.', error: true);
       return;
     }
     Navigator.pop(context, pin);
@@ -110,11 +110,11 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Pick on map'),
+        title: const Text('Set office location'),
         actions: [
           TextButton(
             onPressed: _confirm,
-            child: const Text('Use pin'),
+            child: const Text('Use location'),
           ),
         ],
       ),
@@ -127,8 +127,8 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
               child: Text(
                 _pin == null
-                    ? 'Tap the map to drop the workplace pin. You can drag and zoom.'
-                    : 'Pin set · tap elsewhere to move it · radius preview $radius m',
+                    ? 'Tap the map to set the office location. You can drag and zoom.'
+                    : 'Location set · tap elsewhere to move · radius preview $radius m',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,
@@ -162,7 +162,9 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.gps_fixed_rounded),
-                      label: Text(_locating ? 'GPS…' : 'Use GPS'),
+                      label: Text(
+                        _locating ? 'Locating…' : 'Current location',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),

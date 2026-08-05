@@ -38,9 +38,11 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool forceRefresh = false}) async {
     try {
-      final data = await SupabaseService.getAllEmployees();
+      final data = await SupabaseService.getAllEmployees(
+        forceRefresh: forceRefresh,
+      );
       if (!mounted) return;
       setState(() {
         _employees = data;
@@ -73,7 +75,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     );
     if (ok == true && mounted) {
       setState(() => _loading = true);
-      await _load();
+      await _load(forceRefresh: true);
     }
   }
 
@@ -144,7 +146,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                       : RefreshIndicator(
                           onRefresh: () async {
                             setState(() => _loading = true);
-                            await _load();
+                            await _load(forceRefresh: true);
                           },
                           child: ListView.separated(
                             padding: const EdgeInsets.all(16),

@@ -761,8 +761,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
             Expanded(
               child: _bentoActionCard(
                 context,
-                label: 'Workplace location',
-                hint: 'Clock-in geofence (one site)',
+                label: 'Office location',
+                hint: 'Clock-in location check',
                 icon: Icons.location_on_rounded,
                 iconGradient: AppGradients.teal,
                 iconGlowColor: AppColors.teal,
