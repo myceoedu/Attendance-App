@@ -1043,12 +1043,12 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     width: 6,
+                    constraints: const BoxConstraints(minHeight: 88),
                     decoration: BoxDecoration(
                       color: typeAccent,
                       borderRadius: const BorderRadius.horizontal(
@@ -1332,7 +1332,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   ),
                 ],
               ),
-            ),
             if (r.status == 'pending')
               Material(
                 color: AppColors.surface,

@@ -63,15 +63,7 @@ class EmployeeQuickAccessTile extends StatelessWidget {
                 border: Border.all(
                   color: accentColor.withValues(alpha: 0.2),
                 ),
-                // One soft shadow (same lift as before, less scroll paint cost).
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.16),
-                    blurRadius: 14,
-                    offset: const Offset(0, 5),
-                    spreadRadius: -5,
-                  ),
-                ],
+                // Border lift only — no blur shadow (smooth scroll on web).
               ),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -98,14 +90,6 @@ class EmployeeQuickAccessTile extends StatelessWidget {
                               colors: [accentColor, iconEnd],
                             ),
                             borderRadius: BorderRadius.circular(13),
-                            boxShadow: [
-                              BoxShadow(
-                                color: accentColor.withValues(alpha: 0.42),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                                spreadRadius: -4,
-                              ),
-                            ],
                           ),
                           child: Icon(
                             icon,

@@ -5,22 +5,36 @@ import 'admin_home_tab.dart';
 import 'employee_list_screen.dart';
 import 'attendance_overview_screen.dart';
 
-/// Lets [AdminHomeTab] jump to Attendance or Employees tabs.
+/// Lets [AdminHomeTab] jump to Attendance or Employees tabs and pause work
+/// when a tab is not visible.
 class AdminTabScope extends InheritedWidget {
-  const AdminTabScope({super.key, required this.goToTab, required super.child});
+  const AdminTabScope({
+    super.key,
+    required this.currentIndex,
+    required this.goToTab,
+    required super.child,
+  });
 
+  /// Home = 0, Attendance = 1, Employees = 2
+  final int currentIndex;
   final void Function(int index) goToTab;
 
-  static void goToTabOf(BuildContext context, int index) {
-    final element = context
-        .getElementForInheritedWidgetOfExactType<AdminTabScope>();
-    final scope = element?.widget as AdminTabScope?;
-    scope?.goToTab(index);
+  static AdminTabScope? maybeOf(BuildContext context) {
+    final element =
+        context.getElementForInheritedWidgetOfExactType<AdminTabScope>();
+    return element?.widget as AdminTabScope?;
   }
+
+  static void goToTabOf(BuildContext context, int index) {
+    maybeOf(context)?.goToTab(index);
+  }
+
+  static bool isActive(BuildContext context, int tabIndex) =>
+      maybeOf(context)?.currentIndex == tabIndex;
 
   @override
   bool updateShouldNotify(AdminTabScope oldWidget) =>
-      oldWidget.goToTab != goToTab;
+      oldWidget.currentIndex != currentIndex || oldWidget.goToTab != goToTab;
 }
 
 class AdminShell extends StatefulWidget {
@@ -66,6 +80,7 @@ class _AdminShellState extends State<AdminShell> {
   Widget build(BuildContext context) {
     final base = Theme.of(context);
     return AdminTabScope(
+      currentIndex: _index,
       goToTab: _goToTab,
       child: Scaffold(
         backgroundColor: AppColors.surface,
@@ -76,7 +91,10 @@ class _AdminShellState extends State<AdminShell> {
             if (!_visited.contains(i)) {
               return const SizedBox.shrink();
             }
-            return _ensurePage(i);
+            return TickerMode(
+              enabled: i == _index,
+              child: _ensurePage(i),
+            );
           }),
         ),
         bottomNavigationBar: DecoratedBox(
@@ -87,10 +105,9 @@ class _AdminShellState extends State<AdminShell> {
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.adminNavBackground.withValues(alpha: 0.55),
-                blurRadius: 18,
-                offset: const Offset(0, -4),
-                spreadRadius: -2,
+                color: AppColors.adminNavBackground.withValues(alpha: 0.3),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
               ),
             ],
           ),

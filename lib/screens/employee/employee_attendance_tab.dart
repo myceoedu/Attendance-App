@@ -20,6 +20,7 @@ import '../../utils/error_messages.dart';
 import '../../utils/geofence.dart';
 import 'attendance_history_screen.dart';
 import 'employee_attendance_log_screen.dart';
+import 'employee_shell.dart';
 
 /// Clock in / clock out flow for employees.
 ///
@@ -54,18 +55,30 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   RealtimeChannel? _channel;
   RealtimeChannel? _leaveChannel;
   final _loadGuard = AsyncLoadGuard();
+  bool _tabActive = true;
   late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
     AppTime.malaysiaNow(),
   );
 
+  static const int _clockTabIndex = 1;
+
   @override
   void initState() {
     super.initState();
-    _syncTicker();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _load();
-      _attachRealtime();
+      if (!mounted) return;
+      _applyTabVisibility(EmployeeTabScope.isActive(context, _clockTabIndex));
+      _load();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = EmployeeTabScope.isActive(context, _clockTabIndex);
+    if (active != _tabActive) {
+      _applyTabVisibility(active);
+    }
   }
 
   @override
@@ -75,18 +88,40 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     _realtimeDebounce?.cancel();
     AppRealtime.disposeChannel(_channel);
     AppRealtime.disposeChannel(_leaveChannel);
+    _channel = null;
+    _leaveChannel = null;
     _now.dispose();
     super.dispose();
   }
 
+  void _applyTabVisibility(bool active) {
+    _tabActive = active;
+    if (active) {
+      if (_channel == null) _attachRealtime();
+      _now.value = AppTime.malaysiaNow();
+      _syncTicker();
+    } else {
+      _ticker?.cancel();
+      _ticker = null;
+      _realtimeDebounce?.cancel();
+      AppRealtime.disposeChannel(_channel);
+      AppRealtime.disposeChannel(_leaveChannel);
+      _channel = null;
+      _leaveChannel = null;
+    }
+  }
+
   /// Live clock only while working (1s). Otherwise refresh once a minute.
+  /// Paused entirely when the Clock tab is not visible.
   void _syncTicker() {
     _ticker?.cancel();
+    _ticker = null;
+    if (!_tabActive || !mounted) return;
     final working = _state == _AttendanceState.working;
     _ticker = Timer.periodic(
       working ? const Duration(seconds: 1) : const Duration(minutes: 1),
       (_) {
-        if (mounted) _now.value = AppTime.malaysiaNow();
+        if (mounted && _tabActive) _now.value = AppTime.malaysiaNow();
       },
     );
   }
@@ -529,12 +564,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                           },
                         ),
                         const SizedBox(height: 14),
-                        ValueListenableBuilder<DateTime>(
-                          valueListenable: _now,
-                          builder: (context, now, _) {
-                            return _clockCard(timeFmt, now);
-                          },
-                        ),
+                        // Gradient chrome stays stable; only text ticks.
+                        RepaintBoundary(child: _clockCard(timeFmt)),
                         const SizedBox(height: 18),
                         _stepIndicator(),
                         const SizedBox(height: 22),
@@ -550,9 +581,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
   }
 
-  Widget _clockCard(DateFormat timeFmt, DateTime now) {
+  Widget _clockCard(DateFormat timeFmt) {
     final state = _state;
-    final timeNow = timeFmt.format(now);
 
     final (String label, Color labelFg, Color labelBg) = switch (state) {
       _AttendanceState.blocked => (
@@ -585,23 +615,27 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
         border: Border.all(color: AppColors.brandHeaderBorder),
         boxShadow: [
           BoxShadow(
-            color: AppColors.brandHeaderShadow,
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-            spreadRadius: -4,
+            color: AppColors.brandHeaderShadow.withValues(alpha: 0.35),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          Text(
-            timeNow,
-            style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.w800,
-              color: AppColors.onBrand,
-              letterSpacing: 1.2,
-            ),
+          ValueListenableBuilder<DateTime>(
+            valueListenable: _now,
+            builder: (context, now, _) {
+              return Text(
+                timeFmt.format(now),
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onBrand,
+                  letterSpacing: 1.2,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 10),
           Container(
@@ -702,15 +736,20 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                     color: AppColors.onBrandSecondary,
                   ),
                   const SizedBox(width: 6),
-                  Text(
-                    state == _AttendanceState.done
-                        ? 'Worked: ${_fmtDuration(_elapsed(now.toUtc()))}'
-                        : 'Elapsed: ${_fmtDuration(_elapsed(now.toUtc()))}',
-                    style: const TextStyle(
-                      color: AppColors.onBrand,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  ValueListenableBuilder<DateTime>(
+                    valueListenable: _now,
+                    builder: (context, now, _) {
+                      return Text(
+                        state == _AttendanceState.done
+                            ? 'Worked: ${_fmtDuration(_elapsed(now.toUtc()))}'
+                            : 'Elapsed: ${_fmtDuration(_elapsed(now.toUtc()))}',
+                        style: const TextStyle(
+                          color: AppColors.onBrand,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

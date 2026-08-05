@@ -50,16 +50,51 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     AppTime.malaysiaNow(),
   );
   Timer? _clockTicker;
+  bool _tabActive = true;
+  static const int _homeTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) _now.value = AppTime.malaysiaNow();
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _load();
-      _attachRealtime();
+      if (!mounted) return;
+      _applyTabVisibility(AdminTabScope.isActive(context, _homeTabIndex));
+      _load();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = AdminTabScope.isActive(context, _homeTabIndex);
+    if (active != _tabActive) {
+      _applyTabVisibility(active);
+    }
+  }
+
+  void _applyTabVisibility(bool active) {
+    _tabActive = active;
+    if (active) {
+      _startClockTicker();
+      if (_attendanceChannel == null) _attachRealtime();
+      _now.value = AppTime.malaysiaNow();
+    } else {
+      _clockTicker?.cancel();
+      _clockTicker = null;
+      _realtimeDebounce?.cancel();
+      AppRealtime.disposeChannel(_attendanceChannel);
+      AppRealtime.disposeChannel(_leaveChannel);
+      AppRealtime.disposeChannel(_claimChannel);
+      _attendanceChannel = null;
+      _leaveChannel = null;
+      _claimChannel = null;
+    }
+  }
+
+  void _startClockTicker() {
+    _clockTicker?.cancel();
+    _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && _tabActive) _now.value = AppTime.malaysiaNow();
     });
   }
 
@@ -91,9 +126,10 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   }
 
   void _onRealtimeEvent() {
+    if (!_tabActive) return;
     _realtimeDebounce?.cancel();
     _realtimeDebounce = Timer(const Duration(milliseconds: 550), () {
-      if (mounted) _load(showSpinner: false);
+      if (mounted && _tabActive) _load(showSpinner: false);
     });
   }
 
@@ -262,44 +298,15 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.adminHeaderShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 10),
-              spreadRadius: -6,
+              color: AppColors.adminHeaderShadow.withValues(alpha: 0.35),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            Positioned(
-              right: -30,
-              top: -20,
-              child: IgnorePointer(
-                child: Container(
-                  width: 140,
-                  height: 140,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: -40,
-              bottom: 8,
-              child: IgnorePointer(
-                child: Container(
-                  width: 100,
-                  height: 100,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.05),
-                  ),
-                ),
-              ),
-            ),
             SafeArea(
               bottom: false,
               child: Padding(
@@ -326,13 +333,6 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                               color: AppColors.brandAvatarRing,
                               width: 2,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.violet.withValues(alpha: 0.35),
-                                blurRadius: 14,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
                           ),
                           alignment: Alignment.center,
                           child: const Icon(
@@ -463,10 +463,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0F0F172A),
-            blurRadius: 14,
-            offset: Offset(0, 6),
-            spreadRadius: -3,
+            color: Color(0x0A0F172A),
+            blurRadius: 6,
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -482,7 +481,6 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 glowColor: AppColors.violet,
                 size: 26,
                 iconSize: 13,
-                softShadow: true,
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -878,17 +876,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                             Container(
                               width: 8,
                               height: 8,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: AppColors.orange,
                                 shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppColors.orange.withValues(
-                                      alpha: 0.45,
-                                    ),
-                                    blurRadius: 6,
-                                  ),
-                                ],
                               ),
                             ),
                           ],
@@ -923,6 +913,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   }
 
   /// Same visual language as Leave hub: gradient rounded square + white glyph.
+  /// No glow shadow — cheaper while scrolling on web.
   static Widget _workspaceGradientIcon({
     required IconData icon,
     required LinearGradient gradient,
@@ -931,22 +922,12 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     double? iconSize,
     bool softShadow = false,
   }) {
-    final blur = softShadow ? 6.0 : 12.0;
-    final off = softShadow ? 2.0 : 4.0;
-    final a = softShadow ? 0.22 : 0.35;
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: glowColor.withValues(alpha: a),
-            blurRadius: blur,
-            offset: Offset(0, off),
-          ),
-        ],
       ),
       alignment: Alignment.center,
       child: Icon(icon, color: Colors.white, size: iconSize ?? size * 0.48),

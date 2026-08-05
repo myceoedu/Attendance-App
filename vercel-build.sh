@@ -22,4 +22,5 @@ if [ ${#BUILD_ARGS[@]} -eq 0 ]; then
   echo "Note: SUPABASE_URL / SUPABASE_ANON_KEY not set on Vercel — using app defaults."
 fi
 
-flutter build web --release "${BUILD_ARGS[@]}"
+# Release web: no source maps (smaller/faster), tree-shake icons.
+flutter build web --release --no-source-maps --tree-shake-icons "${BUILD_ARGS[@]}"

@@ -60,29 +60,63 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   late final ValueNotifier<DateTime> _clockNow = ValueNotifier<DateTime>(
     AppTime.malaysiaNow(),
   );
-  late Timer _clockTicker;
+  Timer? _clockTicker;
+  bool _tabActive = true;
+  static const int _homeTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (mounted) _clockNow.value = AppTime.malaysiaNow();
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      _applyTabVisibility(EmployeeTabScope.isActive(context, _homeTabIndex));
       _load();
-      Future<void>.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = EmployeeTabScope.isActive(context, _homeTabIndex);
+    if (active != _tabActive) {
+      _applyTabVisibility(active);
+    }
+  }
+
+  void _applyTabVisibility(bool active) {
+    _tabActive = active;
+    if (active) {
+      _startClockTicker();
+      if (_attendanceChannel == null) {
         _attachRealtime();
         _attachAnnouncementsRealtime();
-      });
+      }
+      _clockNow.value = AppTime.malaysiaNow();
+    } else {
+      _clockTicker?.cancel();
+      _clockTicker = null;
+      _realtimeDebounce?.cancel();
+      _announcementBadgeDebounce?.cancel();
+      AppRealtime.disposeChannel(_attendanceChannel);
+      AppRealtime.disposeChannel(_leaveChannel);
+      AppRealtime.disposeChannel(_announcementsChannel);
+      _attendanceChannel = null;
+      _leaveChannel = null;
+      _announcementsChannel = null;
+    }
+  }
+
+  void _startClockTicker() {
+    _clockTicker?.cancel();
+    _clockTicker = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (mounted && _tabActive) _clockNow.value = AppTime.malaysiaNow();
     });
   }
 
   @override
   void dispose() {
     _loadGuard.invalidate();
-    _clockTicker.cancel();
+    _clockTicker?.cancel();
     _clockNow.dispose();
     _realtimeDebounce?.cancel();
     _announcementBadgeDebounce?.cancel();
@@ -142,9 +176,10 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   }
 
   void _scheduleReload() {
+    if (!_tabActive) return;
     _realtimeDebounce?.cancel();
     _realtimeDebounce = Timer(const Duration(milliseconds: 550), () {
-      if (mounted) _load(showSpinner: false);
+      if (mounted && _tabActive) _load(showSpinner: false);
     });
   }
 
@@ -301,9 +336,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.28),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: AppColors.primaryDark.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -329,13 +364,11 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                           colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
                         ),
                         borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
+                        boxShadow: const [
                           BoxShadow(
-                            color: const Color(
-                              0xFF0D9488,
-                            ).withValues(alpha: 0.4),
-                            blurRadius: 14,
-                            offset: const Offset(0, 5),
+                            color: Color(0x330D9488),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
                           ),
                         ],
                       ),
@@ -500,11 +533,11 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.16),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Color(0x1A000000),
+            blurRadius: 8,
+            offset: Offset(0, 3),
           ),
         ],
       ),
@@ -883,11 +916,11 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+            color: Color(0x0A000000),
+            blurRadius: 4,
+            offset: Offset(0, 1),
           ),
         ],
       ),
@@ -937,25 +970,106 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   // ── Quick access section ─────────────────────────────────────────────────
 
   Widget _quickAccessSection(BuildContext context) {
+    const gap = 10.0;
+    final tiles = <Widget>[
+      EmployeeQuickAccessTile(
+        label: 'Leave',
+        subLabel: 'Balance & history',
+        semanticAction:
+            'Opens leave — annual balance, sick leave, and emergency leave.',
+        icon: Icons.event_available_rounded,
+        accentColor: AppColors.teal,
+        onTap: () => pushAppPage(context, const LeaveTab()),
+      ),
+      EmployeeQuickAccessTile(
+        label: 'Claim',
+        subLabel: 'Expenses',
+        semanticAction: 'Opens expense claims and receipt uploads.',
+        icon: Icons.receipt_long_rounded,
+        accentColor: AppColors.orange,
+        onTap: () => pushAppPage(context, const ClaimsScreen()),
+      ),
+      EmployeeQuickAccessTile(
+        label: 'Payroll',
+        subLabel: 'Payslips',
+        semanticAction: 'Opens your payslip history and PDF downloads.',
+        icon: Icons.payments_rounded,
+        accentColor: AppColors.violet,
+        onTap: () =>
+            pushAppPage(context, const EmployeePayrollHistoryScreen()),
+      ),
+      EmployeeQuickAccessTile(
+        label: 'Notices',
+        subLabel: 'Announcements',
+        semanticAction: 'Company-wide notices posted by administrators.',
+        icon: Icons.campaign_rounded,
+        accentColor: AppColors.accent,
+        badgeCount: _announcementUnread > 0 ? _announcementUnread : null,
+        onTap: () async {
+          await pushAppPage(context, const AnnouncementsScreen());
+          if (mounted) await _refreshAnnouncementBadge();
+        },
+      ),
+      EmployeeQuickAccessTile(
+        label: 'Calendar',
+        subLabel: 'Attendance',
+        semanticAction: 'Opens your attendance calendar.',
+        icon: Icons.calendar_month_rounded,
+        accentColor: AppColors.indigo,
+        onTap: () => pushAppPage(context, const AttendanceHistoryScreen()),
+      ),
+      EmployeeQuickAccessTile(
+        label: 'Help',
+        subLabel: 'HR & IT support',
+        semanticAction:
+            'Opens help topics, contact HR or IT, and copy diagnostics.',
+        icon: Icons.support_agent_rounded,
+        accentColor: AppColors.sky,
+        onTap: () => pushAppPage(context, const HelpSupportScreen()),
+      ),
+    ];
+
     return LayoutBuilder(
       builder: (context, c) {
-        final w = c.maxWidth;
-        const gap = 10.0;
-        // 3 columns on all phones → 6 tiles in 2 rows → fits on one screen
-        final crossAxisCount = w >= 720 ? 4 : 3;
-        // Slightly taller than wide to fit icon + label comfortably
-        const aspect = 1.02;
+        final cols = c.maxWidth >= 720 ? 4 : 3;
+        final tileH = (c.maxWidth - gap * (cols - 1)) / cols / 1.02;
+        final rows = <Widget>[];
+        for (var i = 0; i < tiles.length; i += cols) {
+          final slice = tiles.sublist(
+            i,
+            i + cols > tiles.length ? tiles.length : i + cols,
+          );
+          rows.add(
+            SizedBox(
+              height: tileH,
+              child: Row(
+                children: [
+                  for (var j = 0; j < slice.length; j++) ...[
+                    if (j > 0) const SizedBox(width: gap),
+                    Expanded(child: slice[j]),
+                  ],
+                  // Pad incomplete last row so tile widths stay even.
+                  for (var j = slice.length; j < cols; j++) ...[
+                    const SizedBox(width: gap),
+                    const Expanded(child: SizedBox.shrink()),
+                  ],
+                ],
+              ),
+            ),
+          );
+          if (i + cols < tiles.length) {
+            rows.add(const SizedBox(height: gap));
+          }
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Slim stat strip (uses stored state — no 'now' needed)
             _statStrip(),
             const SizedBox(height: 16),
-            // Section heading — compact single line
-            Row(
+            const Row(
               children: [
-                const Text(
+                Text(
                   'Quick access',
                   style: TextStyle(
                     fontSize: 17,
@@ -965,7 +1079,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                     height: 1.1,
                   ),
                 ),
-                const Spacer(),
+                Spacer(),
                 Text(
                   '6 tools',
                   style: TextStyle(
@@ -977,77 +1091,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
               ],
             ),
             const SizedBox(height: 10),
-            GridView.count(
-              crossAxisCount: crossAxisCount,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: gap,
-              crossAxisSpacing: gap,
-              childAspectRatio: aspect,
-              children: [
-                EmployeeQuickAccessTile(
-                  label: 'Leave',
-                  subLabel: 'Balance & history',
-                  semanticAction:
-                      'Opens leave — annual balance, sick leave, and emergency leave.',
-                  icon: Icons.event_available_rounded,
-                  accentColor: AppColors.teal,
-                  onTap: () => pushAppPage(context, const LeaveTab()),
-                ),
-                EmployeeQuickAccessTile(
-                  label: 'Claim',
-                  subLabel: 'Expenses',
-                  semanticAction: 'Opens expense claims and receipt uploads.',
-                  icon: Icons.receipt_long_rounded,
-                  accentColor: AppColors.orange,
-                  onTap: () => pushAppPage(context, const ClaimsScreen()),
-                ),
-                EmployeeQuickAccessTile(
-                  label: 'Payroll',
-                  subLabel: 'Payslips',
-                  semanticAction:
-                      'Opens your payslip history and PDF downloads.',
-                  icon: Icons.payments_rounded,
-                  accentColor: AppColors.violet,
-                  onTap: () =>
-                      pushAppPage(context, const EmployeePayrollHistoryScreen()),
-                ),
-                EmployeeQuickAccessTile(
-                  label: 'Notices',
-                  subLabel: 'Announcements',
-                  semanticAction:
-                      'Company-wide notices posted by administrators.',
-                  icon: Icons.campaign_rounded,
-                  accentColor: AppColors.accent,
-                  badgeCount: _announcementUnread > 0
-                      ? _announcementUnread
-                      : null,
-                  onTap: () async {
-                    await pushAppPage(context, const AnnouncementsScreen());
-                    if (mounted) await _refreshAnnouncementBadge();
-                  },
-                ),
-                EmployeeQuickAccessTile(
-                  label: 'Calendar',
-                  subLabel: 'Attendance',
-                  semanticAction: 'Opens your attendance calendar.',
-                  icon: Icons.calendar_month_rounded,
-                  accentColor: AppColors.indigo,
-                  onTap: () =>
-                      pushAppPage(context, const AttendanceHistoryScreen()),
-                ),
-                EmployeeQuickAccessTile(
-                  label: 'Help',
-                  subLabel: 'HR & IT support',
-                  semanticAction:
-                      'Opens help topics, contact HR or IT, and copy diagnostics.',
-                  icon: Icons.support_agent_rounded,
-                  accentColor: AppColors.sky,
-                  onTap: () =>
-                      pushAppPage(context, const HelpSupportScreen()),
-                ),
-              ],
-            ),
+            ...rows,
           ],
         );
       },

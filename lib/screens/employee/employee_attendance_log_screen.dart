@@ -441,13 +441,16 @@ class _EmployeeAttendanceLogScreenState
                                         child: ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(16),
-                                          child: IntrinsicHeight(
-                                            child: Row(
+                                          child: Row(
                                               crossAxisAlignment:
-                                                  CrossAxisAlignment.stretch,
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Container(
                                                   width: 5,
+                                                  constraints:
+                                                      const BoxConstraints(
+                                                    minHeight: 72,
+                                                  ),
                                                   decoration:
                                                       const BoxDecoration(
                                                     gradient: AppGradients
@@ -615,7 +618,6 @@ class _EmployeeAttendanceLogScreenState
                                           ),
                                         ),
                                       ),
-                                    ),
                                     ),
                                   );
                                 },

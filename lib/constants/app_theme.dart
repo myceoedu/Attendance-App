@@ -403,26 +403,19 @@ abstract class AppLayout {
   static const double navBarHeight = 72;
 }
 
-/// One–two layer shadows used across cards (avoid noisy multi-drop shadows).
+/// Light single-layer shadows (blur is expensive while scrolling on web).
 abstract class AppElevation {
   static List<BoxShadow> cardOnSurface = [
     BoxShadow(
-      color: AppColors.textPrimary.withValues(alpha: 0.06),
-      blurRadius: 20,
-      offset: const Offset(0, 8),
-      spreadRadius: -4,
+      color: AppColors.textPrimary.withValues(alpha: 0.05),
+      blurRadius: 6,
+      offset: const Offset(0, 2),
     ),
   ];
 
   static List<BoxShadow> cardTinted(Color accent) => [
         BoxShadow(
-          color: accent.withValues(alpha: 0.12),
-          blurRadius: 20,
-          offset: const Offset(0, 8),
-          spreadRadius: -4,
-        ),
-        BoxShadow(
-          color: AppColors.textPrimary.withValues(alpha: 0.04),
+          color: accent.withValues(alpha: 0.1),
           blurRadius: 6,
           offset: const Offset(0, 2),
         ),

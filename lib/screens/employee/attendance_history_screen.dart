@@ -722,13 +722,14 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
               ),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: leaves.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1, indent: 16, endIndent: 16),
-              itemBuilder: (_, i) => _buildLeaveItem(leaves[i]),
+            Column(
+              children: [
+                for (var i = 0; i < leaves.length; i++) ...[
+                  if (i > 0)
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                  _buildLeaveItem(leaves[i]),
+                ],
+              ],
             ),
         ],
       ),

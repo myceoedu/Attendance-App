@@ -5,26 +5,37 @@ import 'employee_attendance_tab.dart';
 import 'employee_home_tab.dart';
 import 'profile_tab.dart';
 
-/// Lets descendant widgets (e.g. [EmployeeHomeTab]) switch the bottom-nav tab.
+/// Lets descendant widgets (e.g. [EmployeeHomeTab]) switch the bottom-nav tab
+/// and know whether their tab is currently visible (pause timers / realtime).
 class EmployeeTabScope extends InheritedWidget {
   const EmployeeTabScope({
     super.key,
+    required this.currentIndex,
     required this.goToTab,
     required super.child,
   });
 
+  /// Home = 0, Clock = 1, Profile = 2
+  final int currentIndex;
   final void Function(int index) goToTab;
 
-  static void goToTabOf(BuildContext context, int index) {
+  static EmployeeTabScope? maybeOf(BuildContext context) {
     final element = context
         .getElementForInheritedWidgetOfExactType<EmployeeTabScope>();
-    final scope = element?.widget as EmployeeTabScope?;
-    scope?.goToTab(index);
+    return element?.widget as EmployeeTabScope?;
   }
+
+  static void goToTabOf(BuildContext context, int index) {
+    maybeOf(context)?.goToTab(index);
+  }
+
+  /// True when this shell tab is the one on screen.
+  static bool isActive(BuildContext context, int tabIndex) =>
+      maybeOf(context)?.currentIndex == tabIndex;
 
   @override
   bool updateShouldNotify(EmployeeTabScope oldWidget) =>
-      oldWidget.goToTab != goToTab;
+      oldWidget.currentIndex != currentIndex || oldWidget.goToTab != goToTab;
 }
 
 /// Employee shell: **one [Scaffold]** owns the bottom bar and is the only scaffold
@@ -85,6 +96,7 @@ class _EmployeeShellState extends State<EmployeeShell> {
   @override
   Widget build(BuildContext context) {
     return EmployeeTabScope(
+      currentIndex: _index,
       goToTab: _goToTab,
       child: Scaffold(
         resizeToAvoidBottomInset: true,
@@ -98,7 +110,11 @@ class _EmployeeShellState extends State<EmployeeShell> {
               if (!_visited.contains(i)) {
                 return const SizedBox.shrink();
               }
-              return _ensurePage(i);
+              // Pause animations on hidden tabs; timers still pause via scope.
+              return TickerMode(
+                enabled: i == _index,
+                child: _ensurePage(i),
+              );
             }),
           ),
         ),
@@ -148,12 +164,12 @@ class _EmployeeBottomNavBar extends StatelessWidget {
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
         ),
+        // Single light lift — avoid multi-layer blur on every frame.
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F2255).withValues(alpha: 0.5),
-            blurRadius: 20,
-            offset: const Offset(0, -6),
-            spreadRadius: -2,
+            color: const Color(0xFF0F2255).withValues(alpha: 0.28),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -181,28 +197,13 @@ class _EmployeeBottomNavBar extends StatelessWidget {
                             width: 52,
                             height: 52,
                             alignment: Alignment.center,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               shape: BoxShape.circle,
-                              gradient: const LinearGradient(
+                              gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
                               ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF0D9488,
-                                  ).withValues(alpha: 0.55),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 4),
-                                  spreadRadius: -2,
-                                ),
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
                             ),
                             child: Icon(
                               selected
@@ -233,7 +234,7 @@ class _EmployeeBottomNavBar extends StatelessWidget {
                 );
               }
 
-              // Home & Profile tabs
+              // Home & Profile tabs — no AnimatedContainer (instant, cheaper).
               return Expanded(
                 child: Material(
                   color: Colors.transparent,
@@ -243,10 +244,9 @@ class _EmployeeBottomNavBar extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: selected ? 44 : 40,
-                          height: selected ? 32 : 32,
+                        Container(
+                          width: 44,
+                          height: 32,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
                             color: selected

@@ -14,6 +14,7 @@ import '../../utils/debouncer.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/status_chip.dart';
 import '../../widgets/empty_state.dart';
+import 'admin_shell.dart';
 import 'employee_attendance_calendar_screen.dart';
 import 'monthly_attendance_screen.dart';
 
@@ -35,14 +36,38 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   final Debouncer _searchDebounce = Debouncer();
   final _loadGuard = AsyncLoadGuard();
   String _statusFilter = 'all';
+  bool _tabActive = true;
+  static const int _tabIndex = 1;
+  static final _timeFmt = DateFormat('h:mm a');
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _load();
-      _attachRealtime();
+      if (!mounted) return;
+      _applyTabVisibility(AdminTabScope.isActive(context, _tabIndex));
+      _load();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = AdminTabScope.isActive(context, _tabIndex);
+    if (active != _tabActive) {
+      _applyTabVisibility(active);
+    }
+  }
+
+  void _applyTabVisibility(bool active) {
+    _tabActive = active;
+    if (active) {
+      if (_attendanceChannel == null) _attachRealtime();
+    } else {
+      _realtimeDebounce?.cancel();
+      AppRealtime.disposeChannel(_attendanceChannel);
+      _attendanceChannel = null;
+    }
   }
 
   @override
@@ -59,9 +84,10 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
     _attendanceChannel = AppRealtime.subscribeAdminAttendance(
       channelSuffix: 'overview',
       onReload: () {
+        if (!_tabActive) return;
         _realtimeDebounce?.cancel();
         _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
-          if (mounted) _load(showSpinner: false);
+          if (mounted && _tabActive) _load(showSpinner: false);
         });
       },
     );
@@ -101,168 +127,208 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final timeFmt = DateFormat('h:mm a');
-    final completed = _records.where((r) => r.status == 'completed').length;
-    final inProgress = _records.where((r) => r.status == 'in_progress').length;
+    var completed = 0;
+    var inProgress = 0;
+    for (final r in _records) {
+      if (r.status == 'completed') {
+        completed++;
+      } else if (r.status == 'in_progress') {
+        inProgress++;
+      }
+    }
     final filteredRecords = _filteredRecords;
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Text(
-          'Attendance — ${DateFormat('d MMM').format(AppTime.malaysiaNow())}',
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Monthly summary',
-            onPressed: () =>
-                pushAppPage(context, const MonthlyAttendanceScreen()),
-            icon: const Icon(Icons.calendar_month_outlined),
-          ),
-          IconButton(
-            tooltip: 'Employee calendar',
-            onPressed: () =>
-                pushAppPage(context, const EmployeeAttendanceCalendarScreen()),
-            icon: const Icon(Icons.calendar_view_month_outlined),
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(
-              child: Text(
-                _error!,
-                style: const TextStyle(color: AppColors.danger),
+    // No nested [Scaffold] — shell already owns one.
+    return SizedBox.expand(
+      child: ColoredBox(
+        color: AppColors.surface,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppBar(
+              title: Text(
+                'Attendance — ${DateFormat('d MMM').format(AppTime.malaysiaNow())}',
               ),
-            )
-          : Column(
-              children: [
-                // Summary bar
-                Container(
-                  margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.divider),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _summaryItem(
-                        'Total',
-                        '${_records.length}',
-                        AppColors.primary,
-                      ),
-                      _summaryItem(
-                        'In Progress',
-                        '$inProgress',
-                        AppColors.inProgress,
-                      ),
-                      _summaryItem(
-                        'Completed',
-                        '$completed',
-                        AppColors.success,
-                      ),
-                    ],
-                  ),
+              actions: [
+                IconButton(
+                  tooltip: 'Monthly summary',
+                  onPressed: () =>
+                      pushAppPage(context, const MonthlyAttendanceScreen()),
+                  icon: const Icon(Icons.calendar_month_outlined),
                 ),
-                AppFilterBar(
-                  searchController: _searchCtrl,
-                  onSearchChanged: (_) => _searchDebounce(() {
-                    if (mounted) setState(() {});
-                  }),
-                  searchHint: 'Search employee name',
-                  chipOptions: const [
-                    AppFilterOption(value: 'all', label: 'All'),
-                    AppFilterOption(value: 'in_progress', label: 'In Progress'),
-                    AppFilterOption(value: 'completed', label: 'Completed'),
-                  ],
-                  selectedChip: _statusFilter,
-                  onChipSelected: (value) {
-                    setState(() => _statusFilter = value);
-                  },
-                ),
-                Expanded(
-                  child: filteredRecords.isEmpty
-                      ? const EmptyState(
-                          icon: Icons.access_time,
-                          title: 'No records match the filters',
-                          subtitle: 'Try another employee or status',
-                        )
-                      : RefreshIndicator(
-                          onRefresh: () async => _load(showSpinner: true),
-                          child: ListView.separated(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: filteredRecords.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (_, i) {
-                              final r = filteredRecords[i];
-                              final name = (r.userName?.isNotEmpty == true)
-                                  ? r.userName!
-                                  : 'Unknown';
-                              return Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppColors.divider),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 20,
-                                      backgroundColor: AppColors.primaryLight,
-                                      child: Text(
-                                        name[0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primary,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            name,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'In: ${r.clockInTime != null ? timeFmt.format(AppTime.toMalaysia(r.clockInTime!)) : '-'}'
-                                            '  •  '
-                                            'Out: ${r.clockOutTime != null ? timeFmt.format(AppTime.toMalaysia(r.clockOutTime!)) : '-'}',
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    StatusChip.fromStatus(r.status),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                IconButton(
+                  tooltip: 'Employee calendar',
+                  onPressed: () => pushAppPage(
+                    context,
+                    const EmployeeAttendanceCalendarScreen(),
+                  ),
+                  icon: const Icon(Icons.calendar_view_month_outlined),
                 ),
               ],
             ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: AppColors.danger),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        Container(
+                          margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _summaryItem(
+                                'Total',
+                                '${_records.length}',
+                                AppColors.primary,
+                              ),
+                              _summaryItem(
+                                'In Progress',
+                                '$inProgress',
+                                AppColors.inProgress,
+                              ),
+                              _summaryItem(
+                                'Completed',
+                                '$completed',
+                                AppColors.success,
+                              ),
+                            ],
+                          ),
+                        ),
+                        AppFilterBar(
+                          searchController: _searchCtrl,
+                          onSearchChanged: (_) => _searchDebounce(() {
+                            if (mounted) setState(() {});
+                          }),
+                          searchHint: 'Search employee name',
+                          chipOptions: const [
+                            AppFilterOption(value: 'all', label: 'All'),
+                            AppFilterOption(
+                              value: 'in_progress',
+                              label: 'In Progress',
+                            ),
+                            AppFilterOption(
+                              value: 'completed',
+                              label: 'Completed',
+                            ),
+                          ],
+                          selectedChip: _statusFilter,
+                          onChipSelected: (value) {
+                            setState(() => _statusFilter = value);
+                          },
+                        ),
+                        Expanded(
+                          child: filteredRecords.isEmpty
+                              ? const EmptyState(
+                                  icon: Icons.access_time,
+                                  title: 'No records match the filters',
+                                  subtitle: 'Try another employee or status',
+                                )
+                              : RefreshIndicator(
+                                  onRefresh: () async =>
+                                      _load(showSpinner: true),
+                                  child: ListView.separated(
+                                    padding: const EdgeInsets.all(16),
+                                    addAutomaticKeepAlives: false,
+                                    cacheExtent: 400,
+                                    itemCount: filteredRecords.length,
+                                    separatorBuilder: (_, __) =>
+                                        const SizedBox(height: 8),
+                                    itemBuilder: (_, i) {
+                                      final r = filteredRecords[i];
+                                      final name =
+                                          (r.userName?.isNotEmpty == true)
+                                          ? r.userName!
+                                          : 'Unknown';
+                                      return KeyedSubtree(
+                                        key: ValueKey<String>(r.id),
+                                        child: RepaintBoundary(
+                                          child: Container(
+                                            padding: const EdgeInsets.all(14),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: AppColors.divider,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 20,
+                                                  backgroundColor:
+                                                      AppColors.primaryLight,
+                                                  child: Text(
+                                                    name[0].toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                      color: AppColors.primary,
+                                                      fontSize: 14,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        name,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          fontSize: 14,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        'In: ${r.clockInTime != null ? _timeFmt.format(AppTime.toMalaysia(r.clockInTime!)) : '-'}'
+                                                        '  •  '
+                                                        'Out: ${r.clockOutTime != null ? _timeFmt.format(AppTime.toMalaysia(r.clockOutTime!)) : '-'}',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                StatusChip.fromStatus(r.status),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

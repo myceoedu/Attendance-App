@@ -1299,8 +1299,9 @@ class _ProfileExpandableSection extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: Visibility(
               visible: expanded,
-              maintainState: true,
-              maintainAnimation: true,
+              // Drop collapsed section trees — cheaper scroll / less memory.
+              maintainState: false,
+              maintainAnimation: false,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,

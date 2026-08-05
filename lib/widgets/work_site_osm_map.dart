@@ -35,63 +35,65 @@ class WorkSiteOsmMap extends StatelessWidget {
     final zoom = pin == null ? 12.0 : initialZoom;
     final radius = radiusMeters.clamp(20, 5000).toDouble();
 
-    return FlutterMap(
-      mapController: mapController,
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: zoom,
-        minZoom: 3,
-        maxZoom: 19,
-        onTap: onTap,
-        interactionOptions: InteractionOptions(
-          flags: interactive
-              ? InteractiveFlag.all & ~InteractiveFlag.rotate
-              : InteractiveFlag.none,
-        ),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.attendance_app',
+    return RepaintBoundary(
+      child: FlutterMap(
+        mapController: mapController,
+        options: MapOptions(
+          initialCenter: center,
+          initialZoom: zoom,
+          minZoom: 3,
           maxZoom: 19,
-          // Keep memory bounded on web / low-end phones.
-          keepBuffer: 2,
-          panBuffer: 1,
-        ),
-        if (pin != null)
-          CircleLayer(
-            circles: [
-              CircleMarker(
-                point: pin!,
-                radius: radius,
-                useRadiusInMeter: true,
-                color: AppColors.teal.withValues(alpha: 0.18),
-                borderStrokeWidth: 2,
-                borderColor: AppColors.teal.withValues(alpha: 0.85),
-              ),
-            ],
+          onTap: onTap,
+          interactionOptions: InteractionOptions(
+            flags: interactive
+                ? InteractiveFlag.all & ~InteractiveFlag.rotate
+                : InteractiveFlag.none,
           ),
-        if (pin != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: pin!,
-                width: 44,
-                height: 44,
-                alignment: Alignment.topCenter,
-                child: const Icon(
-                  Icons.location_on_rounded,
-                  color: Color(0xFFE11D48),
-                  size: 40,
+        ),
+        children: [
+          TileLayer(
+            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            userAgentPackageName: 'com.example.attendance_app',
+            maxZoom: 19,
+            // Keep memory bounded on web / low-end phones.
+            keepBuffer: 2,
+            panBuffer: 1,
+          ),
+          if (pin != null)
+            CircleLayer(
+              circles: [
+                CircleMarker(
+                  point: pin!,
+                  radius: radius,
+                  useRadiusInMeter: true,
+                  color: AppColors.teal.withValues(alpha: 0.18),
+                  borderStrokeWidth: 2,
+                  borderColor: AppColors.teal.withValues(alpha: 0.85),
                 ),
-              ),
-            ],
+              ],
+            ),
+          if (pin != null)
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: pin!,
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.topCenter,
+                  child: const Icon(
+                    Icons.location_on_rounded,
+                    color: Color(0xFFE11D48),
+                    size: 40,
+                  ),
+                ),
+              ],
+            ),
+          const SimpleAttributionWidget(
+            source: Text('© OpenStreetMap'),
+            alignment: Alignment.bottomLeft,
           ),
-        const SimpleAttributionWidget(
-          source: Text('© OpenStreetMap'),
-          alignment: Alignment.bottomLeft,
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
