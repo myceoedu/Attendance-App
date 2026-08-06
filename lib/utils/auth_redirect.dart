@@ -43,8 +43,16 @@ abstract final class AuthRedirect {
   /// True when the current URL is a Supabase password-recovery callback.
   static bool isPasswordRecoveryUrl([Uri? uri]) {
     final u = uri ?? Uri.base;
-    if (u.queryParameters['passwordReset'] == '1') return true;
-    if (u.queryParameters['type'] == 'recovery') return true;
+    final q = u.queryParameters;
+    if (q['passwordReset'] == '1') return true;
+    if (q['type'] == 'recovery') return true;
+    // PKCE email link: redirectTo kept `passwordReset=1`, Supabase adds `code`.
+    // Some clients only forward `code` — still treat as recovery when both the
+    // bootstrap flag was set earlier (see [AuthLinkBootstrap]) or type is set.
+    if (q.containsKey('code') &&
+        (q['passwordReset'] == '1' || q['type'] == 'recovery')) {
+      return true;
+    }
 
     final frag = u.fragment;
     if (frag.isEmpty) return false;

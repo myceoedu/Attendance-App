@@ -47,8 +47,45 @@ class AuthProvider extends ChangeNotifier {
   void _enterPasswordRecovery() {
     if (_passwordRecoveryPending) return;
     _passwordRecoveryPending = true;
+    // Drop any failed-link banner — recovery session is valid now.
+    _loginBanner = null;
+    _loginBannerIsError = false;
     clearAuthCallbackFromUrl();
     notifyListeners();
+  }
+
+  bool get _isRecoveryCallback =>
+      AuthLinkBootstrap.recoveryHint || AuthRedirect.isPasswordRecoveryUrl();
+
+  /// Waits for PKCE / recovery session after an email reset link.
+  ///
+  /// Supabase often finishes `?code=` exchange shortly *after* initialize;
+  /// failing immediately was showing "Could not open the reset link" too early.
+  Future<bool> _awaitRecoverySession({
+    required Completer<void> gate,
+    Duration timeout = const Duration(seconds: 12),
+  }) async {
+    if (_passwordRecoveryPending || SupabaseService.currentAuthUser != null) {
+      return true;
+    }
+
+    // Poll in case the session lands without another auth event.
+    final poll = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (SupabaseService.currentAuthUser != null && !gate.isCompleted) {
+        gate.complete();
+      }
+    });
+
+    try {
+      await gate.future.timeout(timeout);
+      return _passwordRecoveryPending ||
+          SupabaseService.currentAuthUser != null;
+    } on TimeoutException {
+      return _passwordRecoveryPending ||
+          SupabaseService.currentAuthUser != null;
+    } finally {
+      poll.cancel();
+    }
   }
 
   Future<void> init() async {
@@ -63,78 +100,33 @@ class AuthProvider extends ChangeNotifier {
       );
     }
 
-    // Expired / invalid email link → show on login (do not block recovery).
+    // Hard failure from Supabase redirect (?error=otp_expired…).
     final bootError = AuthLinkBootstrap.linkError;
     if (bootError != null && bootError.isNotEmpty) {
       _loginBanner = bootError;
       _loginBannerIsError = true;
     }
 
-    final session = SupabaseService.currentAuthUser;
-    var usedCache = false;
-
-    // Recovery from email link (URL hint or session already established).
-    if (AuthLinkBootstrap.recoveryHint) {
-      if (session != null) {
-        _passwordRecoveryPending = true;
-        clearAuthCallbackFromUrl();
-      } else if (_loginBanner == null) {
-        _loginBanner =
-            'Could not open the reset link. Request a new one from Forgot password.';
-        _loginBannerIsError = true;
-      }
+    final recoveryAwaiting =
+        AuthLinkBootstrap.recoveryHint && bootError == null;
+    Completer<void>? recoveryGate;
+    if (recoveryAwaiting) {
+      recoveryGate = Completer<void>();
     }
 
-    if (session != null && !_passwordRecoveryPending) {
-      AppUser? resolved;
-      if (!_skipProfileCache) {
-        resolved = await SessionProfileCache.loadIfMatches(session.id);
-      }
-      if (resolved != null) {
-        _user = resolved;
-        usedCache = true;
-      } else {
-        _user = await SupabaseService.getCurrentUserProfile();
-        if (_user != null) {
-          await SessionProfileCache.save(_user!);
-        }
-      }
-    } else if (session != null && _passwordRecoveryPending) {
-      // Do not open the shell; load profile lightly in background if needed.
-      _user = null;
-      await SessionProfileCache.clear();
-    } else {
-      _user = null;
-      await SessionProfileCache.clear();
+    void signalRecoveryReady() {
+      final g = recoveryGate;
+      if (g != null && !g.isCompleted) g.complete();
     }
 
-    _loading = false;
-    notifyListeners();
-
-    if (kDebugMode) {
-      if (_passwordRecoveryPending) {
-        StartupTiming.mark('auth_interactive_guest');
-      } else if (usedCache) {
-        StartupTiming.mark('auth_interactive_cached');
-      } else if (session != null) {
-        StartupTiming.mark('auth_interactive_network');
-      } else {
-        StartupTiming.mark('auth_interactive_guest');
-      }
-      StartupTiming.reportAuthPath(
-        hadSession: session != null && !_passwordRecoveryPending,
-        usedCache: usedCache,
-        backgroundRefreshScheduled:
-            session != null && usedCache && !_passwordRecoveryPending,
-      );
-    }
-
+    // Listen before waiting so we don't miss passwordRecovery / signedIn.
     _authSub = SupabaseService.client.auth.onAuthStateChange.listen((
       event,
     ) async {
       switch (event.event) {
         case AuthChangeEvent.passwordRecovery:
           _enterPasswordRecovery();
+          signalRecoveryReady();
           break;
         case AuthChangeEvent.signedIn:
         case AuthChangeEvent.userUpdated:
@@ -142,8 +134,10 @@ class AuthProvider extends ChangeNotifier {
             // Stay on set-password UI; ignore profile routing until done.
             return;
           }
-          if (AuthRedirect.isPasswordRecoveryUrl()) {
+          // Use bootstrap hint too — SDK may clear ?passwordReset=1 from the URL.
+          if (_isRecoveryCallback) {
             _enterPasswordRecovery();
+            signalRecoveryReady();
             return;
           }
           final fresh = await SupabaseService.getCurrentUserProfile();
@@ -180,8 +174,75 @@ class AuthProvider extends ChangeNotifier {
       }
     });
 
-    if (session != null && usedCache && !_passwordRecoveryPending) {
-      unawaited(_refreshCachedProfile(session.id));
+    var sessionUser = SupabaseService.currentAuthUser;
+    var usedCache = false;
+
+    if (recoveryAwaiting) {
+      if (sessionUser != null) {
+        _enterPasswordRecovery();
+        signalRecoveryReady();
+      } else {
+        final ok = await _awaitRecoverySession(gate: recoveryGate!);
+        sessionUser = SupabaseService.currentAuthUser;
+        if (ok) {
+          if (!_passwordRecoveryPending) _enterPasswordRecovery();
+        } else if (_loginBanner == null) {
+          _loginBanner =
+              'Could not open the reset link. Request a new one from Forgot password.';
+          _loginBannerIsError = true;
+        }
+      }
+    } else if (AuthLinkBootstrap.recoveryHint && sessionUser != null) {
+      // Boot error present but a session somehow exists — prefer recovery UI.
+      _enterPasswordRecovery();
+    }
+
+    if (sessionUser != null && !_passwordRecoveryPending) {
+      AppUser? resolved;
+      if (!_skipProfileCache) {
+        resolved = await SessionProfileCache.loadIfMatches(sessionUser.id);
+      }
+      if (resolved != null) {
+        _user = resolved;
+        usedCache = true;
+      } else {
+        _user = await SupabaseService.getCurrentUserProfile();
+        if (_user != null) {
+          await SessionProfileCache.save(_user!);
+        }
+      }
+    } else if (sessionUser != null && _passwordRecoveryPending) {
+      // Do not open the shell; stay on set-password screen.
+      _user = null;
+      await SessionProfileCache.clear();
+    } else {
+      _user = null;
+      await SessionProfileCache.clear();
+    }
+
+    _loading = false;
+    notifyListeners();
+
+    if (kDebugMode) {
+      if (_passwordRecoveryPending) {
+        StartupTiming.mark('auth_interactive_guest');
+      } else if (usedCache) {
+        StartupTiming.mark('auth_interactive_cached');
+      } else if (sessionUser != null) {
+        StartupTiming.mark('auth_interactive_network');
+      } else {
+        StartupTiming.mark('auth_interactive_guest');
+      }
+      StartupTiming.reportAuthPath(
+        hadSession: sessionUser != null && !_passwordRecoveryPending,
+        usedCache: usedCache,
+        backgroundRefreshScheduled:
+            sessionUser != null && usedCache && !_passwordRecoveryPending,
+      );
+    }
+
+    if (sessionUser != null && usedCache && !_passwordRecoveryPending) {
+      unawaited(_refreshCachedProfile(sessionUser.id));
     }
   }
 
