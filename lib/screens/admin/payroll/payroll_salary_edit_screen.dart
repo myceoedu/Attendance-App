@@ -9,17 +9,14 @@ import '../../../services/supabase_service.dart';
 import '../../../utils/employment_status.dart';
 
 class PayrollSalaryEditScreen extends StatefulWidget {
-  const PayrollSalaryEditScreen({
-    super.key,
-    required this.user,
-    this.existing,
-  });
+  const PayrollSalaryEditScreen({super.key, required this.user, this.existing});
 
   final AppUser user;
   final PayrollSalarySetting? existing;
 
   @override
-  State<PayrollSalaryEditScreen> createState() => _PayrollSalaryEditScreenState();
+  State<PayrollSalaryEditScreen> createState() =>
+      _PayrollSalaryEditScreenState();
 }
 
 class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
@@ -45,7 +42,11 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
   late String _status;
   bool _saving = false;
 
-  static final _money0 = NumberFormat.currency(locale: 'en_US', symbol: 'RM ', decimalDigits: 0);
+  static final _money0 = NumberFormat.currency(
+    locale: 'en_US',
+    symbol: 'RM ',
+    decimalDigits: 0,
+  );
 
   @override
   void initState() {
@@ -56,7 +57,9 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
     _dept = TextEditingController(text: ex?.department ?? u.department ?? '');
     _pos = TextEditingController(text: ex?.position ?? u.jobTitle ?? '');
     _basic = TextEditingController(text: '${ex?.basicSalary ?? 0}');
-    _internAllowance = TextEditingController(text: '${ex?.fixedAllowance ?? 0}');
+    _internAllowance = TextEditingController(
+      text: '${ex?.fixedAllowance ?? 0}',
+    );
     _allowance = TextEditingController(text: '${ex?.fixedAllowance ?? 0}');
     _commission = TextEditingController(text: '${ex?.monthlyCommission ?? 0}');
     _incentive = TextEditingController(text: '${ex?.monthlyIncentive ?? 0}');
@@ -69,7 +72,9 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
       _increment,
     ]);
     _bank = TextEditingController(text: ex?.bankName ?? u.bankName ?? '');
-    _acct = TextEditingController(text: ex?.bankAccountNumber ?? u.bankAccountNumber ?? '');
+    _acct = TextEditingController(
+      text: ex?.bankAccountNumber ?? u.bankAccountNumber ?? '',
+    );
     _eis = ex?.eisEligible ?? true;
     _compType = ex?.compensationType ?? 'employee';
     _employmentStatus = EmploymentStatus.normalize(ex?.employmentStatus);
@@ -77,7 +82,6 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
     _socCat = ex?.socsoCategory ?? 'standard';
     _payMethod = ex?.paymentMethod ?? 'bank_transfer';
     _status = ex?.payrollStatus ?? 'active';
-
   }
 
   @override
@@ -110,8 +114,9 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
         position: _pos.text.trim(),
         employmentStatus: EmploymentStatus.normalize(_employmentStatus),
         basicSalary: isIntern ? 0 : (double.tryParse(_basic.text) ?? 0),
-        fixedAllowance:
-            isIntern ? (double.tryParse(_internAllowance.text) ?? 0) : _parseRm(_allowance),
+        fixedAllowance: isIntern
+            ? (double.tryParse(_internAllowance.text) ?? 0)
+            : _parseRm(_allowance),
         monthlyCommission: isIntern ? 0 : _parseRm(_commission),
         monthlyIncentive: isIntern ? 0 : _parseRm(_incentive),
         monthlyIncrement: isIntern ? 0 : _parseRm(_increment),
@@ -128,12 +133,16 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
       );
       await SupabaseService.upsertPayrollSalarySetting(s);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Saved')));
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -191,7 +200,8 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
       animation: _employeePayPreviewListenable,
       builder: (_, __) {
         final basic = _parseRm(_basic);
-        final add = _parseRm(_allowance) +
+        final add =
+            _parseRm(_allowance) +
             _parseRm(_commission) +
             _parseRm(_incentive) +
             _parseRm(_increment);
@@ -284,16 +294,14 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
 
   /// Avoids horizontal overflow on narrow screens when the selected label is long.
   Text _dropdownLabel(String text) {
-    return Text(
-      text,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    return Text(text, maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = widget.user.name.isNotEmpty ? widget.user.name : widget.user.username;
+    final name = widget.user.name.isNotEmpty
+        ? widget.user.name
+        : widget.user.username;
     final isIntern = _compType == 'intern';
 
     return Scaffold(
@@ -320,7 +328,10 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
         children: [
           _card(
             children: [
-              _blockTitle('Job details', subtitle: 'These fields are stored with payroll for reports.'),
+              _blockTitle(
+                'Job details',
+                subtitle: 'These fields are stored with payroll for reports.',
+              ),
               const SizedBox(height: 14),
               TextField(
                 controller: _staffId,
@@ -386,7 +397,8 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
             children: [
               _blockTitle(
                 'Employment type',
-                subtitle: 'This controls how monthly pay and leave are calculated.',
+                subtitle:
+                    'This controls how monthly pay and leave are calculated.',
               ),
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
@@ -418,7 +430,8 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
               children: [
                 _blockTitle(
                   'Intern pay',
-                  subtitle: 'Step 1 — enter the full monthly allowance. No basic salary or statutory rows.',
+                  subtitle:
+                      'Step 1 — enter the full monthly allowance. No basic salary or statutory rows.',
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -430,8 +443,12 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                     prefixText: 'RM ',
                     isDense: true,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
                 ),
                 const SizedBox(height: 14),
                 _internPreview(),
@@ -465,8 +482,12 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                     prefixText: 'RM ',
                     isDense: true,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                  ],
                 ),
                 const SizedBox(height: 22),
                 const Divider(height: 1),
@@ -521,7 +542,8 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
               children: [
                 _blockTitle(
                   'Malaysia statutory',
-                  subtitle: 'Age and category rules apply when payroll is calculated.',
+                  subtitle:
+                      'Age and category rules apply when payroll is calculated.',
                 ),
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -537,13 +559,20 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                   isExpanded: true,
                   decoration: const InputDecoration(
                     labelText: 'EPF / KWSP category',
-                    helperText: 'Use “Age 60+” if employee is 60 or above (or DOB on file).',
+                    helperText:
+                        'Use “Age 60+” if employee is 60 or above (or DOB on file).',
                     border: OutlineInputBorder(),
                     isDense: true,
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'standard', child: Text('Standard')),
-                    DropdownMenuItem(value: 'above60', child: Text('Age 60 and above')),
+                    DropdownMenuItem(
+                      value: 'standard',
+                      child: Text('Standard'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'above60',
+                      child: Text('Age 60 and above'),
+                    ),
                   ],
                   onChanged: (v) => setState(() => _epfCat = v ?? 'standard'),
                 ),
@@ -558,7 +587,10 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                     isDense: true,
                   ),
                   items: const [
-                    DropdownMenuItem(value: 'standard', child: Text('Standard')),
+                    DropdownMenuItem(
+                      value: 'standard',
+                      child: Text('Standard'),
+                    ),
                   ],
                   onChanged: (v) => setState(() => _socCat = v ?? 'standard'),
                 ),
@@ -580,10 +612,14 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                   isDense: true,
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'bank_transfer', child: Text('Bank transfer')),
+                  DropdownMenuItem(
+                    value: 'bank_transfer',
+                    child: Text('Bank transfer'),
+                  ),
                   DropdownMenuItem(value: 'cash', child: Text('Cash')),
                 ],
-                onChanged: (v) => setState(() => _payMethod = v ?? 'bank_transfer'),
+                onChanged: (v) =>
+                    setState(() => _payMethod = v ?? 'bank_transfer'),
               ),
               const SizedBox(height: 12),
               TextField(

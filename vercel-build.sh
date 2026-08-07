@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 
-# Matches the framework revision recorded in .metadata. Clone the release tag
-# directly so Flutter can also resolve its engine and SDK version correctly.
-FLUTTER_VERSION="3.32.2"
+# The app uses current DropdownButtonFormField APIs; pin a stable SDK new
+# enough to compile them while keeping Vercel deployments reproducible.
+FLUTTER_VERSION="3.44.9"
 
 if [ ! -d "flutter" ]; then
   git clone https://github.com/flutter/flutter.git \

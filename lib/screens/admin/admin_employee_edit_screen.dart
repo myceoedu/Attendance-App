@@ -221,14 +221,14 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
     final now = AppTime.malaysiaNow();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _employmentStart ??
-          DateTime(now.year, now.month, 1),
+      initialDate: _employmentStart ?? DateTime(now.year, now.month, 1),
       firstDate: DateTime(1950),
       lastDate: DateTime(now.year + 1, 12, 31),
     );
     if (picked != null) {
       setState(
-        () => _employmentStart = DateTime(picked.year, picked.month, picked.day),
+        () =>
+            _employmentStart = DateTime(picked.year, picked.month, picked.day),
       );
     }
   }
@@ -382,9 +382,10 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
         onTap: onTap,
         borderRadius: BorderRadius.circular(_fieldRadius),
         child: InputDecorator(
-          decoration: _dec(label, icon).copyWith(
-            suffixIcon: _fieldIcon(Icons.calendar_today_rounded),
-          ),
+          decoration: _dec(
+            label,
+            icon,
+          ).copyWith(suffixIcon: _fieldIcon(Icons.calendar_today_rounded)),
           child: Text(
             value,
             style: TextStyle(
@@ -592,8 +593,9 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                       _gap(),
                       DropdownButtonFormField<String>(
                         key: ValueKey<String>('marital_$_maritalValue'),
-                        initialValue:
-                            _maritalValue.isEmpty ? '' : _maritalValue,
+                        initialValue: _maritalValue.isEmpty
+                            ? ''
+                            : _maritalValue,
                         decoration: _dec(
                           'Marital Status',
                           Icons.favorite_border_rounded,
@@ -601,10 +603,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                         icon: _fieldIcon(Icons.keyboard_arrow_down_rounded),
                         borderRadius: BorderRadius.circular(_fieldRadius),
                         items: const [
-                          DropdownMenuItem(
-                            value: '',
-                            child: Text('Not set'),
-                          ),
+                          DropdownMenuItem(value: '', child: Text('Not set')),
                           DropdownMenuItem(
                             value: 'Single',
                             child: Text('Single'),
@@ -632,10 +631,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                       _gap(),
                       TextFormField(
                         controller: _icCtrl,
-                        decoration: _dec(
-                          'IC / NRIC',
-                          Icons.badge_outlined,
-                        ),
+                        decoration: _dec('IC / NRIC', Icons.badge_outlined),
                         validator: ProfileValidators.icNumber,
                       ),
                     ],
@@ -798,10 +794,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                       _gap(),
                       TextFormField(
                         controller: _eduInstCtrl,
-                        decoration: _dec(
-                          'Institution',
-                          Icons.domain_outlined,
-                        ),
+                        decoration: _dec('Institution', Icons.domain_outlined),
                       ),
                     ],
                   ),
@@ -814,18 +807,12 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                     children: [
                       TextFormField(
                         controller: _emeNameCtrl,
-                        decoration: _dec(
-                          'Name',
-                          Icons.person_outline_rounded,
-                        ),
+                        decoration: _dec('Name', Icons.person_outline_rounded),
                       ),
                       _gap(),
                       TextFormField(
                         controller: _emeRelCtrl,
-                        decoration: _dec(
-                          'Relationship',
-                          Icons.group_outlined,
-                        ),
+                        decoration: _dec('Relationship', Icons.group_outlined),
                       ),
                       _gap(),
                       TextFormField(
@@ -873,9 +860,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                     width: double.infinity,
                     height: 48,
                     child: OutlinedButton(
-                      onPressed: _saving
-                          ? null
-                          : () => Navigator.pop(context),
+                      onPressed: _saving ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.textSecondary,
                         side: const BorderSide(color: _cardBorder),

@@ -21,7 +21,9 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -51,13 +53,13 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
   }
 
   static String _statusLabel(String status) => switch (status) {
-        'draft' => 'Draft',
-        'calculated' => 'Calculated',
-        'approved' => 'Approved',
-        'paid' => 'Paid',
-        'cancelled' => 'Cancelled',
-        _ => status.replaceAll('_', ' '),
-      };
+    'draft' => 'Draft',
+    'calculated' => 'Calculated',
+    'approved' => 'Approved',
+    'paid' => 'Paid',
+    'cancelled' => 'Cancelled',
+    _ => status.replaceAll('_', ' '),
+  };
 
   String _subtitle(PayrollRun r) {
     final money = NumberFormat.currency(symbol: 'RM ', decimalDigits: 2);
@@ -75,12 +77,12 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
   }
 
   Color _statusColor(String s) => switch (s) {
-        'paid' => AppColors.success,
-        'approved' => AppColors.indigo,
-        'calculated' => AppColors.primary,
-        'draft' => AppColors.textHint,
-        _ => AppColors.textSecondary,
-      };
+    'paid' => AppColors.success,
+    'approved' => AppColors.indigo,
+    'calculated' => AppColors.primary,
+    'draft' => AppColors.textHint,
+    _ => AppColors.textSecondary,
+  };
 
   Future<void> _newRun() async {
     final now = DateTime.now();
@@ -112,10 +114,7 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                   items: List.generate(12, (i) {
                     final m = i + 1;
                     final label = DateFormat.MMMM().format(DateTime(2000, m));
-                    return DropdownMenuItem<int>(
-                      value: m,
-                      child: Text(label),
-                    );
+                    return DropdownMenuItem<int>(value: m, child: Text(label));
                   }),
                   onChanged: (v) {
                     if (v != null) setS(() => selectedMonth = v);
@@ -151,19 +150,16 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
     final y = int.tryParse(yCtrl.text) ?? now.year;
     final m = selectedMonth;
     if (m < 1 || m > 12) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid month')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invalid month')));
       return;
     }
     try {
       final existing = await SupabaseService.getPayrollRunForPeriod(y, m);
       if (existing != null) {
         if (!mounted) return;
-        await pushAppPage(
-          context,
-          PayrollRunDetailScreen(runId: existing.id),
-        );
+        await pushAppPage(context, PayrollRunDetailScreen(runId: existing.id));
         if (mounted) _load();
         return;
       }
@@ -174,15 +170,13 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
         statutoryConfigId: stat?.id,
       );
       if (!mounted) return;
-      await pushAppPage(
-        context,
-        PayrollRunDetailScreen(runId: run.id),
-      );
+      await pushAppPage(context, PayrollRunDetailScreen(runId: run.id));
       if (mounted) _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -226,8 +220,9 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             height: 1.4,
-                            color:
-                                AppColors.textSecondary.withValues(alpha: 0.95),
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.95,
+                            ),
                           ),
                         ),
                       ),
@@ -255,8 +250,7 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                             ],
                           )
                         : ListView.separated(
-                            padding:
-                                const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
                             itemCount: _runs.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 8),
@@ -269,8 +263,9 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                                 child: ListTile(
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(14),
-                                    side:
-                                        const BorderSide(color: AppColors.divider),
+                                    side: const BorderSide(
+                                      color: AppColors.divider,
+                                    ),
                                   ),
                                   title: Text(
                                     _periodTitle(r),
@@ -293,15 +288,17 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
                                     ),
                                   ),
                                   leading: CircleAvatar(
-                                    backgroundColor:
-                                        accent.withValues(alpha: 0.15),
+                                    backgroundColor: accent.withValues(
+                                      alpha: 0.15,
+                                    ),
                                     child: Icon(
                                       Icons.folder_rounded,
                                       color: accent,
                                     ),
                                   ),
                                   trailing: const Icon(
-                                      Icons.chevron_right_rounded),
+                                    Icons.chevron_right_rounded,
+                                  ),
                                   onTap: () async {
                                     await pushAppPage(
                                       context,

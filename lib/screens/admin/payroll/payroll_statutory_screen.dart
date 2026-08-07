@@ -18,7 +18,9 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
   bool _loading = true;
   List<PayrollStatutoryConfig> _list = [];
   Map<String, int> _usageByConfigId = const {};
-  final TextEditingController _debugWageCtrl = TextEditingController(text: '1700');
+  final TextEditingController _debugWageCtrl = TextEditingController(
+    text: '1700',
+  );
   String _debugEpfCategory = 'standard';
   String _debugSocsoCategory = 'standard';
   bool _debugEisEligible = true;
@@ -32,7 +34,9 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -53,9 +57,9 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load rate sets: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load rate sets: $e')));
     }
   }
 
@@ -156,7 +160,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
           children: [
             const Row(
               children: [
-                Icon(Icons.science_outlined, size: 18, color: AppColors.primary),
+                Icon(
+                  Icons.science_outlined,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Statutory debug preview',
@@ -167,7 +175,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
             const SizedBox(height: 4),
             const Text(
               'Quick HR sandbox: input wage and categories to verify KWSP/SOCSO/EIS bracket outputs.',
-              style: TextStyle(fontSize: 11.5, color: AppColors.textHint, height: 1.35),
+              style: TextStyle(
+                fontSize: 11.5,
+                color: AppColors.textHint,
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 12),
             Row(
@@ -175,7 +187,9 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                 Expanded(
                   child: TextField(
                     controller: _debugWageCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(
                       labelText: 'Wage base (RM)',
                       hintText: 'e.g. 1700',
@@ -195,8 +209,14 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       isDense: true,
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'standard', child: Text('Below 60')),
-                      DropdownMenuItem(value: 'above60', child: Text('60 and above')),
+                      DropdownMenuItem(
+                        value: 'standard',
+                        child: Text('Below 60'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'above60',
+                        child: Text('60 and above'),
+                      ),
                     ],
                     onChanged: (v) {
                       if (v == null) return;
@@ -219,8 +239,14 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       isDense: true,
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'standard', child: Text('First category')),
-                      DropdownMenuItem(value: 'second', child: Text('Second category')),
+                      DropdownMenuItem(
+                        value: 'standard',
+                        child: Text('First category'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'second',
+                        child: Text('Second category'),
+                      ),
                     ],
                     onChanged: (v) {
                       if (v == null) return;
@@ -234,7 +260,10 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                     contentPadding: EdgeInsets.zero,
                     title: const Text(
                       'EIS eligible',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     dense: true,
                     value: _debugEisEligible,
@@ -248,15 +277,38 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
               padding: EdgeInsets.only(bottom: 4),
               child: Row(
                 children: [
-                  Expanded(child: Text('Contribution', style: TextStyle(fontSize: 11, color: AppColors.textHint))),
-                  SizedBox(width: 108, child: Text('Employee', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, color: AppColors.textHint))),
+                  Expanded(
+                    child: Text(
+                      'Contribution',
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 108,
+                    child: Text(
+                      'Employee',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                  ),
                   SizedBox(width: 8),
-                  SizedBox(width: 108, child: Text('Employer', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, color: AppColors.textHint))),
+                  SizedBox(
+                    width: 108,
+                    child: Text(
+                      'Employer',
+                      textAlign: TextAlign.right,
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                  ),
                 ],
               ),
             ),
             rowLine('KWSP', amounts.epfEmployee, amounts.epfEmployer),
-            rowLine('SOCSO / PERKESO', amounts.socsoEmployee, amounts.socsoEmployer),
+            rowLine(
+              'SOCSO / PERKESO',
+              amounts.socsoEmployee,
+              amounts.socsoEmployer,
+            ),
             rowLine('EIS / SIP', amounts.eisEmployee, amounts.eisEmployer),
           ],
         ),
@@ -277,19 +329,26 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
       text: _fmtDate(effectiveDate),
     );
     final epfECtrl = TextEditingController(
-        text: '${seed?.epfEmployeePct ?? 11}');
+      text: '${seed?.epfEmployeePct ?? 11}',
+    );
     final epfErCtrl = TextEditingController(
-        text: '${seed?.epfEmployerPct ?? 13}');
+      text: '${seed?.epfEmployerPct ?? 13}',
+    );
     final ceilingCtrl = TextEditingController(
-        text: seed?.epfSalaryCeiling?.toString() ?? '');
+      text: seed?.epfSalaryCeiling?.toString() ?? '',
+    );
     final soECtrl = TextEditingController(
-        text: '${seed?.socsoEmployeePct ?? 0.5}');
+      text: '${seed?.socsoEmployeePct ?? 0.5}',
+    );
     final soErCtrl = TextEditingController(
-        text: '${seed?.socsoEmployerPct ?? 1.75}');
+      text: '${seed?.socsoEmployerPct ?? 1.75}',
+    );
     final eiECtrl = TextEditingController(
-        text: '${seed?.eisEmployeePct ?? 0.2}');
+      text: '${seed?.eisEmployeePct ?? 0.2}',
+    );
     final eiErCtrl = TextEditingController(
-        text: '${seed?.eisEmployerPct ?? 0.2}');
+      text: '${seed?.eisEmployerPct ?? 0.2}',
+    );
 
     String? formError;
 
@@ -362,9 +421,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: epfECtrl,
                         decoration: const InputDecoration(
-                            labelText: 'EPF employee %'),
+                          labelText: 'EPF employee %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -372,9 +433,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: epfErCtrl,
                         decoration: const InputDecoration(
-                            labelText: 'EPF employer %'),
+                          labelText: 'EPF employer %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -386,8 +449,9 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                     labelText: 'EPF wage ceiling (optional)',
                     hintText: 'Leave blank for no ceiling',
                   ),
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -396,9 +460,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: soECtrl,
                         decoration: const InputDecoration(
-                            labelText: 'SOCSO employee %'),
+                          labelText: 'SOCSO employee %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -406,9 +472,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: soErCtrl,
                         decoration: const InputDecoration(
-                            labelText: 'SOCSO employer %'),
+                          labelText: 'SOCSO employer %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -420,9 +488,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: eiECtrl,
                         decoration: const InputDecoration(
-                            labelText: 'EIS employee %'),
+                          labelText: 'EIS employee %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -430,9 +500,11 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       child: TextField(
                         controller: eiErCtrl,
                         decoration: const InputDecoration(
-                            labelText: 'EIS employer %'),
+                          labelText: 'EIS employer %',
+                        ),
                         keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true),
+                          decimal: true,
+                        ),
                       ),
                     ),
                   ],
@@ -486,14 +558,15 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                 } else if (eiEr == null) {
                   err = 'EIS employer % must be 0–100';
                 } else {
-                  final sameDate = _list.any((x) =>
-                      x.id != (existing?.id ?? '') &&
-                      x.effectiveFrom.year == effectiveDate.year &&
-                      x.effectiveFrom.month == effectiveDate.month &&
-                      x.effectiveFrom.day == effectiveDate.day);
+                  final sameDate = _list.any(
+                    (x) =>
+                        x.id != (existing?.id ?? '') &&
+                        x.effectiveFrom.year == effectiveDate.year &&
+                        x.effectiveFrom.month == effectiveDate.month &&
+                        x.effectiveFrom.day == effectiveDate.day,
+                  );
                   if (sameDate) {
-                    err =
-                        'Another rate set already uses this effective date';
+                    err = 'Another rate set already uses this effective date';
                   }
                 }
 
@@ -513,9 +586,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
 
     final config = PayrollStatutoryConfig(
       id: existing?.id ?? '',
-      label: labelCtrl.text.trim().isEmpty
-          ? 'Rate set'
-          : labelCtrl.text.trim(),
+      label: labelCtrl.text.trim().isEmpty ? 'Rate set' : labelCtrl.text.trim(),
       effectiveFrom: effectiveDate,
       epfEmployeePct:
           double.tryParse(epfECtrl.text) ?? (seed?.epfEmployeePct ?? 11),
@@ -553,17 +624,16 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
 
   Future<void> _delete(PayrollStatutoryConfig c) async {
-    final isCurrentDefault =
-        _list.isNotEmpty && _list.first.id == c.id;
-    final nextDefault =
-        isCurrentDefault && _list.length > 1 ? _list[1] : null;
+    final isCurrentDefault = _list.isNotEmpty && _list.first.id == c.id;
+    final nextDefault = isCurrentDefault && _list.length > 1 ? _list[1] : null;
 
     final body = isCurrentDefault && nextDefault != null
         ? 'Delete "${c.label}"?\n\n"${nextDefault.label}" (effective ${_fmtDate(nextDefault.effectiveFrom)}) will become the new default for future payroll runs.\n\nThis cannot be undone.'
@@ -580,8 +650,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style:
-                FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
           ),
@@ -593,14 +662,16 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
     try {
       await SupabaseService.deletePayrollStatutoryConfig(c.id);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Deleted')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Deleted')));
       }
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -627,15 +698,16 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
             children: [
               Text(
                 'Move payroll runs using "${from.label}" to another rate set.',
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: selectedId,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Target rate set',
-                ),
+                decoration: const InputDecoration(labelText: 'Target rate set'),
                 items: candidates
                     .map(
                       (c) => DropdownMenuItem<String>(
@@ -676,14 +748,19 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Moved $updated payroll run${updated == 1 ? '' : 's'}')),
+          SnackBar(
+            content: Text(
+              'Moved $updated payroll run${updated == 1 ? '' : 's'}',
+            ),
+          ),
         );
       }
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
   }
@@ -707,300 +784,285 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _list.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.percent_rounded,
-                            size: 48,
-                            color:
-                                AppColors.textHint.withValues(alpha: 0.5)),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'No statutory rate sets yet.\nTap + to add one.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.info_outline,
-                              size: 13, color: AppColors.textHint),
-                          const SizedBox(width: 6),
-                          const Expanded(
-                            child: Text(
-                              'The top item is the default for NEW payroll runs (latest effective date). EPF/KWSP, SOCSO/PERKESO, and EIS/SIP amounts use Malaysia wage-band rules; saved percentage fields are retained as reference/legacy settings.',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textHint,
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                    Icon(
+                      Icons.percent_rounded,
+                      size: 48,
+                      color: AppColors.textHint.withValues(alpha: 0.5),
                     ),
-                    _debugStatutoryPreviewCard(),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: _load,
-                        child: ListView.separated(
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                          itemCount: _list.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (_, i) {
-                            final c = _list[i];
-                            final isDefault = i == 0;
-                            final today = DateTime.now();
-                            final isFuture = c.effectiveFrom.isAfter(
-                              DateTime(today.year, today.month, today.day),
-                            );
-                            final usedCount = _usageByConfigId[c.id] ?? 0;
-                            // Default set: deletable only if another set exists
-                            // to take over. Other sets: deletable only if no
-                            // existing runs reference them.
-                            final canDelete = isDefault
-                                ? _list.length > 1
-                                : usedCount == 0;
-                            final deleteTooltip = canDelete
-                                ? (isDefault
-                                    ? '"${_list[1].label}" will become the new default'
-                                    : 'Delete')
-                                : (isDefault
-                                    ? 'Add another rate set first'
-                                    : 'Used by $usedCount run${usedCount > 1 ? 's' : ''} — replace usage first');
-                            return Material(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              child: InkWell(
-                                onTap: () => _showForm(existing: c),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No statutory rate sets yet.\nTap + to add one.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        size: 13,
+                        color: AppColors.textHint,
+                      ),
+                      const SizedBox(width: 6),
+                      const Expanded(
+                        child: Text(
+                          'The top item is the default for NEW payroll runs (latest effective date). EPF/KWSP, SOCSO/PERKESO, and EIS/SIP amounts use Malaysia wage-band rules; saved percentage fields are retained as reference/legacy settings.',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textHint,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _debugStatutoryPreviewCard(),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      itemCount: _list.length,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (_, i) {
+                        final c = _list[i];
+                        final isDefault = i == 0;
+                        final today = DateTime.now();
+                        final isFuture = c.effectiveFrom.isAfter(
+                          DateTime(today.year, today.month, today.day),
+                        );
+                        final usedCount = _usageByConfigId[c.id] ?? 0;
+                        // Default set: deletable only if another set exists
+                        // to take over. Other sets: deletable only if no
+                        // existing runs reference them.
+                        final canDelete = isDefault
+                            ? _list.length > 1
+                            : usedCount == 0;
+                        final deleteTooltip = canDelete
+                            ? (isDefault
+                                  ? '"${_list[1].label}" will become the new default'
+                                  : 'Delete')
+                            : (isDefault
+                                  ? 'Add another rate set first'
+                                  : 'Used by $usedCount run${usedCount > 1 ? 's' : ''} — replace usage first');
+                        return Material(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          child: InkWell(
+                            onTap: () => _showForm(existing: c),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Ink(
+                              decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(16),
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isDefault
-                                          ? AppColors.primary
-                                              .withValues(alpha: 0.45)
-                                          : AppColors.divider,
-                                      width: isDefault ? 1.5 : 1,
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.fromLTRB(
-                                      16, 14, 8, 14),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                border: Border.all(
+                                  color: isDefault
+                                      ? AppColors.primary.withValues(
+                                          alpha: 0.45,
+                                        )
+                                      : AppColors.divider,
+                                  width: isDefault ? 1.5 : 1,
+                                ),
+                              ),
+                              padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Row(
-                                              children: [
-                                                Flexible(
-                                                  child: Text(
-                                                    c.label,
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      fontSize: 15,
-                                                    ),
-                                                  ),
+                                            Flexible(
+                                              child: Text(
+                                                c.label,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 15,
                                                 ),
-                                                if (isDefault) ...[
-                                                  const SizedBox(width: 8),
-                                                  Container(
-                                                    padding:
-                                                        const EdgeInsets
-                                                            .symmetric(
+                                              ),
+                                            ),
+                                            if (isDefault) ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
                                                       horizontal: 8,
                                                       vertical: 2,
                                                     ),
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors
-                                                          .successLight,
-                                                      borderRadius:
-                                                          BorderRadius
-                                                              .circular(20),
-                                                    ),
-                                                    child: const Text(
-                                                      'NEW RUN DEFAULT',
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: AppColors
-                                                            .success,
-                                                        letterSpacing: 0.5,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  'Effective ${_fmtDate(c.effectiveFrom)}',
-                                                  style: const TextStyle(
-                                                    color: AppColors
-                                                        .textSecondary,
-                                                    fontSize: 12,
-                                                  ),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.successLight,
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
                                                 ),
-                                                if (isFuture) ...[
-                                                  const SizedBox(width: 6),
-                                                  Container(
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                      horizontal: 6,
-                                                      vertical: 1,
-                                                    ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.orange
-                                                          .withValues(
-                                                              alpha: 0.12),
-                                                      borderRadius:
-                                                          BorderRadius
-                                                              .circular(8),
-                                                    ),
-                                                    child: const Text(
-                                                      'FUTURE DATE',
-                                                      style: TextStyle(
-                                                        fontSize: 9,
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color: Colors.orange,
-                                                        letterSpacing: 0.4,
-                                                      ),
-                                                    ),
+                                                child: const Text(
+                                                  'NEW RUN DEFAULT',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.success,
+                                                    letterSpacing: 0.5,
                                                   ),
-                                                ],
-                                              ],
-                                            ),
-                                            const SizedBox(height: 3),
-                                            Text(
-                                              isDefault
-                                                  ? 'Default for new payroll runs'
-                                                  : (usedCount == 0
-                                                      ? 'Not used by any payroll run'
-                                                      : 'Used by $usedCount payroll run${usedCount > 1 ? 's' : ''}'),
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDefault
-                                                    ? AppColors.success
-                                                    : (usedCount == 0
-                                                        ? AppColors.textHint
-                                                        : AppColors.primaryDark),
-                                                fontWeight: isDefault
-                                                    ? FontWeight.w600
-                                                    : (usedCount == 0
-                                                        ? FontWeight.w500
-                                                        : FontWeight.w700),
-                                              ),
-                                            ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              'Reference: EPF ${c.epfEmployeePct}% / ${c.epfEmployerPct}%'
-                                              '  ·  SOCSO ${c.socsoEmployeePct}% / ${c.socsoEmployerPct}%'
-                                              '  ·  EIS ${c.eisEmployeePct}% / ${c.eisEmployerPct}%',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                color:
-                                                    AppColors.textSecondary,
-                                                height: 1.35,
-                                              ),
-                                            ),
-                                            if (c.epfSalaryCeiling !=
-                                                null) ...[
-                                              const SizedBox(height: 3),
-                                              Text(
-                                                'EPF wage ceiling: RM ${c.epfSalaryCeiling!.toStringAsFixed(0)}',
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  color: AppColors.textHint,
                                                 ),
                                               ),
                                             ],
                                           ],
                                         ),
-                                      ),
-                                      Column(
-                                        children: [
-                                          const Icon(
-                                            Icons.edit_outlined,
-                                            size: 18,
-                                            color: AppColors.textHint,
-                                          ),
-                                          const SizedBox(height: 4),
-                                          IconButton(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            padding: EdgeInsets.zero,
-                                            constraints:
-                                                const BoxConstraints(),
-                                            icon: Icon(
-                                              Icons.swap_horiz_rounded,
-                                              size: 18,
-                                              color: usedCount > 0
-                                                  ? AppColors.primary
-                                                  : AppColors.textHint,
+                                        const SizedBox(height: 3),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Effective ${_fmtDate(c.effectiveFrom)}',
+                                              style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 12,
+                                              ),
                                             ),
-                                            onPressed: usedCount > 0
-                                                ? () => _replaceUsage(c)
-                                                : null,
-                                            tooltip: usedCount > 0
-                                                ? 'Replace usage with another set'
-                                                : 'No usage to replace',
+                                            if (isFuture) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 6,
+                                                      vertical: 1,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange
+                                                      .withValues(alpha: 0.12),
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                ),
+                                                child: const Text(
+                                                  'FUTURE DATE',
+                                                  style: TextStyle(
+                                                    fontSize: 9,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: Colors.orange,
+                                                    letterSpacing: 0.4,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                        const SizedBox(height: 3),
+                                        Text(
+                                          isDefault
+                                              ? 'Default for new payroll runs'
+                                              : (usedCount == 0
+                                                    ? 'Not used by any payroll run'
+                                                    : 'Used by $usedCount payroll run${usedCount > 1 ? 's' : ''}'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDefault
+                                                ? AppColors.success
+                                                : (usedCount == 0
+                                                      ? AppColors.textHint
+                                                      : AppColors.primaryDark),
+                                            fontWeight: isDefault
+                                                ? FontWeight.w600
+                                                : (usedCount == 0
+                                                      ? FontWeight.w500
+                                                      : FontWeight.w700),
                                           ),
-                                          const SizedBox(height: 4),
-                                          IconButton(
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                            padding: EdgeInsets.zero,
-                                            constraints:
-                                                const BoxConstraints(),
-                                            icon: Icon(
-                                              Icons
-                                                  .delete_outline_rounded,
-                                              size: 18,
-                                              color: canDelete
-                                                  ? AppColors.danger
-                                                  : AppColors.textHint,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Reference: EPF ${c.epfEmployeePct}% / ${c.epfEmployerPct}%'
+                                          '  ·  SOCSO ${c.socsoEmployeePct}% / ${c.socsoEmployerPct}%'
+                                          '  ·  EIS ${c.eisEmployeePct}% / ${c.eisEmployerPct}%',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            height: 1.35,
+                                          ),
+                                        ),
+                                        if (c.epfSalaryCeiling != null) ...[
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            'EPF wage ceiling: RM ${c.epfSalaryCeiling!.toStringAsFixed(0)}',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: AppColors.textHint,
                                             ),
-                                            onPressed:
-                                                canDelete ? () => _delete(c) : null,
-                                            tooltip: deleteTooltip,
                                           ),
                                         ],
+                                      ],
+                                    ),
+                                  ),
+                                  Column(
+                                    children: [
+                                      const Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: AppColors.textHint,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        icon: Icon(
+                                          Icons.swap_horiz_rounded,
+                                          size: 18,
+                                          color: usedCount > 0
+                                              ? AppColors.primary
+                                              : AppColors.textHint,
+                                        ),
+                                        onPressed: usedCount > 0
+                                            ? () => _replaceUsage(c)
+                                            : null,
+                                        tooltip: usedCount > 0
+                                            ? 'Replace usage with another set'
+                                            : 'No usage to replace',
+                                      ),
+                                      const SizedBox(height: 4),
+                                      IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                        icon: Icon(
+                                          Icons.delete_outline_rounded,
+                                          size: 18,
+                                          color: canDelete
+                                              ? AppColors.danger
+                                              : AppColors.textHint,
+                                        ),
+                                        onPressed: canDelete
+                                            ? () => _delete(c)
+                                            : null,
+                                        tooltip: deleteTooltip,
                                       ),
                                     ],
                                   ),
-                                ),
+                                ],
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ],
+                  ),
                 ),
+              ],
+            ),
     );
   }
 }

@@ -22,9 +22,9 @@ enum _ProfileSectionKey {
 }
 
 Set<_ProfileSectionKey> _defaultExpandedForView() => {
-      _ProfileSectionKey.personal,
-      _ProfileSectionKey.employment,
-    };
+  _ProfileSectionKey.personal,
+  _ProfileSectionKey.employment,
+};
 
 String _profileSectionSubtitle(_ProfileSectionKey section, AppUser u) {
   switch (section) {
@@ -279,26 +279,26 @@ class _ProfileTabState extends State<ProfileTab> {
 
     setState(() => _saving = true);
     final err = await context.read<AuthProvider>().updateEmployeeProfileFull(
-          name: _nameCtrl.text,
-          phone: _phoneCtrl.text,
-          address: _addressCtrl.text,
-          maritalStatus: _maritalValue,
-          dateOfBirth: _dob,
-          icNumber: _icCtrl.text,
-          jobTitle: _jobCtrl.text,
-          department: _deptCtrl.text,
-          employeeCode: _empIdCtrl.text,
-          epfNumber: _epfCtrl.text,
-          socsoNumber: _socsoCtrl.text,
-          bankName: _bankNameCtrl.text,
-          bankAccountNumber: _bankAcctCtrl.text,
-          educationLevel: _eduLevelCtrl.text,
-          educationInstitution: _eduInstCtrl.text,
-          emergencyContactName: _emeNameCtrl.text,
-          emergencyContactRelationship: _emeRelCtrl.text,
-          emergencyContactPhone: _emePhoneCtrl.text,
-          employmentStartDate: _joinDate,
-        );
+      name: _nameCtrl.text,
+      phone: _phoneCtrl.text,
+      address: _addressCtrl.text,
+      maritalStatus: _maritalValue,
+      dateOfBirth: _dob,
+      icNumber: _icCtrl.text,
+      jobTitle: _jobCtrl.text,
+      department: _deptCtrl.text,
+      employeeCode: _empIdCtrl.text,
+      epfNumber: _epfCtrl.text,
+      socsoNumber: _socsoCtrl.text,
+      bankName: _bankNameCtrl.text,
+      bankAccountNumber: _bankAcctCtrl.text,
+      educationLevel: _eduLevelCtrl.text,
+      educationInstitution: _eduInstCtrl.text,
+      emergencyContactName: _emeNameCtrl.text,
+      emergencyContactRelationship: _emeRelCtrl.text,
+      emergencyContactPhone: _emePhoneCtrl.text,
+      employmentStartDate: _joinDate,
+    );
     if (!mounted) return;
     setState(() => _saving = false);
     if (err != null) {
@@ -379,18 +379,20 @@ class _ProfileTabState extends State<ProfileTab> {
     Widget body = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
-        SliverToBoxAdapter(child: _ProfileHeader(
-          user: user,
-          editing: _editing,
-          pct: pct,
-          onTogglePhoto: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Profile photo upload will be available soon.'),
-              ),
-            );
-          },
-        )),
+        SliverToBoxAdapter(
+          child: _ProfileHeader(
+            user: user,
+            editing: _editing,
+            pct: pct,
+            onTogglePhoto: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Profile photo upload will be available soon.'),
+                ),
+              );
+            },
+          ),
+        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           sliver: SliverToBoxAdapter(
@@ -404,8 +406,9 @@ class _ProfileTabState extends State<ProfileTab> {
                       TextButton(
                         onPressed: () {
                           setState(() {
-                            _expandedSections =
-                                Set<_ProfileSectionKey>.from(_ProfileSectionKey.values);
+                            _expandedSections = Set<_ProfileSectionKey>.from(
+                              _ProfileSectionKey.values,
+                            );
                           });
                         },
                         child: const Text('Expand all'),
@@ -423,332 +426,455 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Personal information',
                     icon: Icons.person_outline_rounded,
                     accent: AppColors.indigo,
-                    subtitle:
-                        _profileSectionSubtitle(_ProfileSectionKey.personal, user),
-                    expanded:
-                        _expandedSections.contains(_ProfileSectionKey.personal),
+                    subtitle: _profileSectionSubtitle(
+                      _ProfileSectionKey.personal,
+                      user,
+                    ),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.personal,
+                    ),
                     onToggle: () => _toggleSection(_ProfileSectionKey.personal),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      if (!_editing) ...[
-                        _viewRow(Icons.badge_outlined, 'Full name', user.name),
-                        _viewRow(Icons.phone_iphone_rounded, 'Mobile',
-                            ProfileValidators.displayValue(user.phone, editing: false)),
-                        _viewRow(Icons.home_outlined, 'Current address',
-                            ProfileValidators.displayValue(user.address, editing: false)),
-                        _viewRow(Icons.favorite_outline_rounded, 'Marital status',
-                            ProfileValidators.displayValue(user.maritalStatus, editing: false)),
-                        _viewRow(Icons.cake_outlined, 'Date of birth',
-                            user.dateOfBirth != null
-                                ? dateFmtLong.format(user.dateOfBirth!)
-                                : 'Not updated yet'),
-                        _viewRow(Icons.credit_card_outlined, 'IC number',
-                            user.icNumber == null || user.icNumber!.trim().isEmpty
-                                ? 'Not updated yet'
-                                : ProfileValidators.displayIcMasked(user.icNumber)),
-                      ] else ...[
-                        TextFormField(
-                          controller: _nameCtrl,
-                          decoration: _dec(Icons.badge_outlined, 'Full name'),
-                          validator: ProfileValidators.requiredName,
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _phoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          decoration: _dec(Icons.phone_iphone_rounded, 'Mobile number'),
-                          validator: ProfileValidators.phoneMalaysia,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _addressCtrl,
-                          maxLines: 2,
-                          decoration: _dec(Icons.home_outlined, 'Current address'),
-                          textCapitalization: TextCapitalization.sentences,
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          key: ValueKey<String>('marital_$_maritalValue'),
-                          initialValue:
-                              _maritalValue.isEmpty ? '' : _maritalValue,
-                          decoration: _dec(
-                            Icons.favorite_outline_rounded,
-                            'Marital status',
+                        if (!_editing) ...[
+                          _viewRow(
+                            Icons.badge_outlined,
+                            'Full name',
+                            user.name,
                           ),
-                          items: const [
-                            DropdownMenuItem(value: '', child: Text('Not set')),
-                            DropdownMenuItem(value: 'Single', child: Text('Single')),
-                            DropdownMenuItem(value: 'Married', child: Text('Married')),
-                            DropdownMenuItem(value: 'Divorced', child: Text('Divorced')),
-                            DropdownMenuItem(value: 'Widowed', child: Text('Widowed')),
-                            DropdownMenuItem(value: 'Other', child: Text('Other')),
-                          ],
-                          onChanged: (v) => setState(() => _maritalValue = v ?? ''),
-                        ),
-                        const SizedBox(height: 12),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.cake_outlined, color: AppColors.primary.withValues(alpha: 0.85)),
-                          title: const Text('Date of birth'),
-                          subtitle: Text(
-                            _dob == null
-                                ? 'Tap to select'
-                                : dateFmtLong.format(_dob!),
-                            style: TextStyle(
-                              color: _dob == null
-                                  ? AppColors.textHint
-                                  : AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
+                          _viewRow(
+                            Icons.phone_iphone_rounded,
+                            'Mobile',
+                            ProfileValidators.displayValue(
+                              user.phone,
+                              editing: false,
                             ),
                           ),
-                          trailing: const Icon(Icons.edit_calendar_outlined),
-                          onTap: _pickDob,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: AppColors.border),
+                          _viewRow(
+                            Icons.home_outlined,
+                            'Current address',
+                            ProfileValidators.displayValue(
+                              user.address,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _icCtrl,
-                          decoration: _dec(
+                          _viewRow(
+                            Icons.favorite_outline_rounded,
+                            'Marital status',
+                            ProfileValidators.displayValue(
+                              user.maritalStatus,
+                              editing: false,
+                            ),
+                          ),
+                          _viewRow(
+                            Icons.cake_outlined,
+                            'Date of birth',
+                            user.dateOfBirth != null
+                                ? dateFmtLong.format(user.dateOfBirth!)
+                                : 'Not updated yet',
+                          ),
+                          _viewRow(
                             Icons.credit_card_outlined,
-                            'IC number (######-##-####)',
+                            'IC number',
+                            user.icNumber == null ||
+                                    user.icNumber!.trim().isEmpty
+                                ? 'Not updated yet'
+                                : ProfileValidators.displayIcMasked(
+                                    user.icNumber,
+                                  ),
                           ),
-                          validator: ProfileValidators.icNumber,
-                        ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _nameCtrl,
+                            decoration: _dec(Icons.badge_outlined, 'Full name'),
+                            validator: ProfileValidators.requiredName,
+                            textCapitalization: TextCapitalization.words,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _phoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: _dec(
+                              Icons.phone_iphone_rounded,
+                              'Mobile number',
+                            ),
+                            validator: ProfileValidators.phoneMalaysia,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _addressCtrl,
+                            maxLines: 2,
+                            decoration: _dec(
+                              Icons.home_outlined,
+                              'Current address',
+                            ),
+                            textCapitalization: TextCapitalization.sentences,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            key: ValueKey<String>('marital_$_maritalValue'),
+                            initialValue: _maritalValue.isEmpty
+                                ? ''
+                                : _maritalValue,
+                            decoration: _dec(
+                              Icons.favorite_outline_rounded,
+                              'Marital status',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: '',
+                                child: Text('Not set'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Single',
+                                child: Text('Single'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Married',
+                                child: Text('Married'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Divorced',
+                                child: Text('Divorced'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Widowed',
+                                child: Text('Widowed'),
+                              ),
+                              DropdownMenuItem(
+                                value: 'Other',
+                                child: Text('Other'),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setState(() => _maritalValue = v ?? ''),
+                          ),
+                          const SizedBox(height: 12),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              Icons.cake_outlined,
+                              color: AppColors.primary.withValues(alpha: 0.85),
+                            ),
+                            title: const Text('Date of birth'),
+                            subtitle: Text(
+                              _dob == null
+                                  ? 'Tap to select'
+                                  : dateFmtLong.format(_dob!),
+                              style: TextStyle(
+                                color: _dob == null
+                                    ? AppColors.textHint
+                                    : AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.edit_calendar_outlined),
+                            onTap: _pickDob,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: AppColors.border),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _icCtrl,
+                            decoration: _dec(
+                              Icons.credit_card_outlined,
+                              'IC number (######-##-####)',
+                            ),
+                            validator: ProfileValidators.icNumber,
+                          ),
+                        ],
+                        const SizedBox(height: 8),
+                        _readonlyBlock(),
                       ],
-                      const SizedBox(height: 8),
-                      _readonlyBlock(),
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Employment information',
                     icon: Icons.work_outline_rounded,
                     accent: AppColors.teal,
-                    subtitle:
-                        _profileSectionSubtitle(_ProfileSectionKey.employment, user),
-                    expanded: _expandedSections
-                        .contains(_ProfileSectionKey.employment),
-                    onToggle: () => _toggleSection(_ProfileSectionKey.employment),
+                    subtitle: _profileSectionSubtitle(
+                      _ProfileSectionKey.employment,
+                      user,
+                    ),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.employment,
+                    ),
+                    onToggle: () =>
+                        _toggleSection(_ProfileSectionKey.employment),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      _viewRow(
-                        Icons.shield_outlined,
-                        'Role',
-                        user.isAdmin ? 'Administrator' : 'Employee',
-                      ),
-                      if (!_editing)
                         _viewRow(
-                          Icons.event_outlined,
-                          'Join date',
-                          _joinDateLabel(user),
-                        )
-                      else ...[
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(
+                          Icons.shield_outlined,
+                          'Role',
+                          user.isAdmin ? 'Administrator' : 'Employee',
+                        ),
+                        if (!_editing)
+                          _viewRow(
                             Icons.event_outlined,
-                            color: AppColors.primary.withValues(alpha: 0.85),
-                          ),
-                          title: const Text('Join date'),
-                          subtitle: Text(
-                            dateFmtLong.format(_joinDate),
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
+                            'Join date',
+                            _joinDateLabel(user),
+                          )
+                        else ...[
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              Icons.event_outlined,
+                              color: AppColors.primary.withValues(alpha: 0.85),
+                            ),
+                            title: const Text('Join date'),
+                            subtitle: Text(
+                              dateFmtLong.format(_joinDate),
+                              style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            trailing: const Icon(Icons.edit_calendar_outlined),
+                            onTap: _pickJoinDate,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: const BorderSide(color: AppColors.border),
                             ),
                           ),
-                          trailing: const Icon(Icons.edit_calendar_outlined),
-                          onTap: _pickJoinDate,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            side: const BorderSide(color: AppColors.border),
+                          const SizedBox(height: 10),
+                          Text(
+                            'If your start date was recorded wrong, update it here. '
+                            'Annual leave calculations may use this date.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.9,
+                              ),
+                              height: 1.35,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'If your start date was recorded wrong, update it here. '
-                          'Annual leave calculations may use this date.',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: AppColors.textSecondary.withValues(alpha: 0.9),
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      if (!_editing) ...[
-                        _viewRow(
-                          Icons.workspace_premium_outlined,
-                          'Position',
-                          ProfileValidators.displayValue(user.jobTitle, editing: false),
-                        ),
-                        _viewRow(
-                          Icons.apartment_outlined,
-                          'Department',
-                          ProfileValidators.displayValue(user.department, editing: false),
-                        ),
-                        _viewRow(
-                          Icons.badge_rounded,
-                          'Employee ID',
-                          ProfileValidators.displayValue(user.employeeCode, editing: false),
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _jobCtrl,
-                          decoration: _dec(
+                          const SizedBox(height: 10),
+                        ],
+                        if (!_editing) ...[
+                          _viewRow(
                             Icons.workspace_premium_outlined,
-                            'Position / role title',
+                            'Position',
+                            ProfileValidators.displayValue(
+                              user.jobTitle,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _deptCtrl,
-                          decoration: _dec(Icons.apartment_outlined, 'Department'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _empIdCtrl,
-                          decoration: _dec(Icons.badge_rounded, 'Employee ID'),
-                        ),
+                          _viewRow(
+                            Icons.apartment_outlined,
+                            'Department',
+                            ProfileValidators.displayValue(
+                              user.department,
+                              editing: false,
+                            ),
+                          ),
+                          _viewRow(
+                            Icons.badge_rounded,
+                            'Employee ID',
+                            ProfileValidators.displayValue(
+                              user.employeeCode,
+                              editing: false,
+                            ),
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _jobCtrl,
+                            decoration: _dec(
+                              Icons.workspace_premium_outlined,
+                              'Position / role title',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _deptCtrl,
+                            decoration: _dec(
+                              Icons.apartment_outlined,
+                              'Department',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _empIdCtrl,
+                            decoration: _dec(
+                              Icons.badge_rounded,
+                              'Employee ID',
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Statutory (Malaysia)',
                     icon: Icons.account_balance_outlined,
                     accent: AppColors.sky,
-                    subtitle:
-                        _profileSectionSubtitle(_ProfileSectionKey.statutory, user),
-                    expanded: _expandedSections
-                        .contains(_ProfileSectionKey.statutory),
-                    onToggle: () => _toggleSection(_ProfileSectionKey.statutory),
+                    subtitle: _profileSectionSubtitle(
+                      _ProfileSectionKey.statutory,
+                      user,
+                    ),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.statutory,
+                    ),
+                    onToggle: () =>
+                        _toggleSection(_ProfileSectionKey.statutory),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      if (!_editing) ...[
-                        _viewRow(
-                          Icons.account_balance_wallet_outlined,
-                          'EPF number',
-                          ProfileValidators.displayValue(user.epfNumber, editing: false),
-                        ),
-                        _viewRow(
-                          Icons.health_and_safety_outlined,
-                          'SOCSO number',
-                          ProfileValidators.displayValue(user.socsoNumber, editing: false),
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _epfCtrl,
-                          decoration: _dec(Icons.account_balance_wallet_outlined, 'EPF number'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _socsoCtrl,
-                          decoration:
-                              _dec(Icons.health_and_safety_outlined, 'SOCSO number'),
-                        ),
+                        if (!_editing) ...[
+                          _viewRow(
+                            Icons.account_balance_wallet_outlined,
+                            'EPF number',
+                            ProfileValidators.displayValue(
+                              user.epfNumber,
+                              editing: false,
+                            ),
+                          ),
+                          _viewRow(
+                            Icons.health_and_safety_outlined,
+                            'SOCSO number',
+                            ProfileValidators.displayValue(
+                              user.socsoNumber,
+                              editing: false,
+                            ),
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _epfCtrl,
+                            decoration: _dec(
+                              Icons.account_balance_wallet_outlined,
+                              'EPF number',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _socsoCtrl,
+                            decoration: _dec(
+                              Icons.health_and_safety_outlined,
+                              'SOCSO number',
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Bank information',
                     icon: Icons.account_balance_wallet_outlined,
                     accent: AppColors.violet,
-                    subtitle: _profileSectionSubtitle(_ProfileSectionKey.bank, user),
-                    expanded: _expandedSections.contains(_ProfileSectionKey.bank),
+                    subtitle: _profileSectionSubtitle(
+                      _ProfileSectionKey.bank,
+                      user,
+                    ),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.bank,
+                    ),
                     onToggle: () => _toggleSection(_ProfileSectionKey.bank),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      if (!_editing) ...[
-                        _viewRow(
-                          Icons.account_balance_outlined,
-                          'Bank name',
-                          ProfileValidators.displayValue(user.bankName, editing: false),
-                        ),
-                        _viewRow(
-                          Icons.numbers_rounded,
-                          'Account number',
-                          user.bankAccountNumber == null ||
-                                  user.bankAccountNumber!.trim().isEmpty
-                              ? 'Not updated yet'
-                              : ProfileValidators.displayBankMasked(
-                                  user.bankAccountNumber),
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _bankNameCtrl,
-                          decoration: _dec(Icons.account_balance_outlined, 'Bank name'),
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _bankAcctCtrl,
-                          keyboardType: TextInputType.number,
-                          decoration: _dec(Icons.numbers_rounded, 'Bank account number'),
-                          validator: ProfileValidators.bankAccount,
-                        ),
+                        if (!_editing) ...[
+                          _viewRow(
+                            Icons.account_balance_outlined,
+                            'Bank name',
+                            ProfileValidators.displayValue(
+                              user.bankName,
+                              editing: false,
+                            ),
+                          ),
+                          _viewRow(
+                            Icons.numbers_rounded,
+                            'Account number',
+                            user.bankAccountNumber == null ||
+                                    user.bankAccountNumber!.trim().isEmpty
+                                ? 'Not updated yet'
+                                : ProfileValidators.displayBankMasked(
+                                    user.bankAccountNumber,
+                                  ),
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _bankNameCtrl,
+                            decoration: _dec(
+                              Icons.account_balance_outlined,
+                              'Bank name',
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _bankAcctCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: _dec(
+                              Icons.numbers_rounded,
+                              'Bank account number',
+                            ),
+                            validator: ProfileValidators.bankAccount,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Education',
                     icon: Icons.school_outlined,
                     accent: AppColors.orange,
-                    subtitle:
-                        _profileSectionSubtitle(_ProfileSectionKey.education, user),
-                    expanded:
-                        _expandedSections.contains(_ProfileSectionKey.education),
-                    onToggle: () => _toggleSection(_ProfileSectionKey.education),
+                    subtitle: _profileSectionSubtitle(
+                      _ProfileSectionKey.education,
+                      user,
+                    ),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.education,
+                    ),
+                    onToggle: () =>
+                        _toggleSection(_ProfileSectionKey.education),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      if (!_editing) ...[
-                        _viewRow(
-                          Icons.stacked_bar_chart_outlined,
-                          'Highest level of studies',
-                          ProfileValidators.displayValue(user.educationLevel,
-                              editing: false),
-                        ),
-                        _viewRow(
-                          Icons.domain_outlined,
-                          'College / university',
-                          ProfileValidators.displayValue(
-                            user.educationInstitution,
-                            editing: false,
-                          ),
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _eduLevelCtrl,
-                          decoration: _dec(
+                        if (!_editing) ...[
+                          _viewRow(
                             Icons.stacked_bar_chart_outlined,
-                            'Highest level (e.g. Bachelor)',
+                            'Highest level of studies',
+                            ProfileValidators.displayValue(
+                              user.educationLevel,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _eduInstCtrl,
-                          decoration: _dec(Icons.domain_outlined, 'Institution name'),
-                          textCapitalization: TextCapitalization.words,
-                        ),
+                          _viewRow(
+                            Icons.domain_outlined,
+                            'College / university',
+                            ProfileValidators.displayValue(
+                              user.educationInstitution,
+                              editing: false,
+                            ),
+                          ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _eduLevelCtrl,
+                            decoration: _dec(
+                              Icons.stacked_bar_chart_outlined,
+                              'Highest level (e.g. Bachelor)',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _eduInstCtrl,
+                            decoration: _dec(
+                              Icons.domain_outlined,
+                              'Institution name',
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Emergency contact',
@@ -758,68 +884,79 @@ class _ProfileTabState extends State<ProfileTab> {
                       _ProfileSectionKey.emergency,
                       user,
                     ),
-                    expanded:
-                        _expandedSections.contains(_ProfileSectionKey.emergency),
-                    onToggle: () => _toggleSection(_ProfileSectionKey.emergency),
+                    expanded: _expandedSections.contains(
+                      _ProfileSectionKey.emergency,
+                    ),
+                    onToggle: () =>
+                        _toggleSection(_ProfileSectionKey.emergency),
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                      if (!_editing) ...[
-                        _viewRow(
-                          Icons.person_outline_rounded,
-                          'Contact name',
-                          ProfileValidators.displayValue(
-                            user.emergencyContactName,
-                            editing: false,
+                        if (!_editing) ...[
+                          _viewRow(
+                            Icons.person_outline_rounded,
+                            'Contact name',
+                            ProfileValidators.displayValue(
+                              user.emergencyContactName,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                        _viewRow(
-                          Icons.group_outlined,
-                          'Relationship',
-                          ProfileValidators.displayValue(
-                            user.emergencyContactRelationship,
-                            editing: false,
+                          _viewRow(
+                            Icons.group_outlined,
+                            'Relationship',
+                            ProfileValidators.displayValue(
+                              user.emergencyContactRelationship,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                        _viewRow(
-                          Icons.phone_callback_outlined,
-                          'Phone',
-                          ProfileValidators.displayValue(
-                            user.emergencyContactPhone,
-                            editing: false,
+                          _viewRow(
+                            Icons.phone_callback_outlined,
+                            'Phone',
+                            ProfileValidators.displayValue(
+                              user.emergencyContactPhone,
+                              editing: false,
+                            ),
                           ),
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: _emeNameCtrl,
-                          decoration: _dec(Icons.person_outline_rounded, 'Contact name'),
-                          textCapitalization: TextCapitalization.words,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _emeRelCtrl,
-                          decoration: _dec(Icons.group_outlined, 'Relationship'),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _emePhoneCtrl,
-                          keyboardType: TextInputType.phone,
-                          decoration:
-                              _dec(Icons.phone_callback_outlined, 'Phone number'),
-                          validator: ProfileValidators.phoneMalaysia,
-                        ),
+                        ] else ...[
+                          TextFormField(
+                            controller: _emeNameCtrl,
+                            decoration: _dec(
+                              Icons.person_outline_rounded,
+                              'Contact name',
+                            ),
+                            textCapitalization: TextCapitalization.words,
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _emeRelCtrl,
+                            decoration: _dec(
+                              Icons.group_outlined,
+                              'Relationship',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextFormField(
+                            controller: _emePhoneCtrl,
+                            keyboardType: TextInputType.phone,
+                            decoration: _dec(
+                              Icons.phone_callback_outlined,
+                              'Phone number',
+                            ),
+                            validator: ProfileValidators.phoneMalaysia,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
-                ),
                   const SizedBox(height: 20),
                   _QuickActions(
                     editing: _editing,
                     saving: _saving,
                     onStartEdit: () => setState(() {
                       _editing = true;
-                      _expandedSections =
-                          Set<_ProfileSectionKey>.from(_ProfileSectionKey.values);
+                      _expandedSections = Set<_ProfileSectionKey>.from(
+                        _ProfileSectionKey.values,
+                      );
                     }),
                     onSave: _save,
                     onCancel: () => _cancelEdit(user),
@@ -847,10 +984,7 @@ class _ProfileTabState extends State<ProfileTab> {
     return SizedBox.expand(
       child: ColoredBox(
         color: AppColors.surface,
-        child: RefreshIndicator(
-          onRefresh: _onRefresh,
-          child: body,
-        ),
+        child: RefreshIndicator(onRefresh: _onRefresh, child: body),
       ),
     );
   }
@@ -944,7 +1078,9 @@ class _ProfileHeader extends StatelessWidget {
         width: double.infinity,
         decoration: BoxDecoration(
           gradient: AppGradients.brandHeader,
-          border: Border(bottom: BorderSide(color: AppColors.brandHeaderBorder)),
+          border: Border(
+            bottom: BorderSide(color: AppColors.brandHeaderBorder),
+          ),
           boxShadow: [
             BoxShadow(
               color: AppColors.brandHeaderShadow,
@@ -1016,9 +1152,7 @@ class _ProfileHeader extends StatelessWidget {
                       ),
                       alignment: Alignment.center,
                       child: Text(
-                        user.name.isNotEmpty
-                            ? user.name[0].toUpperCase()
-                            : '?',
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
                         style: const TextStyle(
                           fontSize: 40,
                           fontWeight: FontWeight.w800,
@@ -1206,7 +1340,9 @@ class _ProfileExpandableSection extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary.withValues(alpha: 0.92),
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.92,
+                              ),
                             ),
                           ),
                         ],
@@ -1221,7 +1357,9 @@ class _ProfileExpandableSection extends StatelessWidget {
                         child: Icon(
                           Icons.expand_more_rounded,
                           size: 26,
-                          color: AppColors.textSecondary.withValues(alpha: 0.75),
+                          color: AppColors.textSecondary.withValues(
+                            alpha: 0.75,
+                          ),
                         ),
                       ),
                     ),
@@ -1316,7 +1454,10 @@ class _QuickActions extends StatelessWidget {
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Icon(Icons.save_outlined, size: 18),
             label: Text(saving ? 'Saving…' : 'Save changes'),
@@ -1354,7 +1495,11 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(height: 8),
         OutlinedButton.icon(
           onPressed: onSignOut,
-          icon: const Icon(Icons.logout_rounded, size: 18, color: AppColors.danger),
+          icon: const Icon(
+            Icons.logout_rounded,
+            size: 18,
+            color: AppColors.danger,
+          ),
           label: const Text('Sign out'),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.danger,
