@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-FLUTTER_REVISION="8defaa71a77c16e8547abdbfad2053ce3a6e2d5b"
+# Matches the framework revision recorded in .metadata. Clone the release tag
+# directly so Flutter can also resolve its engine and SDK version correctly.
+FLUTTER_VERSION="3.32.2"
 
 if [ ! -d "flutter" ]; then
-  git clone https://github.com/flutter/flutter.git -b stable --depth 1
+  git clone https://github.com/flutter/flutter.git \
+    --branch "$FLUTTER_VERSION" \
+    --depth 1 \
+    flutter
 fi
-
-git -C flutter fetch --depth 1 origin "$FLUTTER_REVISION"
-git -C flutter checkout --detach "$FLUTTER_REVISION"
 
 export PATH="$PWD/flutter/bin:$PATH"
 
