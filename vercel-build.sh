@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
+FLUTTER_REVISION="8defaa71a77c16e8547abdbfad2053ce3a6e2d5b"
+
 if [ ! -d "flutter" ]; then
   git clone https://github.com/flutter/flutter.git -b stable --depth 1
 fi
+
+git -C flutter fetch --depth 1 origin "$FLUTTER_REVISION"
+git -C flutter checkout --detach "$FLUTTER_REVISION"
 
 export PATH="$PWD/flutter/bin:$PATH"
 

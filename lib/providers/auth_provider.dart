@@ -123,105 +123,122 @@ class AuthProvider extends ChangeNotifier {
     _authSub = SupabaseService.client.auth.onAuthStateChange.listen((
       event,
     ) async {
-      switch (event.event) {
-        case AuthChangeEvent.passwordRecovery:
-          _enterPasswordRecovery();
-          signalRecoveryReady();
-          break;
-        case AuthChangeEvent.signedIn:
-        case AuthChangeEvent.userUpdated:
-          if (_passwordRecoveryPending || _completingPasswordReset) {
-            // Stay on set-password UI; ignore profile routing until done.
-            return;
-          }
-          // Use bootstrap hint too — SDK may clear ?passwordReset=1 from the URL.
-          if (_isRecoveryCallback) {
+      try {
+        switch (event.event) {
+          case AuthChangeEvent.passwordRecovery:
             _enterPasswordRecovery();
             signalRecoveryReady();
-            return;
-          }
-          final fresh = await SupabaseService.getCurrentUserProfile();
-          final previous = _user;
-          _user = fresh;
-          if (_user != null) {
-            await SessionProfileCache.save(_user!);
-          } else {
-            await SessionProfileCache.clear();
-          }
-          if (!_sameVisibleProfile(previous, _user)) {
+            break;
+          case AuthChangeEvent.signedIn:
+          case AuthChangeEvent.userUpdated:
+            if (_passwordRecoveryPending || _completingPasswordReset) {
+              // Stay on set-password UI; ignore profile routing until done.
+              return;
+            }
+            // Use bootstrap hint too — SDK may clear ?passwordReset=1 from the URL.
+            if (_isRecoveryCallback) {
+              _enterPasswordRecovery();
+              signalRecoveryReady();
+              return;
+            }
+            final fresh = await SupabaseService.getCurrentUserProfile();
+            final previous = _user;
+            _user = fresh;
+            if (_user != null) {
+              await SessionProfileCache.save(_user!);
+            } else {
+              await SessionProfileCache.clear();
+            }
+            if (!_sameVisibleProfile(previous, _user)) {
+              notifyListeners();
+            }
+            break;
+          case AuthChangeEvent.tokenRefreshed:
+            if (_passwordRecoveryPending || _completingPasswordReset) return;
+            // Token silently refreshed — user identity unchanged.
+            // Only fetch profile (and notify) if we somehow have no user yet.
+            if (_user != null) return;
+            _user = await SupabaseService.getCurrentUserProfile();
+            if (_user != null) await SessionProfileCache.save(_user!);
             notifyListeners();
-          }
-          break;
-        case AuthChangeEvent.tokenRefreshed:
-          if (_passwordRecoveryPending || _completingPasswordReset) return;
-          // Token silently refreshed — user identity unchanged.
-          // Only fetch profile (and notify) if we somehow have no user yet.
-          if (_user != null) return;
-          _user = await SupabaseService.getCurrentUserProfile();
-          if (_user != null) await SessionProfileCache.save(_user!);
-          notifyListeners();
-          break;
-        case AuthChangeEvent.signedOut:
-          final hadUser = _user != null;
-          final hadRecovery = _passwordRecoveryPending;
-          _user = null;
-          _passwordRecoveryPending = false;
-          await SessionProfileCache.clear();
-          if (hadUser || hadRecovery) notifyListeners();
-          break;
-        default:
-          break;
+            break;
+          case AuthChangeEvent.signedOut:
+            final hadUser = _user != null;
+            final hadRecovery = _passwordRecoveryPending;
+            _user = null;
+            _passwordRecoveryPending = false;
+            await SessionProfileCache.clear();
+            if (hadUser || hadRecovery) notifyListeners();
+            break;
+          default:
+            break;
+        }
+      } catch (e, st) {
+        debugPrint('Auth state update failed: $e\n$st');
+        _loginBanner =
+            'Your session could not be refreshed. Please sign in again.';
+        _loginBannerIsError = true;
+        if (_user == null) notifyListeners();
       }
     });
 
-    var sessionUser = SupabaseService.currentAuthUser;
+    User? sessionUser;
     var usedCache = false;
+    try {
+      sessionUser = SupabaseService.currentAuthUser;
 
-    if (recoveryAwaiting) {
-      if (sessionUser != null) {
+      if (recoveryAwaiting) {
+        if (sessionUser != null) {
+          _enterPasswordRecovery();
+          signalRecoveryReady();
+        } else {
+          final ok = await _awaitRecoverySession(gate: recoveryGate!);
+          sessionUser = SupabaseService.currentAuthUser;
+          if (ok) {
+            if (!_passwordRecoveryPending) _enterPasswordRecovery();
+          } else if (_loginBanner == null) {
+            _loginBanner =
+                'Could not open the reset link. Request a new one from Forgot password.';
+            _loginBannerIsError = true;
+          }
+        }
+      } else if (AuthLinkBootstrap.recoveryHint && sessionUser != null) {
+        // Boot error present but a session somehow exists — prefer recovery UI.
         _enterPasswordRecovery();
-        signalRecoveryReady();
-      } else {
-        final ok = await _awaitRecoverySession(gate: recoveryGate!);
-        sessionUser = SupabaseService.currentAuthUser;
-        if (ok) {
-          if (!_passwordRecoveryPending) _enterPasswordRecovery();
-        } else if (_loginBanner == null) {
-          _loginBanner =
-              'Could not open the reset link. Request a new one from Forgot password.';
-          _loginBannerIsError = true;
-        }
       }
-    } else if (AuthLinkBootstrap.recoveryHint && sessionUser != null) {
-      // Boot error present but a session somehow exists — prefer recovery UI.
-      _enterPasswordRecovery();
-    }
 
-    if (sessionUser != null && !_passwordRecoveryPending) {
-      AppUser? resolved;
-      if (!_skipProfileCache) {
-        resolved = await SessionProfileCache.loadIfMatches(sessionUser.id);
-      }
-      if (resolved != null) {
-        _user = resolved;
-        usedCache = true;
-      } else {
-        _user = await SupabaseService.getCurrentUserProfile();
-        if (_user != null) {
-          await SessionProfileCache.save(_user!);
+      if (sessionUser != null && !_passwordRecoveryPending) {
+        AppUser? resolved;
+        if (!_skipProfileCache) {
+          resolved = await SessionProfileCache.loadIfMatches(sessionUser.id);
         }
+        if (resolved != null) {
+          _user = resolved;
+          usedCache = true;
+        } else {
+          _user = await SupabaseService.getCurrentUserProfile();
+          if (_user != null) await SessionProfileCache.save(_user!);
+        }
+      } else {
+        // Do not open the shell while password recovery is in progress.
+        _user = null;
+        await SessionProfileCache.clear();
       }
-    } else if (sessionUser != null && _passwordRecoveryPending) {
-      // Do not open the shell; stay on set-password screen.
+    } catch (e, st) {
+      debugPrint('Auth bootstrap failed: $e\n$st');
       _user = null;
-      await SessionProfileCache.clear();
-    } else {
-      _user = null;
-      await SessionProfileCache.clear();
+      _loginBanner =
+          'Could not restore your session. Check your connection and sign in again.';
+      _loginBannerIsError = true;
+      try {
+        await SessionProfileCache.clear();
+      } catch (_) {
+        // A corrupt local cache must never block access to Login.
+      }
+    } finally {
+      _loading = false;
+      notifyListeners();
     }
-
-    _loading = false;
-    notifyListeners();
 
     if (kDebugMode) {
       if (_passwordRecoveryPending) {
@@ -414,7 +431,9 @@ class AuthProvider extends ChangeNotifier {
       if (msg.contains('same_password') || msg.contains('same password')) {
         return 'Choose a password different from your current one.';
       }
-      if (msg.contains('session') || msg.contains('jwt') || msg.contains('401')) {
+      if (msg.contains('session') ||
+          msg.contains('jwt') ||
+          msg.contains('401')) {
         _passwordRecoveryPending = false;
         notifyListeners();
         return 'Reset session expired. Request a new reset email.';

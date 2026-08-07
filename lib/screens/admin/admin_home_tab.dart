@@ -33,6 +33,7 @@ class AdminHomeTab extends StatefulWidget {
 
 class _AdminHomeTabState extends State<AdminHomeTab> {
   bool _loading = true;
+  String? _error;
   int _employeeCount = 0;
   int _checkedIn = 0;
   int _completed = 0;
@@ -148,7 +149,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
       final nextEmployees = results[0] as int;
       final nextLeaves = results[2] as int;
       final nextClaims = results[3] as int;
-      final unchanged = !showSpinner &&
+      final unchanged =
+          !showSpinner &&
           !_loading &&
           _employeeCount == nextEmployees &&
           _checkedIn == pulse.checkedIn &&
@@ -166,11 +168,16 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         _pendingLeaveCount = nextLeaves;
         _pendingClaimCount = nextClaims;
         _loading = false;
+        _error = null;
       });
       _now.value = AppTime.malaysiaNow();
     } catch (_) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error =
+            'Could not load the dashboard. Check your connection and try again.';
+      });
     }
   }
 
@@ -222,6 +229,28 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         ),
       );
     }
+    if (_error != null) {
+      return SizedBox.expand(
+        child: ColoredBox(
+          color: AppColors.surface,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cloud_off_outlined, size: 38),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return SizedBox.expand(
       child: ColoredBox(
@@ -237,11 +266,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 child: ValueListenableBuilder<DateTime>(
                   valueListenable: _now,
                   builder: (context, now, _) {
-                    return _heroHeader(
-                      displayName,
-                      _dateFmt.format(now),
-                      now,
-                    );
+                    return _heroHeader(displayName, _dateFmt.format(now), now);
                   },
                 ),
               ),
@@ -669,8 +694,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 iconGradient: AppGradients.teal,
                 iconGlowColor: AppColors.teal,
                 showDot: pendingLeaves > 0,
-                onTap: () =>
-                    pushAppPage(context, const AdminLeaveHubScreen(), haptic: false),
+                onTap: () => pushAppPage(
+                  context,
+                  const AdminLeaveHubScreen(),
+                  haptic: false,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -682,8 +710,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
                 icon: Icons.payments_rounded,
                 iconGradient: AppGradients.primary,
                 iconGlowColor: AppColors.indigo,
-                onTap: () =>
-                    pushAppPage(context, const PayrollHubScreen(), haptic: false),
+                onTap: () => pushAppPage(
+                  context,
+                  const PayrollHubScreen(),
+                  haptic: false,
+                ),
               ),
             ),
           ],

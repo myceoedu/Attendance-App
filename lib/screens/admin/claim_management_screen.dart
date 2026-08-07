@@ -25,8 +25,11 @@ class ClaimManagementScreen extends StatefulWidget {
 }
 
 class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
+  static const _pageSize = 50;
   List<ExpenseClaim> _claims = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
   String _filter = 'all';
   final _searchCtrl = TextEditingController();
@@ -67,11 +70,13 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
   Future<void> _load({bool showSpinner = true}) async {
     if (showSpinner && mounted) setState(() => _loading = true);
     try {
-      final data = await SupabaseService.getAllExpenseClaims();
+      final data = await SupabaseService.getExpenseClaimsPage(limit: _pageSize);
       if (!mounted) return;
       setState(() {
         _claims = data;
         _loading = false;
+        _loadingMore = false;
+        _hasMore = data.length == _pageSize;
         _error = null;
       });
     } catch (e) {
@@ -80,6 +85,25 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
         _loading = false;
         _error = friendlyAdminClaimError(e);
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    try {
+      final next = await SupabaseService.getExpenseClaimsPage(
+        offset: _claims.length,
+        limit: _pageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _claims = [..._claims, ...next];
+        _hasMore = next.length == _pageSize;
+        _loadingMore = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -121,8 +145,9 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
           content: Text(
             status == 'approved' ? 'Claim approved' : 'Claim rejected',
           ),
-          backgroundColor:
-              status == 'approved' ? AppColors.success : AppColors.danger,
+          backgroundColor: status == 'approved'
+              ? AppColors.success
+              : AppColors.danger,
         ),
       );
     } catch (e) {
@@ -159,236 +184,244 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: () => _load(showSpinner: true),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    AppFilterBar(
-                      searchController: _searchCtrl,
-                      searchHint: 'Employee, title, category…',
-                      onSearchChanged: (_) => _searchDebouncer(() {
-                        if (mounted) setState(() {});
-                      }),
-                      chipOptions: const [
-                        AppFilterOption(value: 'all', label: 'All'),
-                        AppFilterOption(value: 'pending', label: 'Pending'),
-                        AppFilterOption(
-                          value: 'approved',
-                          label: 'Approved',
-                        ),
-                        AppFilterOption(
-                          value: 'rejected',
-                          label: 'Rejected',
-                        ),
-                      ],
-                      selectedChip: _filter,
-                      onChipSelected: (v) => setState(() => _filter = v),
-                    ),
-                    Expanded(
-                      child: RefreshIndicator(
-                        onRefresh: () => _load(showSpinner: true),
-                        child: filteredClaims.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 48),
-                                  EmptyState(
-                                    icon: Icons.receipt_long_outlined,
-                                    title: 'No claims match',
-                                    subtitle:
-                                        'Try another filter or search keyword.',
-                                  ),
-                                ],
-                              )
-                            : ListView.builder(
-                                padding:
-                                    const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                                addAutomaticKeepAlives: false,
-                                cacheExtent: 400,
-                                itemCount: filteredClaims.length,
-                                itemBuilder: (context, i) {
-                                  final c = filteredClaims[i];
-                                  final name = (c.userName != null &&
-                                          c.userName!.isNotEmpty)
-                                      ? c.userName!
-                                      : 'Employee';
-                                  return KeyedSubtree(
-                                    key: ValueKey<String>(c.id),
-                                    child: Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
-                                    child: Material(
-                                      color: AppColors.cardBg,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        side: const BorderSide(
-                                          color: AppColors.divider,
-                                        ),
-                                      ),
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(16),
-                                        onTap: () {
-                                          pushAppPage(
-                                            context,
-                                            ClaimDetailScreen(claimId: c.id),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(16),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  CircleAvatar(
-                                                    radius: 20,
-                                                    backgroundColor: AppColors
-                                                        .orange
-                                                        .withValues(alpha: 0.15),
-                                                    foregroundColor:
-                                                        AppColors.orange,
-                                                    child: Text(
-                                                      name[0].toUpperCase(),
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 12),
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          name,
-                                                          style: const TextStyle(
-                                                            fontWeight:
-                                                                FontWeight.w800,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 2),
-                                                        Text(
-                                                          c.title,
-                                                          maxLines: 2,
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                          style: const TextStyle(
-                                                            fontSize: 13.5,
-                                                            color: AppColors
-                                                                .textSecondary,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  StatusChip.fromStatus(
-                                                    c.status,
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Row(
-                                                children: [
-                                                  Text(
-                                                    _money(c),
-                                                    style: const TextStyle(
-                                                      fontSize: 17,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: AppColors
-                                                          .primaryDark,
-                                                    ),
-                                                  ),
-                                                  const Spacer(),
-                                                  Text(
-                                                    '${c.attachments.length} file(s)',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: AppColors
-                                                          .textSecondary,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                'Expense ${dateFmt.format(c.expenseDate)} · ${c.categoryDisplay}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppColors.textHint,
-                                                ),
-                                              ),
-                                              if (c.status == 'pending') ...[
-                                                const SizedBox(height: 14),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: OutlinedButton(
-                                                        onPressed: () =>
-                                                            _setStatus(
-                                                          c,
-                                                          'rejected',
-                                                        ),
-                                                        child: const Text(
-                                                          'Reject',
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 10),
-                                                    Expanded(
-                                                      child: FilledButton(
-                                                        onPressed: () =>
-                                                            _setStatus(
-                                                          c,
-                                                          'approved',
-                                                        ),
-                                                        style: FilledButton
-                                                            .styleFrom(
-                                                          backgroundColor:
-                                                              AppColors
-                                                                  .success,
-                                                        ),
-                                                        child: const Text(
-                                                          'Approve',
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    ),
-                                  );
-                                },
-                              ),
-                      ),
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => _load(showSpinner: true),
+                      child: const Text('Retry'),
                     ),
                   ],
                 ),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppFilterBar(
+                  searchController: _searchCtrl,
+                  searchHint: 'Employee, title, category…',
+                  onSearchChanged: (_) => _searchDebouncer(() {
+                    if (mounted) setState(() {});
+                  }),
+                  chipOptions: const [
+                    AppFilterOption(value: 'all', label: 'All'),
+                    AppFilterOption(value: 'pending', label: 'Pending'),
+                    AppFilterOption(value: 'approved', label: 'Approved'),
+                    AppFilterOption(value: 'rejected', label: 'Rejected'),
+                  ],
+                  selectedChip: _filter,
+                  onChipSelected: (v) => setState(() => _filter = v),
+                ),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _load(showSpinner: true),
+                    child: filteredClaims.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 48),
+                              EmptyState(
+                                icon: Icons.receipt_long_outlined,
+                                title: 'No claims match',
+                                subtitle:
+                                    'Try another filter or search keyword.',
+                              ),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                            addAutomaticKeepAlives: false,
+                            cacheExtent: 400,
+                            itemCount:
+                                filteredClaims.length + (_hasMore ? 1 : 0),
+                            itemBuilder: (context, i) {
+                              if (i == filteredClaims.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: OutlinedButton(
+                                    onPressed: _loadingMore ? null : _loadMore,
+                                    child: _loadingMore
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text('Load older claims'),
+                                  ),
+                                );
+                              }
+                              final c = filteredClaims[i];
+                              final name =
+                                  (c.userName != null && c.userName!.isNotEmpty)
+                                  ? c.userName!
+                                  : 'Employee';
+                              return KeyedSubtree(
+                                key: ValueKey<String>(c.id),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Material(
+                                    color: AppColors.cardBg,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(
+                                        color: AppColors.divider,
+                                      ),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        pushAppPage(
+                                          context,
+                                          ClaimDetailScreen(claimId: c.id),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 20,
+                                                  backgroundColor: AppColors
+                                                      .orange
+                                                      .withValues(alpha: 0.15),
+                                                  foregroundColor:
+                                                      AppColors.orange,
+                                                  child: Text(
+                                                    name[0].toUpperCase(),
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        name,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w800,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 2),
+                                                      Text(
+                                                        c.title,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: 13.5,
+                                                          color: AppColors
+                                                              .textSecondary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                StatusChip.fromStatus(c.status),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  _money(c),
+                                                  style: const TextStyle(
+                                                    fontSize: 17,
+                                                    fontWeight: FontWeight.w800,
+                                                    color:
+                                                        AppColors.primaryDark,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Text(
+                                                  '${c.attachments.length} file(s)',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Expense ${dateFmt.format(c.expenseDate)} · ${c.categoryDisplay}',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.textHint,
+                                              ),
+                                            ),
+                                            if (c.status == 'pending') ...[
+                                              const SizedBox(height: 14),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: OutlinedButton(
+                                                      onPressed: () =>
+                                                          _setStatus(
+                                                            c,
+                                                            'rejected',
+                                                          ),
+                                                      child: const Text(
+                                                        'Reject',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 10),
+                                                  Expanded(
+                                                    child: FilledButton(
+                                                      onPressed: () =>
+                                                          _setStatus(
+                                                            c,
+                                                            'approved',
+                                                          ),
+                                                      style:
+                                                          FilledButton.styleFrom(
+                                                            backgroundColor:
+                                                                AppColors
+                                                                    .success,
+                                                          ),
+                                                      child: const Text(
+                                                        'Approve',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

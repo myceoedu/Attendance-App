@@ -46,6 +46,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
   // Count of user's pending leave requests (HEAD query, zero data transfer).
   int _pendingLeaveCount = 0;
   bool _loading = true;
+  String? _error;
   int _announcementUnread = 0;
 
   static final _dateFmt = DateFormat('EEEE, d MMMM yyyy');
@@ -207,7 +208,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
       final nextLeave = results[1] as LeaveRequest?;
       final nextPending = results[2] as int;
       final nextUnread = results[3] as int;
-      final unchanged = !showSpinner &&
+      final unchanged =
+          !showSpinner &&
           !_loading &&
           _sameAttendance(_today, nextToday) &&
           _todayLeave?.id == nextLeave?.id &&
@@ -223,11 +225,16 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         _pendingLeaveCount = nextPending;
         _announcementUnread = nextUnread;
         _loading = false;
+        _error = null;
       });
       _clockNow.value = AppTime.malaysiaNow();
     } catch (_) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error =
+            'Could not load your dashboard. Check your connection and try again.';
+      });
     }
   }
 
@@ -279,6 +286,28 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         child: ColoredBox(
           color: AppColors.surface,
           child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (_error != null) {
+      return SizedBox.expand(
+        child: ColoredBox(
+          color: AppColors.surface,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cloud_off_outlined, size: 38),
+                  const SizedBox(height: 12),
+                  Text(_error!, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  FilledButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -995,8 +1024,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         semanticAction: 'Opens your payslip history and PDF downloads.',
         icon: Icons.payments_rounded,
         accentColor: AppColors.violet,
-        onTap: () =>
-            pushAppPage(context, const EmployeePayrollHistoryScreen()),
+        onTap: () => pushAppPage(context, const EmployeePayrollHistoryScreen()),
       ),
       EmployeeQuickAccessTile(
         label: 'Notices',

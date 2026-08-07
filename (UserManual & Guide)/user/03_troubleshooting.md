@@ -23,15 +23,24 @@ Try the steps in order.
 
 1. Login → **Forgot password?**
 2. Enter your email → send reset email
-3. Open the **newest** email link
+3. Open the **newest** email link (copy/paste into the **same browser** you use for the app if the mail app breaks the link)
 4. Set and confirm a new password
 5. Sign in
 
 If the link only opens login and does not show “Set new password”:
 
-- Request a new email
+- Request a new email (wait if rate-limited — see below)
 - Make sure Redirect URLs are configured (developer task)
 - Open the link in the same browser you use for the app
+
+### “Too many reset attempts” / email rate limit exceeded / 429
+
+- Supabase’s built-in email is limited (about **2 auth emails per hour** for the whole project)
+- Waiting and using a different email or network often **does not** help until the hour resets
+- **Staff:** wait up to 1 hour, then try Forgot password **once**  
+- **Admin/developer emergency:** set a temporary password with the Admin API — see [Admin guide §2b](02_admin_guide.md#2b-emergency-set-a-users-password-admin--developer)
+
+Passwords **cannot** be viewed in the database or dashboard. Only a new password can be set.
 
 ---
 

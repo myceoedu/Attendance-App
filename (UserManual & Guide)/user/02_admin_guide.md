@@ -2,7 +2,7 @@
 
 This guide is for **HR / administrators**.  
 Use it to manage staff, attendance, leave, claims, payroll, and workplace location.
-
+ 
 ---
 
 ## 1. Admin Home
@@ -56,6 +56,66 @@ Pull down to refresh.
 - **Email** and **username** are set at registration and are not edited on this screen
 - To make someone an admin, set **Role** to Admin and save  
   (or ask a developer to update `public.users.role` in Supabase)
+- **Nobody can view a user’s real password** (passwords are stored hashed). In an emergency you can only **set a new temporary password** (see below).
+
+---
+
+## 2b. Emergency: set a user’s password (admin / developer)
+
+Use this when:
+
+- Staff cannot sign in and **Forgot password** fails  
+- You see **email rate limit exceeded** / **429 Too Many Requests**  
+- Supabase Dashboard has **Send password recovery** but no simple “Update password” button  
+
+### Preferred when email works
+
+1. Staff use Login → **Forgot password?**  
+2. Open the **newest** email link in the **same browser** they use for the app  
+3. Set a new password → sign in  
+
+If many reset emails were sent recently, Supabase’s built-in mail allows only about **2 emails per hour for the whole project**. Wait up to **1 hour**, then try **once**. Changing Wi‑Fi or email address does not always clear this limit.
+
+### Emergency: set password with Admin API (no email)
+
+Needs a **developer or project owner** with access to the Supabase **service_role** key.
+
+1. Supabase Dashboard → **Authentication → Users** → open the user → copy **UID**  
+2. Supabase → **Project Settings → API** → copy **`service_role`** (secret — never put this in the Flutter app or git)  
+3. Project ref / ID is the subdomain of your API URL, e.g. `dxsnvtiwqmexarqjbwdd` from  
+   `https://dxsnvtiwqmexarqjbwdd.supabase.co`  
+4. On a trusted PC, open **PowerShell** and run (replace the three placeholders):
+
+```powershell
+$PROJECT = "YOUR_PROJECT_REF"
+$SERVICE_ROLE = "YOUR_SERVICE_ROLE_KEY"
+$USER_ID = "USER_UID_FROM_DASHBOARD"
+$NEW_PASSWORD = "TempPass123!"
+
+Invoke-RestMethod `
+  -Method PUT `
+  -Uri "https://$PROJECT.supabase.co/auth/v1/admin/users/$USER_ID" `
+  -Headers @{
+    apikey = $SERVICE_ROLE
+    Authorization = "Bearer $SERVICE_ROLE"
+    "Content-Type" = "application/json"
+  } `
+  -Body (@{ password = $NEW_PASSWORD } | ConvertTo-Json)
+```
+
+5. Tell the staff the temporary password privately  
+6. They sign in → **Profile → Change password** to something only they know  
+
+### Security rules
+
+- Never share or commit the **service_role** key  
+- If the key was pasted into chat, email, or a ticket → **rotate it** in Project Settings → API  
+- Prefer a strong temporary password; require staff to change it after login  
+- Do **not** delete the Auth user to “reset” them — that breaks their linked HR record  
+
+### Longer-term (recommended for production)
+
+Ask a developer to configure **Custom SMTP** in Supabase so password emails are not stuck on the free ~2/hour limit. See the developer deploy guide.
 
 ---
 

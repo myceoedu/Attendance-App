@@ -3,7 +3,6 @@ import '../../../utils/app_route.dart';
 import 'package:intl/intl.dart';
 
 import '../../../constants/app_theme.dart';
-import '../../../models/app_user.dart';
 import '../../../models/payroll_run.dart';
 import '../../../services/supabase_service.dart';
 import 'payroll_reports_screen.dart';
@@ -21,13 +20,16 @@ class PayrollHubScreen extends StatefulWidget {
 
 class _PayrollHubScreenState extends State<PayrollHubScreen> {
   bool _loading = true;
+  String? _error;
   List<PayrollRun> _runs = [];
   int _employeeCount = 0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -35,18 +37,21 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
     try {
       final results = await Future.wait([
         SupabaseService.getPayrollRuns(),
-        SupabaseService.getAllEmployees(),
+        SupabaseService.getEmployeeCount(),
       ]);
       if (!mounted) return;
       setState(() {
         _runs = results[0] as List<PayrollRun>;
-        final emps = results[1] as List<AppUser>;
-        _employeeCount = emps.where((e) => e.role == 'employee').length;
+        _employeeCount = results[1] as int;
         _loading = false;
+        _error = null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error = 'Could not load payroll. Check your connection and try again.';
+      });
     }
   }
 
@@ -79,14 +84,25 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _load,
-          ),
+          IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _load),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(onPressed: _load, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
@@ -431,8 +447,9 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                             fontSize: 12,
                             height: 1.3,
                             fontWeight: FontWeight.w500,
-                            color:
-                                AppColors.textSecondary.withValues(alpha: 0.95),
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.95,
+                            ),
                           ),
                         ),
                       ],

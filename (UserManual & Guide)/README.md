@@ -53,17 +53,32 @@ Also skim the **user** guides so you understand the product.
 ```text
 docs/
   README.md                 ← you are here
-  user/                     ← for employees & admins (non-technical)
-  developer/                ← for engineers taking over the codebase
-  pdf/                      ← ready-to-share PDF manuals
+  user/                     ← editable User Manual chapters (Markdown)
+  developer/                ← editable Developer Handover chapters (Markdown)
+  scripts/                  ← creates PDFs from the Markdown chapters
+  pdf/                      ← finished PDFs only; share these with readers
 ```
 
-### PDF downloads
+## Choose the format
 
-| File | For |
-|------|-----|
-| [pdf/myRekod_User_Manual.pdf](pdf/myRekod_User_Manual.pdf) | Employees & admins |
-| [pdf/myRekod_Developer_Handover.pdf](pdf/myRekod_Developer_Handover.pdf) | Developers |
+| If you want to… | Open |
+|-----------------|------|
+| Read or update the User Manual in Cursor/Git | [`user/`](user/) |
+| Read or update the Developer Handover in Cursor/Git | [`developer/`](developer/) |
+| Share or print the User Manual | [myRekod_User_Manual.pdf](pdf/myRekod_User_Manual.pdf) |
+| Share or print the Developer Handover | [myRekod_Developer_Handover.pdf](pdf/myRekod_Developer_Handover.pdf) |
+
+The Markdown chapters are the **single source of truth**. PDFs are generated from those chapters, so the PDF folder contains no editable duplicate manual content.
+
+## Refresh the PDFs after editing Markdown
+
+From the project root, run:
+
+```bash
+node "docs (UserManual & Guide)/scripts/build-pdf-manuals.mjs"
+```
+
+Node.js is required. The command rebuilds both PDFs in `pdf/`.
 
 ---
 
@@ -88,6 +103,7 @@ Configured in: `lib/constants/help_support_config.dart`
 | Claims currency | MYR only |
 | Geofence | One workplace site; clock-in only |
 | Password reset | Email link → set new password → login |
+| Password emergency | Admin/developer sets temp password via Supabase Admin API (see [Admin guide §2b](user/02_admin_guide.md#2b-emergency-set-a-users-password-admin--developer)) — passwords cannot be viewed |
 
 ---
 

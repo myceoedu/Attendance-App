@@ -22,6 +22,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   List<AppNotification> _items = [];
   bool _loading = true;
+  String? _error;
   RealtimeChannel? _channel;
   Timer? _debounce;
 
@@ -63,10 +64,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       setState(() {
         _items = data;
         _loading = false;
+        _error = null;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error =
+            'Could not load notifications. Check your connection and try again.';
+      });
     }
   }
 
@@ -103,109 +109,123 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(onPressed: _load, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            )
           : _items.isEmpty
-              ? const EmptyState(
-                  icon: Icons.notifications_none,
-                  title: 'No notifications yet',
-                  subtitle: 'Updates about leave actions will appear here',
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _load(showSpinner: true),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) {
-                      final item = _items[i];
-                      return InkWell(
-                        onTap: () => _openItem(item),
+          ? const EmptyState(
+              icon: Icons.notifications_none,
+              title: 'No notifications yet',
+              subtitle: 'Updates about leave actions will appear here',
+            )
+          : RefreshIndicator(
+              onRefresh: () => _load(showSpinner: true),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (_, i) {
+                  final item = _items[i];
+                  return InkWell(
+                    onTap: () => _openItem(item),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
+                        border: Border.all(
+                          color: item.isRead
+                              ? AppColors.divider
+                              : AppColors.primary.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
                               color: item.isRead
-                                  ? AppColors.divider
-                                  : AppColors.primary.withValues(alpha: 0.35),
+                                  ? AppColors.surfaceAlt
+                                  : AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              item.type == 'leave_status'
+                                  ? Icons.event_available
+                                  : Icons.notifications_active_outlined,
+                              color: item.isRead
+                                  ? AppColors.textSecondary
+                                  : AppColors.primary,
                             ),
                           ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: item.isRead
-                                      ? AppColors.surfaceAlt
-                                      : AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Icon(
-                                  item.type == 'leave_status'
-                                      ? Icons.event_available
-                                      : Icons.notifications_active_outlined,
-                                  color: item.isRead
-                                      ? AppColors.textSecondary
-                                      : AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            item.title,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
+                                    Expanded(
+                                      child: Text(
+                                        item.title,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimary,
                                         ),
-                                        if (!item.isRead)
-                                          Container(
-                                            width: 9,
-                                            height: 9,
-                                            decoration: const BoxDecoration(
-                                              color: AppColors.primary,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      item.body,
-                                      style: const TextStyle(
-                                        fontSize: 13,
-                                        color: AppColors.textSecondary,
-                                        height: 1.35,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      dateFmt.format(item.createdAt.toLocal()),
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: AppColors.textHint,
+                                    if (!item.isRead)
+                                      Container(
+                                        width: 9,
+                                        height: 9,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.primary,
+                                          shape: BoxShape.circle,
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  item.body,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                    height: 1.35,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  dateFmt.format(item.createdAt.toLocal()),
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    color: AppColors.textHint,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

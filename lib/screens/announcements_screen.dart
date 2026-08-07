@@ -25,6 +25,7 @@ class AnnouncementsScreen extends StatefulWidget {
 class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<CompanyAnnouncement> _items = [];
   bool _loading = true;
+  String? _error;
   RealtimeChannel? _channel;
   Timer? _debounce;
 
@@ -62,6 +63,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       setState(() {
         _items = data;
         _loading = false;
+        _error = null;
       });
       final uid = context.read<AuthProvider>().user?.id;
       if (uid != null) {
@@ -69,7 +71,11 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _loading = false);
+      setState(() {
+        _loading = false;
+        _error =
+            'Could not load announcements. Check your connection and try again.';
+      });
     }
   }
 
@@ -78,98 +84,110 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
     final dateFmt = DateFormat('d MMM yyyy, h:mm a');
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Announcements'),
-      ),
+      appBar: AppBar(title: const Text('Announcements')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _items.isEmpty
-              ? const EmptyState(
-                  icon: Icons.campaign_outlined,
-                  title: 'No announcements yet',
-                  subtitle:
-                      'Your organisation has not posted any notices. Check back later.',
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _load(showSpinner: true),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final a = _items[i];
-                      final author = a.authorName?.trim().isNotEmpty == true
-                          ? a.authorName!
-                          : 'Management';
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.divider),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accent.withValues(alpha: 0.06),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: AppColors.accent.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.campaign_rounded,
-                                color: AppColors.accent.withValues(alpha: 0.95),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    a.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15.5,
-                                      color: AppColors.textPrimary,
-                                      height: 1.25,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    a.body,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textSecondary,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    'Posted by $author · ${dateFmt.format(a.createdAt.toLocal())}',
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      color: AppColors.textHint,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+          : _error != null
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    FilledButton(onPressed: _load, child: const Text('Retry')),
+                  ],
                 ),
+              ),
+            )
+          : _items.isEmpty
+          ? const EmptyState(
+              icon: Icons.campaign_outlined,
+              title: 'No announcements yet',
+              subtitle:
+                  'Your organisation has not posted any notices. Check back later.',
+            )
+          : RefreshIndicator(
+              onRefresh: () => _load(showSpinner: true),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) {
+                  final a = _items[i];
+                  final author = a.authorName?.trim().isNotEmpty == true
+                      ? a.authorName!
+                      : 'Management';
+                  return Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.divider),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.campaign_rounded,
+                            color: AppColors.accent.withValues(alpha: 0.95),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.title,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 15.5,
+                                  color: AppColors.textPrimary,
+                                  height: 1.25,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                a.body,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                  height: 1.4,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'Posted by $author · ${dateFmt.format(a.createdAt.toLocal())}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  color: AppColors.textHint,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

@@ -717,8 +717,7 @@ class SupabaseService {
   static Future<WorkSite?> getWorkSite({bool forceRefresh = false}) {
     if (!forceRefresh) {
       final at = _workSiteCacheAt;
-      if (at != null &&
-          DateTime.now().difference(at) < _workSiteCacheTtl) {
+      if (at != null && DateTime.now().difference(at) < _workSiteCacheTtl) {
         if (_workSiteCacheIsEmpty) return Future.value(null);
         final cached = _workSiteCache;
         if (cached != null) return Future.value(cached);
@@ -768,7 +767,10 @@ class SupabaseService {
     required int radiusMeters,
     required bool isActive,
   }) async {
-    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    if (latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
       throw Exception('Invalid coordinates');
     }
     final radius = radiusMeters.clamp(
@@ -874,7 +876,7 @@ class SupabaseService {
 
   /// Lightweight pulse stats for admin home (no user join, HEAD counts only).
   static Future<({int checkedIn, int completed})>
-      getTodayAttendancePulseCounts() async {
+  getTodayAttendancePulseCounts() async {
     final today = _todayString();
     final results = await Future.wait([
       client
@@ -1443,6 +1445,33 @@ class SupabaseService {
     }).toList();
   }
 
+  /// Admin inbox page. Keep the initial payload bounded as attachments can be
+  /// large JSON objects on organisations with a long claim history.
+  static Future<List<ExpenseClaim>> getExpenseClaimsPage({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final data = await client
+        .from('expense_claims')
+        .select(_claimWithUserAndAttachmentsSelect)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+    return data.map<ExpenseClaim>((row) {
+      final m = Map<String, dynamic>.from(row);
+      final att = m['claim_attachments'];
+      if (att is List) {
+        att.sort((a, b) {
+          final ma = a as Map<String, dynamic>;
+          final mb = b as Map<String, dynamic>;
+          return (ma['created_at'] as String).compareTo(
+            mb['created_at'] as String,
+          );
+        });
+      }
+      return ExpenseClaim.fromMap(m);
+    }).toList();
+  }
+
   static Future<int> getPendingExpenseClaimCount() async {
     final res = await client
         .from('expense_claims')
@@ -1468,6 +1497,20 @@ class SupabaseService {
         .from('leave_requests')
         .select(_leaveWithUserSelect)
         .order('created_at', ascending: false);
+    return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
+  }
+
+  /// Admin inbox page, newest first. Callers can append further history only
+  /// when the administrator requests it.
+  static Future<List<LeaveRequest>> getLeaveRequestsPage({
+    int offset = 0,
+    int limit = 50,
+  }) async {
+    final data = await client
+        .from('leave_requests')
+        .select(_leaveWithUserSelect)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
     return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
   }
 
@@ -2150,6 +2193,12 @@ class SupabaseService {
     final leaves = results[2] as List<LeaveRequest>;
     final salaryRows = results[3] as List<PayrollSalarySetting>;
     final salaryByUser = {for (final s in salaryRows) s.userId: s};
+    final attendanceByUser = <String, List<Attendance>>{};
+    for (final attendance in attendanceMonth) {
+      attendanceByUser
+          .putIfAbsent(attendance.userId, () => <Attendance>[])
+          .add(attendance);
+    }
     final leavesByUser = <String, List<LeaveRequest>>{};
     for (final leave in leaves) {
       leavesByUser.putIfAbsent(leave.userId, () => <LeaveRequest>[]).add(leave);
@@ -2159,8 +2208,15 @@ class SupabaseService {
     var totalNet = 0.0;
     var totalErCost = 0.0;
     final itemsPayload = <Map<String, dynamic>>[];
+    var processedStaff = 0;
 
     for (final u in staff) {
+      // Yield periodically so the calculating overlay can paint and the app
+      // remains responsive on payrolls with many employees.
+      if (processedStaff > 0 && processedStaff % 20 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      processedStaff++;
       final salary = salaryByUser[u.id];
       if (salary == null || !salary.isActive) continue;
 
@@ -2168,8 +2224,8 @@ class SupabaseService {
       final presentDays = PayrollEngine.presentDaysExcludingApprovedLeave(
         userId: u.id,
         month: month,
-        attendanceInMonth: attendanceMonth,
-        leaves: leaves,
+        attendanceInMonth: attendanceByUser[u.id] ?? const <Attendance>[],
+        leaves: userLeaves,
       );
       final unpaidDays = salary.isIntern
           ? PayrollEngine.internLeaveCalendarUnitsFromRequests(

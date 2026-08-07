@@ -31,10 +31,12 @@ Future<void> main() async {
   // Drop expired email-link error params before first paint (web).
   clearAuthErrorQueryFromUrl();
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.dark,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+    ),
+  );
 
   if (!AppConfig.hasSupabaseConfig) {
     runApp(const _ConfigErrorApp());
@@ -66,7 +68,7 @@ class _SupabaseBootstrapAppState extends State<_SupabaseBootstrapApp> {
 
   Future<void> _initSupabase() async {
     try {
-       await Supabase.initialize(
+      await Supabase.initialize(
         url: AppConfig.supabaseUrl,
         anonKey: AppConfig.supabaseAnonKey,
       );
@@ -90,10 +92,22 @@ class _SupabaseBootstrapAppState extends State<_SupabaseBootstrapApp> {
           body: Padding(
             padding: const EdgeInsets.all(24),
             child: Center(
-              child: Text(
-                'Could not start the app (backend init failed).\n\n'
-                '$_error',
-                textAlign: TextAlign.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Could not start the app. Check your internet connection and try again.',
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: () {
+                      setState(() => _error = null);
+                      unawaited(_initSupabase());
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -217,14 +231,13 @@ class _AuthGate extends StatelessWidget {
     final loading = context.select<AuthProvider, bool>((a) => a.loading);
 
     if (loading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Recovery session must not open the dashboard — set password first.
-    final recovery =
-        context.select<AuthProvider, bool>((a) => a.passwordRecoveryPending);
+    final recovery = context.select<AuthProvider, bool>(
+      (a) => a.passwordRecoveryPending,
+    );
     if (recovery) return const SetNewPasswordScreen();
 
     final loggedIn = context.select<AuthProvider, bool>((a) => a.isLoggedIn);

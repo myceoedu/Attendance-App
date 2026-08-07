@@ -73,6 +73,16 @@ See:
 
 If redirect URL is not allow-listed, users click the email and only see login — recovery UI never opens.
 
+### Built-in email rate limit (common in testing)
+
+Supabase’s default email provider allows about **2 auth emails per hour project-wide** (`/auth/v1/recover`, signup, etc.). Symptom: **429** / `email rate limit exceeded`. Changing network or email often does **not** help until the window resets.
+
+**Production:** configure **Custom SMTP** (Project Settings → Auth → SMTP).
+
+**Emergency unlock (no email):** Admin API `PUT /auth/v1/admin/users/{uid}` with `service_role` and `{ "password": "..." }`. Full steps for HR/admins: [user/02_admin_guide.md §2b](../user/02_admin_guide.md#2b-emergency-set-a-users-password-admin--developer).
+
+Never put `service_role` in the Flutter client. Rotate the key if it was exposed.
+
 ---
 
 ## Help & support contact
