@@ -136,9 +136,9 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
 
     final statusFriendly = switch (run.status) {
       'draft' => 'Draft',
-      'calculated' => 'Calculated — ready for review',
-      'approved' => 'Approved — ready to pay',
-      'paid' => 'Paid — closed',
+      'calculated' => 'Calculated. Ready for review',
+      'approved' => 'Approved. Ready to pay',
+      'paid' => 'Paid. Closed',
       'cancelled' => 'Cancelled',
       _ => run.status.replaceAll('_', ' '),
     };

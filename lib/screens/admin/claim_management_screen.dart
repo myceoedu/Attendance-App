@@ -30,8 +30,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
 
   List<ExpenseClaim> _claims = [];
 
-  /// Filtered view kept in state so a debounced keystroke does not re-scan the
-  /// whole page on every rebuild.
+  /// Cached filtered list (updated by [_recomputeFiltered]).
   List<ExpenseClaim> _visibleClaims = const [];
   bool _loading = true;
   bool _loadingMore = false;
@@ -219,7 +218,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
               children: [
                 AppFilterBar(
                   searchController: _searchCtrl,
-                  searchHint: 'Employee, title, category…',
+                  searchHint: 'Search employee, title, or category',
                   onSearchChanged: (_) => _searchDebouncer(() {
                     if (mounted) setState(_recomputeFiltered);
                   }),
@@ -469,7 +468,7 @@ class _ClaimRejectDialogState extends State<_ClaimRejectDialog> {
         autofocus: true,
         maxLines: 3,
         decoration: const InputDecoration(
-          hintText: 'Reason (shown to employee)…',
+          hintText: 'Reason (shown to employee)',
         ),
       ),
       actions: [

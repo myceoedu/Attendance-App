@@ -268,7 +268,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         _checkingConflicts = false;
       });
     } catch (_) {
-      // Silently ignore — conflict check is advisory only; server enforces on submit.
+      // Silently ignore. Conflict check is advisory. Server enforces on submit.
       if (!mounted) return;
       setState(() => _checkingConflicts = false);
     }
@@ -281,8 +281,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        // Native platforms upload straight from the file path, so pulling the
-        // bytes in would pin up to 5 MB in memory until submit.
+        // Bytes only needed on web. Native uploads from the file path.
         withData: kIsWeb,
       );
       if (result == null || result.files.isEmpty) return;
@@ -374,7 +373,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Sick leave requires a medical certificate (MC) or doctor\'s note — attach a PDF or image.',
+            'Sick leave needs a medical certificate (MC) or doctor\'s note. Attach a PDF or image.',
           ),
           backgroundColor: AppColors.danger,
         ),
@@ -465,7 +464,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                     Expanded(
                       child: Text(
                         'Approved full-day leave blocks clock-in for those dates. '
-                        'Half-day annual does not — you can still record attendance.',
+                        'Half-day annual does not. You can still record attendance.',
                         style: TextStyle(
                           fontSize: 12.5,
                           color: AppColors.textPrimary,
@@ -550,7 +549,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                 title: 'Dates',
                 subtitle: () {
                   if (_annualOnly && LeaveCatalog.isHalfDayAnnual(_leaveType)) {
-                    return 'Pick the single date — start and end stay aligned.';
+                    return 'Pick one date. Start and end stay the same.';
                   }
                   if (_annualOnly) {
                     return 'Start from today or later. Multi-day counts use calendar days in each year.';
@@ -653,8 +652,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   maxLines: 5,
                   decoration: InputDecoration(
                     hintText: _requiresMc
-                        ? 'e.g. Fever and flu — visited clinic on …'
-                        : 'e.g. Family trip / urgent personal matter…',
+                        ? 'e.g. Fever and flu, visited clinic today'
+                        : 'e.g. Family trip or urgent personal matter',
                     alignLabelWithHint: true,
                   ),
                   validator: _validateReason,
@@ -739,7 +738,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                               child: Text(
                                 _attachment == null
                                     ? 'You must attach your MC before submitting sick leave.'
-                                    : 'MC attached — you can submit when ready.',
+                                    : 'MC attached. You can submit when ready.',
                                 style: TextStyle(
                                   fontSize: 12,
                                   height: 1.35,
@@ -795,7 +794,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   Widget _submissionOverviewCard() {
     final lines = _annualOnly
         ? (
-            'Annual leave — choose full day or half AM/PM; balance updates when approved.',
+            'Annual leave. Choose full day or half AM/PM. Balance updates when approved.',
             <(IconData, String)>[
               (
                 Icons.event_available_outlined,
@@ -803,7 +802,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
               ),
               (
                 Icons.date_range_rounded,
-                'Date(s) — one date only for half-day',
+                'Dates (one date only for half-day)',
               ),
               (Icons.notes_rounded, 'Reason'),
               (Icons.attach_file_rounded, 'Optional supporting file'),
@@ -811,8 +810,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
           )
         : (
             _otherLeaveOnly
-                ? 'Other paid/unpaid & statutory leave — MC required only for sick leave.'
-                : 'Pick a type first; rules and attachments change per type.',
+                ? 'Other leave (paid, unpaid, or statutory). MC is required for sick leave only.'
+                : 'Pick a type first. Rules and attachments change per type.',
             <(IconData, String)>[
               (Icons.category_outlined, 'Leave type'),
               (Icons.date_range_rounded, 'Start & end dates'),
@@ -1025,7 +1024,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         break;
       case LeaveCatalog.unpaid:
         msg =
-            'Unpaid: no pay for approved working days — payroll reflects this.';
+            'Unpaid: no pay for approved working days. Payroll reflects this.';
         bg = AppColors.surface;
         break;
       case LeaveCatalog.maternity:
@@ -1041,7 +1040,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         bg = AppColors.pinkLight;
         break;
       case LeaveCatalog.publicHoliday:
-        msg = 'Replacement or observed public holiday — note which holiday.';
+        msg = 'Replacement or observed public holiday. Note which holiday.';
         bg = AppColors.successLight;
         break;
       default:
@@ -1232,7 +1231,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      '${c.leaveTypeDisplay} — $range ($statusLabel)',
+                      '${c.leaveTypeDisplay} · $range ($statusLabel)',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

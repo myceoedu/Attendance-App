@@ -668,7 +668,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Same layout for every shortcut — tap to open.',
+          'Tap a shortcut to open it.',
           style: TextStyle(
             fontSize: 13,
             height: 1.35,

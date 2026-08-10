@@ -29,8 +29,7 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
   String? _error;
   String _reviewFilter = 'all';
 
-  /// Filtered view, recomputed only when the roster, chip, or debounced search
-  /// text changes rather than on every rebuild.
+  /// Cached filtered list (updated by [_recomputeFiltered]).
   List<MonthlyAttendanceSummary> _visibleSummaries = const [];
 
   static DateTime _currentMonth() {

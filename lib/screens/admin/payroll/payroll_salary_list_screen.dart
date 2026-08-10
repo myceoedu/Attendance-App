@@ -83,7 +83,7 @@ class _PayrollSalaryListScreenState extends State<PayrollSalaryListScreen> {
                       u.name.isNotEmpty ? u.name : u.username;
                   final subtitle = s != null
                       ? '${EmploymentStatus.label(s.employmentStatus)} · RM ${s.basicSalary.toStringAsFixed(0)}$extraBit · ${s.payrollStatus}'
-                      : 'Not configured — tap to set up';
+                      : 'Not configured. Tap to set up';
                   final initials = displayName.trim().isEmpty
                       ? '?'
                       : displayName.trim().substring(0, 1).toUpperCase();

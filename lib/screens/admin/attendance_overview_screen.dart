@@ -40,8 +40,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   static final _timeFmt = DateFormat('h:mm a');
   static final _titleDateFmt = DateFormat('d MMM');
 
-  /// Derived view state. Recomputed only when the source data, the status chip,
-  /// or the debounced search text changes — not on every rebuild.
+  /// Cached filter + summary counts (updated by [_recomputeDerived]).
   List<Attendance> _visibleRecords = const [];
   int _completedCount = 0;
   int _inProgressCount = 0;
@@ -119,8 +118,6 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
     }
   }
 
-  /// Single pass over today's records producing both the filtered list and the
-  /// summary counts.
   void _recomputeDerived() {
     final query = _searchCtrl.text.trim().toLowerCase();
     final hasQuery = query.isNotEmpty;
@@ -153,7 +150,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   Widget build(BuildContext context) {
     final filteredRecords = _visibleRecords;
 
-    // No nested [Scaffold] — shell already owns one.
+    // No nested Scaffold. Shell already owns one.
     return SizedBox.expand(
       child: ColoredBox(
         color: AppColors.surface,
@@ -162,7 +159,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
           children: [
             AppBar(
               title: Text(
-                'Attendance — ${_titleDateFmt.format(AppTime.malaysiaNow())}',
+                'Attendance · ${_titleDateFmt.format(AppTime.malaysiaNow())}',
               ),
               actions: [
                 IconButton(

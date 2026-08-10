@@ -112,9 +112,7 @@ class _ProfileTabState extends State<ProfileTab> {
   Set<_ProfileSectionKey> _expandedSections = _defaultExpandedForView();
   String? _expansionUserId;
 
-  /// Derived labels for the six section headers plus the completion ring.
-  /// Recomputed only when the profile itself changes — every section toggle
-  /// used to re-derive all of them.
+  /// Section subtitles + completion % for the current profile.
   AppUser? _derivedFrom;
   int _completion = 0;
   Map<_ProfileSectionKey, String> _sectionSubtitles = const {};
@@ -152,8 +150,6 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reacting to a profile swap here (rather than in `build`) keeps expansion
-    // state out of the build phase, where mutating it forced an extra frame.
     _syncForUser(context.read<AuthProvider>().user);
   }
 
@@ -401,7 +397,6 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = context.select<AuthProvider, AppUser?>((a) => a.user);
     if (user == null) return const SizedBox.shrink();
 
-    // Cheap memo guard: covers the first build, before any dependency change.
     if (!identical(_derivedFrom, user)) _syncForUser(user);
 
     final dateFmtLong = _dateFmtLong;
@@ -1237,7 +1232,7 @@ class _ProfileHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$pct% profile complete — fill empty fields for a complete record',
+                  '$pct% complete. Fill the empty fields to finish your profile.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -1388,7 +1383,7 @@ class _ProfileExpandableSection extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: Visibility(
               visible: expanded,
-              // Drop collapsed section trees — cheaper scroll / less memory.
+              // Skip collapsed section content.
               maintainState: false,
               maintainAnimation: false,
               child: Column(

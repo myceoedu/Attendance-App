@@ -25,8 +25,7 @@ class EmployeeAttendanceCalendarScreen extends StatefulWidget {
 
 class _EmployeeAttendanceCalendarScreenState
     extends State<EmployeeAttendanceCalendarScreen> {
-  // `DateFormat` parses its pattern on construction. The month grid renders up
-  // to 42 cells plus 7 weekday labels per rebuild, so these are shared.
+  // Shared DateFormats for the month grid.
   static final DateFormat _monthFmt = DateFormat('MMMM yyyy');
   static final DateFormat _dowFmt = DateFormat('EEE');
   static final DateFormat _dayShortFmt = DateFormat('d MMM');
@@ -46,8 +45,7 @@ class _EmployeeAttendanceCalendarScreenState
   RealtimeSubscription? _attendanceChannel;
   RealtimeSubscription? _leaveChannel;
 
-  /// Midnight today in Malaysia time. Cached because every cell compared
-  /// against a freshly computed "now"; refreshed on each load.
+  /// Malaysia calendar date (midnight). Refreshed on each load.
   DateTime _today = _todayInMalaysia();
 
   static DateTime _currentMonth() {
@@ -976,7 +974,7 @@ class _EmployeeAttendanceCalendarScreenState
                   employee.email,
                   AppColors.primary,
                 ),
-                // Phone — show value or "Not provided"
+                // Phone field
                 if (employee.hasPhone)
                   _infoRow(
                     Icons.phone_outlined,
@@ -1060,7 +1058,7 @@ class _EmployeeAttendanceCalendarScreenState
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Approved Leave — $monthLabel',
+                    'Approved leave · $monthLabel',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
@@ -1098,8 +1096,7 @@ class _EmployeeAttendanceCalendarScreenState
               ),
             )
           else
-            // Already inside a scrollable; building the rows directly avoids a
-            // nested viewport that would lay out every row twice.
+            // Parent is already a scrollable.
             for (var i = 0; i < leaves.length; i++) ...[
               if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
               _buildLeaveListItem(leaves[i]),

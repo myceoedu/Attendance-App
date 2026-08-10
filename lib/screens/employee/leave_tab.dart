@@ -364,7 +364,7 @@ class _LeaveTabState extends State<LeaveTab> {
                               IconButton(
                                 tooltip: _section == _LeaveHomeSection.annual
                                     ? 'Annual leave: dates, reason, optional proof. Days count once approved.'
-                                    : 'Other leave: sick MC, emergency, unpaid, statutory — separate from annual balance.',
+                                    : 'Other leave: sick MC, emergency, unpaid, statutory. Separate from annual balance.',
                                 onPressed: () {
                                   showModalBottomSheet<void>(
                                     context: context,
@@ -625,7 +625,7 @@ class _LeaveTabState extends State<LeaveTab> {
               ),
             ),
             subtitle: Text(
-              'Sick, emergency, unpaid, statutory… tap to expand',
+              'Sick, emergency, unpaid, statutory. Tap to expand',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -638,25 +638,25 @@ class _LeaveTabState extends State<LeaveTab> {
               _introBullet(
                 Icons.medical_services_rounded,
                 AppColors.pink,
-                'Sick leave — describe your situation and attach an MC or doctor’s note (required).',
+                'Sick leave. Describe your situation and attach an MC or doctor\'s note (required).',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.warning_amber_rounded,
                 AppColors.orange,
-                'Emergency leave — urgent personal matters; attach proof if you can.',
+                'Emergency leave. For urgent personal matters. Attach proof if you can.',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.payments_outlined,
                 AppColors.textSecondary,
-                'Unpaid leave — may reduce pay for those days in payroll.',
+                'Unpaid leave. May reduce pay for those days in payroll.',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.family_restroom_rounded,
                 AppColors.primary,
-                'Maternity, paternity, marriage, PH replacement — clear dates and optional documents.',
+                'Maternity, paternity, marriage, or PH replacement. Add clear dates and optional documents.',
               ),
               const SizedBox(height: 8),
               Text(
@@ -708,8 +708,7 @@ class _LeaveTabState extends State<LeaveTab> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        // A stacked accent bar stretches to the content height without the
-        // extra intrinsic-sizing layout pass an `IntrinsicHeight` row needs.
+        // Accent stripe without IntrinsicHeight.
         child: Stack(
           children: [
             PositionedDirectional(

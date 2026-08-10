@@ -33,7 +33,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   static final DateFormat _dateFmt = DateFormat('d MMM yyyy');
   static final DateFormat _submittedFmt = DateFormat('d MMM yyyy · HH:mm');
 
-  /// Leave types are a fixed catalogue, so the menu is built once per process.
   static final List<DropdownMenuItem<String>> _leaveTypeMenuItems = [
     const DropdownMenuItem(value: 'all', child: Text('All types')),
     ...LeaveCatalog.orderedAllTypes.map(
@@ -50,9 +49,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   List<LeaveRequest> _requests = [];
   Map<String, AnnualLeaveSummary> _annualByUserId = {};
 
-  /// Everything below is derived from [_requests] plus the active filters.
-  /// It used to be recomputed by getters on every rebuild, which meant six
-  /// full passes over the page for each debounced keystroke.
+  /// Cached filter + status counts (updated by [_recomputeDerived]).
   List<LeaveRequest> _visibleRequests = const [];
   int _pendingCount = 0;
   int _approvedCount = 0;
@@ -74,14 +71,13 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final Debouncer _searchDebounce = Debouncer();
 
-  /// `null` = all employees; otherwise filter leaves to this user id.
+  /// null = all employees.
   String? _selectedEmployeeId;
 
   /// First successful load only: if there are pending requests, start on Pending.
   bool _didApplyInitialPendingFilter = false;
 
-  /// Ids whose "Details" block is open. Held in a notifier so expanding one
-  /// card repaints only the detail blocks instead of every visible card.
+  /// Open detail cards (per-card rebuild via ValueNotifier).
   final ValueNotifier<Set<String>> _expandedRequestIds =
       ValueNotifier<Set<String>>(const <String>{});
 
@@ -234,8 +230,8 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
       return 'No leave requests on file for ${_employeeNameById(id)} yet. '
           'Their annual snapshot is still shown above.';
     }
-    return 'No requests for ${_employeeNameById(id)} match these filters — '
-        'try All statuses or another leave type.';
+    return 'No requests for ${_employeeNameById(id)} match these filters. '
+        'Try All statuses or another leave type.';
   }
 
   Future<void> _ensureAnnualSummaryForUser(String userId) async {
@@ -248,12 +244,10 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
       if (!mounted || s == null) return;
       setState(() => _annualByUserId[userId] = s);
     } catch (_) {
-      // Leave map empty; panel shows friendly fallback.
+      // Leave map empty. Panel shows friendly fallback.
     }
   }
 
-  /// One pass over the loaded page produces the visible list, the status
-  /// counters shown in the stat pills, and the empty-state hint.
   void _recomputeDerived() {
     final query = _searchCtrl.text.trim().toLowerCase();
     final hasQuery = query.isNotEmpty;
@@ -293,7 +287,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
       visible.add(request);
     }
 
-    // Pending is a work queue (oldest first); everything else reads as history.
+    // Pending: oldest first. Others: newest first.
     if (_filter == 'pending') {
       visible.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     } else {
@@ -919,7 +913,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Balance unavailable for $name — check leave setup.',
+                      'Balance unavailable for $name. Check leave setup.',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
@@ -1072,8 +1066,8 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
           ),
           children: [
             Text(
-              'Each request can show that employee’s $_annualSummaryYear annual '
-              'totals — even for sick or emergency — so you can sanity-check '
+              'Each request can show that employee\'s $_annualSummaryYear annual '
+              'totals, including sick or emergency, so you can check '
               'entitlement while you review.',
               style: TextStyle(
                 fontSize: 11.5,
@@ -1253,7 +1247,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                             const SizedBox(width: 6),
                             Expanded(
                               child: Text(
-                                '${dateFmt.format(r.startDate)} — '
+                                '${dateFmt.format(r.startDate)} to '
                                 '${dateFmt.format(r.endDate)} · '
                                 '${r.durationDisplayLabel}',
                                 style: TextStyle(
@@ -1278,8 +1272,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // Everything below reacts to the per-card "Details"
-                        // toggle, so it is scoped to a listenable subtree.
                         ValueListenableBuilder<Set<String>>(
                           valueListenable: _expandedRequestIds,
                           builder: (context, expandedIds, _) {
@@ -1358,7 +1350,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                                       const SizedBox(width: 6),
                                       Expanded(
                                         child: Text(
-                                          'MC / attachment on file — tap Details to open.',
+                                          'MC / attachment on file. Tap Details to open.',
                                           style: TextStyle(
                                             fontSize: 11,
                                             height: 1.3,
@@ -1609,7 +1601,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                         border: Border.all(color: AppColors.divider),
                       ),
                       child: Text(
-                        'This request is not annual leave — it does not use the '
+                        'This request is not annual leave. It does not use the '
                         'remaining days above. The numbers are for context only.',
                         style: TextStyle(
                           fontSize: 11,
@@ -1761,7 +1753,7 @@ class _AnnualApproveSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '${dateFmt.format(request.startDate)} — ${dateFmt.format(request.endDate)}',
+            '${dateFmt.format(request.startDate)} to ${dateFmt.format(request.endDate)}',
             style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,

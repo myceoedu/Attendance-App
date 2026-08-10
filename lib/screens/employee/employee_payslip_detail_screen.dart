@@ -102,7 +102,7 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
                 Text(
                   run.status == 'paid'
                       ? 'This period has been marked paid by payroll.'
-                      : 'Approved — payment follows your company’s schedule.',
+                      : 'Approved. Payment follows your company\'s schedule.',
                   style: const TextStyle(fontSize: 12, height: 1.35),
                 ),
               ],
@@ -128,8 +128,8 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
             child: Text(
               intern
                   ? 'Intern allowance (and commission if any) is divided by calendar days. Approved leave in this period reduces pay. No EPF, SOCSO, or EIS.'
-                  : 'Unpaid leave days are approved unpaid leave only (weekdays in this period). '
-                      'Sick and other paid leave types do not reduce pay here.',
+                  : 'Only approved unpaid leave on weekdays reduces pay. '
+                      'Sick and other paid leave do not.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.35,
@@ -210,7 +210,7 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             intern
-                ? 'Intern payslip — allowance and leave only. Contact HR with questions.'
+                ? 'Intern payslip: allowance and leave only. Contact HR with questions.'
                 : 'Malaysia statutory rules are applied for EPF/KWSP, SOCSO/PERKESO, and EIS/SIP. For questions, contact HR.',
             style: const TextStyle(
               fontSize: 11,

@@ -93,7 +93,7 @@ class _PayrollReportsScreenState extends State<PayrollReportsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Approved / paid — net payroll (sum of run totals)', style: TextStyle(fontWeight: FontWeight.w800)),
+                        const Text('Approved / paid net payroll (sum of run totals)', style: TextStyle(fontWeight: FontWeight.w800)),
                         const SizedBox(height: 8),
                         Text(money.format(sumNet), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                       ],

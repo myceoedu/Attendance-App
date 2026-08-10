@@ -82,8 +82,7 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: true,
-        // Claims allow up to 8 files at 10 MB each. Native uploads stream from
-        // the file path, so only web needs the bytes held in memory.
+        // Bytes only needed on web. Native uploads from the file path.
         withData: kIsWeb,
       );
       if (result == null || result.files.isEmpty) return;
@@ -111,7 +110,7 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Only $remaining more file(s) allowed — extra files were skipped.',
+              'Only $remaining more file(s) allowed. Extra files were skipped.',
             ),
           ),
         );
@@ -218,7 +217,7 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
           children: [
             const Text(
               'Tell finance what the spend was for, how much, and when it happened. '
-              'Upload every receipt or proof you have — multiple files are supported.',
+              'Upload every receipt or proof you have. You can add multiple files.',
               style: TextStyle(
                 fontSize: 13.5,
                 color: AppColors.textSecondary,
@@ -304,7 +303,7 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
                 labelText: 'Description & details',
                 hintText:
                     'What was purchased, project or cost centre, why it was necessary, '
-                    'GST / tax if relevant…',
+                    'GST / tax if relevant',
               ),
               validator: (v) {
                 final t = v?.trim() ?? '';

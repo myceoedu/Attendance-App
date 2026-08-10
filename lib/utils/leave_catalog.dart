@@ -95,9 +95,9 @@ abstract final class LeaveCatalog {
       case annual:
         return 'Annual leave (full day)';
       case annualHalfAm:
-        return 'Annual leave — half day (AM)';
+        return 'Annual leave (half day, AM)';
       case annualHalfPm:
-        return 'Annual leave — half day (PM)';
+        return 'Annual leave (half day, PM)';
       case sick:
         return 'Sick leave';
       case emergency:

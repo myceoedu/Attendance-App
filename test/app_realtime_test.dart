@@ -2,8 +2,7 @@ import 'package:attendance_app/services/app_realtime.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-/// Records how many channels the pool actually opens and lets tests fire
-/// events without a live Supabase connection.
+/// Fake channel transport for pooling tests.
 class _FakeChannels {
   final List<String> opened = [];
   final List<String> removed = [];
@@ -21,8 +20,6 @@ class _FakeChannels {
   }) {
     opened.add(topic);
     emit[topic] = onEvent;
-    // The pool only stores this and hands it back at teardown, so an
-    // unconfigured instance is enough for these tests.
     final channel = RealtimeChannel(topic, RealtimeClient(''));
     _topicOf[channel] = topic;
     return channel;
@@ -85,29 +82,25 @@ void main() {
     AppRealtime.disposeChannel(a);
 
     fake.emit['leave_requests:all']!();
-    expect(first, 0, reason: 'released subscriber must not be called');
+    expect(first, 0);
     expect(second, 1);
-    expect(
-      AppRealtime.debugTopicCount(),
-      1,
-      reason: 'channel stays open while another subscriber remains',
-    );
+    expect(AppRealtime.debugTopicCount(), 1);
   });
 
   test('re-subscribing during teardown reuses the open channel', () async {
     final first = AppRealtime.subscribeAdminAttendance(onReload: () {});
     AppRealtime.disposeChannel(first);
 
-    // Same turn of the event loop, as when one screen replaces another.
+    // Same event-loop turn as a screen swap.
     var reloads = 0;
     AppRealtime.subscribeAdminAttendance(onReload: () => reloads++);
     await Future<void>.delayed(Duration.zero);
 
-    expect(fake.opened, ['attendance:all'], reason: 'no second channel opened');
+    expect(fake.opened, ['attendance:all']);
     expect(AppRealtime.debugTopicCount(), 1);
 
     fake.emit['attendance:all']!();
-    expect(reloads, 1, reason: 'replacement screen still receives events');
+    expect(reloads, 1);
   });
 
   test('releasing the last subscriber drops the topic', () async {

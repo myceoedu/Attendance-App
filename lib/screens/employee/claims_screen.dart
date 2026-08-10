@@ -33,8 +33,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
 
   final List<ExpenseClaim> _claims = [];
 
-  /// Filtered view held in state so chip changes and rebuilds do not re-scan
-  /// the loaded pages.
+  /// Cached filtered list (updated by [_recomputeFiltered]).
   List<ExpenseClaim> _visibleClaims = const [];
 
   bool _loading = true;
@@ -123,8 +122,6 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
     if (pos.pixels >= pos.maxScrollExtent - 320) _loadMore();
   }
 
-  /// A short first page can leave the list unscrollable, which would strand the
-  /// user with no way to reach older claims.
   void _fillViewport() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -222,9 +219,6 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                       onChipSelected: (v) => setState(() {
                         _statusFilter = v;
                         _recomputeFiltered();
-                        // Filtering happens over loaded pages, so a narrow
-                        // filter can empty the viewport while older matching
-                        // claims are still unfetched.
                         _fillViewport();
                       }),
                     ),

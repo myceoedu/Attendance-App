@@ -114,7 +114,7 @@ class EmployeeProfilePdf {
     await file.writeAsBytes(bytes, flush: true);
     await Share.shareXFiles(
       [XFile(file.path)],
-      subject: 'Employee profile — ${u.name}',
+      subject: 'Employee profile: ${u.name}',
     );
   }
 }

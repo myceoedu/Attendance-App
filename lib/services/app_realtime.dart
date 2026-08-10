@@ -5,7 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_service.dart';
 
-/// Builds the underlying channel for a topic. Overridable in tests.
+/// Test hook for building a channel.
 typedef RealtimeChannelBuilder =
     RealtimeChannel Function({
       required String topic,
@@ -15,10 +15,7 @@ typedef RealtimeChannelBuilder =
       required void Function() onEvent,
     });
 
-/// One subscriber's handle on a shared realtime topic.
-///
-/// Screens hold this instead of the channel itself so several widgets can
-/// watch the same table without opening a websocket topic each.
+/// Handle for a shared realtime topic.
 final class RealtimeSubscription {
   RealtimeSubscription._(this._topic, this._onReload);
 
@@ -36,10 +33,7 @@ class _SharedTopic {
 /// Supabase Realtime helpers. Tables must be in the `supabase_realtime`
 /// publication (see `supabase_setup.sql`).
 ///
-/// Subscriptions are pooled by topic. Previously every screen opened its own
-/// channel, so an admin with the dashboard, attendance list, and leave inbox in
-/// the navigation stack held three channels on overlapping tables, and the
-/// notification bell duplicated the notifications screen for the same user.
+/// Channels are pooled by topic. Multiple screens can share one channel.
 final class AppRealtime {
   AppRealtime._();
 
@@ -48,8 +42,7 @@ final class AppRealtime {
   static RealtimeChannelBuilder _channelBuilder = _defaultChannelBuilder;
   static void Function(RealtimeChannel) _channelRemover = _defaultChannelRemover;
 
-  /// Swaps the transport so pooling can be exercised without a live client.
-  /// Passing `null` restores the Supabase-backed implementations.
+  /// Override channel open/close for tests. Pass null to restore defaults.
   @visibleForTesting
   static void debugSetChannelBuilder(
     RealtimeChannelBuilder? builder, {
@@ -121,13 +114,13 @@ final class AppRealtime {
   static void _fanOut(String topic) {
     final shared = _topics[topic];
     if (shared == null) return;
-    // Copy first: a listener may release its own subscription while reloading.
+    // Snapshot in case a listener releases itself during the callback.
     for (final subscriber in List.of(shared.subscribers)) {
       if (!subscriber._released) subscriber._onReload();
     }
   }
 
-  /// Releases one subscriber. The channel closes once the last one is gone.
+  /// Release one subscriber. Closes the channel when none remain.
   static void disposeChannel(RealtimeSubscription? subscription) {
     if (subscription == null || subscription._released) return;
     subscription._released = true;
@@ -138,9 +131,7 @@ final class AppRealtime {
     shared.subscribers.remove(subscription);
     if (shared.subscribers.isNotEmpty || shared.teardownScheduled) return;
 
-    // Deferred so channel removal does not compete with the final pop
-    // animation frame, and so a replacement screen subscribing during the same
-    // transition can reuse the still-open channel.
+    // Delay close so a replacement screen can reuse the channel.
     shared.teardownScheduled = true;
     scheduleMicrotask(() {
       shared.teardownScheduled = false;
@@ -152,8 +143,7 @@ final class AppRealtime {
     });
   }
 
-  /// Drops every pooled channel. Used on sign-out so a new session does not
-  /// inherit topics scoped to the previous account.
+  /// Close all pooled channels (call on sign-out).
   static void disposeAll() {
     final topics = List.of(_topics.values);
     _topics.clear();
@@ -219,7 +209,7 @@ final class AppRealtime {
     );
   }
 
-  /// Admins receive rows allowed by RLS (typically all).
+  /// Admin attendance changes (RLS-scoped).
   static RealtimeSubscription subscribeAdminAttendance({
     required void Function() onReload,
   }) {
@@ -250,7 +240,7 @@ final class AppRealtime {
     );
   }
 
-  /// New posts visible to all authenticated users (RLS).
+  /// Company announcements.
   static RealtimeSubscription subscribeCompanyAnnouncements({
     required void Function() onReload,
   }) {

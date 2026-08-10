@@ -97,7 +97,6 @@ class SupabaseService {
   static Future<void> signOut() async {
     _invalidateEmployeesCache();
     _invalidateWorkSiteCache();
-    // Pooled realtime topics are scoped to the signed-in account.
     AppRealtime.disposeAll();
     await client.auth.signOut();
   }
@@ -889,8 +888,8 @@ class SupabaseService {
     return (checkedIn: results[0].count, completed: results[1].count);
   }
 
-  /// Month view **with** employee names, for admin screens that display them.
-  /// Payroll and summaries use [_getAttendanceRowsByMonth] instead.
+  /// Month view with employee names (admin UI).
+  /// Payroll uses [_getAttendanceRowsByMonth] (no name join).
   static Future<List<Attendance>> getAttendanceByMonth(DateTime month) async {
     final monthStart = DateTime(month.year, month.month);
     final monthEnd = DateTime(month.year, month.month + 1);
@@ -1400,9 +1399,7 @@ class SupabaseService {
     return data.map<ExpenseClaim>((e) => ExpenseClaim.fromMap(e)).toList();
   }
 
-  /// Paged variant of [getMyExpenseClaims]. Long-tenured employees can
-  /// accumulate years of claims, so the list screen pulls one page at a time
-  /// instead of holding the whole history in memory.
+  /// Paged claims for the signed-in employee.
   static Future<List<ExpenseClaim>> getMyExpenseClaimsPage(
     String userId, {
     int offset = 0,
@@ -1438,8 +1435,7 @@ class SupabaseService {
     return ExpenseClaim.fromMap(m);
   }
 
-  /// Admin inbox page. Keep the initial payload bounded as attachments can be
-  /// large JSON objects on organisations with a long claim history.
+  /// Admin claims page.
   static Future<List<ExpenseClaim>> getExpenseClaimsPage({
     int offset = 0,
     int limit = 50,
@@ -1485,8 +1481,7 @@ class SupabaseService {
         .eq('id', claimId);
   }
 
-  /// Admin inbox page, newest first. Callers can append further history only
-  /// when the administrator requests it.
+  /// Admin leave requests page (newest first).
   static Future<List<LeaveRequest>> getLeaveRequestsPage({
     int offset = 0,
     int limit = 50,
@@ -2124,10 +2119,8 @@ class SupabaseService {
     }
   }
 
-  /// Employee self-service: own [PayrollItem]s whose run is **approved** or **paid**
-  /// (enforced in Supabase RLS). Newest payroll periods first.
-  /// [limit] bounds the payload for long-tenured staff — payslips accumulate
-  /// twelve rows a year and the screen only shows recent periods.
+  /// Employee payslips for approved/paid runs (newest first).
+  /// [limit] caps how many rows are fetched.
   static Future<List<PayrollHistoryEntry>> getMyPayrollHistory({
     int limit = 36,
   }) async {
@@ -2213,8 +2206,6 @@ class SupabaseService {
     var processedStaff = 0;
 
     for (final u in staff) {
-      // Yield periodically so the calculating overlay can paint and the app
-      // remains responsive on payrolls with many employees.
       if (processedStaff > 0 && processedStaff % 20 == 0) {
         await Future<void>.delayed(Duration.zero);
       }

@@ -74,7 +74,7 @@ String friendlyAdminLeaveError(Object e) {
     final msg = e.message.toLowerCase();
     if (msg.contains('annual leave would exceed balance') ||
         msg.contains('exceed_balance')) {
-      return 'Cannot approve — this employee’s annual leave would exceed their '
+      return 'Cannot approve. This employee\'s annual leave would exceed their '
           'balance for one or more calendar years. Adjust entitlement (HR), '
           'reject overlaps, or ask them to shorten the request.';
     }

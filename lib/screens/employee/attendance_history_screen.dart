@@ -24,8 +24,7 @@ class AttendanceHistoryScreen extends StatefulWidget {
 }
 
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
-  // Shared across the whole month grid: `DateFormat` parses its pattern on
-  // construction and up to 42 cells render per calendar rebuild.
+  // Shared DateFormats for the month grid.
   static final DateFormat _monthFmt = DateFormat('MMMM yyyy');
   static final DateFormat _dowFmt = DateFormat('EEE');
   static final DateFormat _dayShortFmt = DateFormat('d MMM');
@@ -39,8 +38,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   bool _loading = true;
   String? _error;
 
-  /// Midnight today in Malaysia time, refreshed on each load so day cells do
-  /// not each recompute "now".
+  /// Malaysia calendar date (midnight). Refreshed on each load.
   DateTime _today = _todayInMalaysia();
 
   static DateTime _currentMonth() {
@@ -702,7 +700,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Approved Leave — $monthLabel',
+                    'Approved leave · $monthLabel',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,

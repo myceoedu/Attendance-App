@@ -1152,7 +1152,7 @@ class _GeofenceHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = checking
         ? 'Checking distance to office…'
-        : (hint ?? 'Office location check is on — stay in range to clock in');
+        : (hint ?? 'Office location check is on. Stay in range to clock in.');
     final inRange = hint != null && hint!.startsWith('In range');
 
     return Material(

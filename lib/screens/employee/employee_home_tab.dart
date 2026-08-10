@@ -1001,7 +1001,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         label: 'Leave',
         subLabel: 'Balance & history',
         semanticAction:
-            'Opens leave — annual balance, sick leave, and emergency leave.',
+            'Open leave for annual balance, sick leave, and emergency leave.',
         icon: Icons.event_available_rounded,
         accentColor: AppColors.teal,
         onTap: () => pushAppPage(context, const LeaveTab()),

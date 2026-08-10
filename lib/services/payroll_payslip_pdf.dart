@@ -83,7 +83,7 @@ Future<Uint8List> _buildPayslipPdfBytes(Map<String, dynamic> payload) async {
           ),
           row('EPF/KWSP, SOCSO/PERKESO, EIS/SIP', money.format(0)),
           pw.Text(
-            'Not applicable — intern (no EPF/KWSP, SOCSO/PERKESO, or EIS/SIP).',
+            'Not applicable for interns (no EPF/KWSP, SOCSO/PERKESO, or EIS/SIP).',
             style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic),
           ),
           pw.SizedBox(height: 6),
@@ -133,7 +133,7 @@ Future<Uint8List> _buildPayslipPdfBytes(Map<String, dynamic> payload) async {
             style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
           ),
           pw.SizedBox(height: 4),
-          pw.Text('Payslip — $period', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('Payslip · $period', style: const pw.TextStyle(fontSize: 10)),
           pw.Divider(),
           pw.Text(
             'Employee',
@@ -174,7 +174,7 @@ Future<Uint8List> _buildPayslipPdfBytes(Map<String, dynamic> payload) async {
           pw.SizedBox(height: 16),
           pw.Text(
             intern
-                ? 'Intern payslip — allowance and leave only.'
+                ? 'Intern payslip: allowance and leave only.'
                 : 'Malaysia statutory wage-band/threshold rules applied for EPF/KWSP, SOCSO/PERKESO, and EIS/SIP.',
             style: pw.TextStyle(fontSize: 7, fontStyle: pw.FontStyle.italic),
           ),
@@ -272,7 +272,7 @@ class PayrollPayslipPdf {
     final filename =
         'payslip_${run.periodYear}_${run.periodMonth}_$safeName.pdf';
     final subject =
-        'Payslip ${run.periodYear}-${run.periodMonth.toString().padLeft(2, '0')} — ${item.employeeNameSnapshot}';
+        'Payslip ${run.periodYear}-${run.periodMonth.toString().padLeft(2, '0')} · ${item.employeeNameSnapshot}';
 
     final savedOrDownloaded = await offerPayslipPdf(bytes, filename, subject);
     if (!savedOrDownloaded) {

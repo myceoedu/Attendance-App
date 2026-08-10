@@ -22,7 +22,7 @@ class HelpSupportScreen extends StatelessWidget {
       scheme: 'mailto',
       path: raw,
       queryParameters: <String, String>{
-        'subject': 'myRekod — Support request',
+        'subject': 'myRekod support request',
         'body': 'Please describe your issue below:\n\n',
       },
     );
@@ -83,7 +83,7 @@ Platform: ${_platformLabel()}'''.trim();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Diagnostics copied — share with HR/IT when you contact them.'),
+        content: Text('Diagnostics copied. Share with HR/IT when you contact them.'),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -354,7 +354,7 @@ Platform: ${_platformLabel()}'''.trim();
           Text(
             adminView
                 ? 'Quick answers for administrators, plus a direct line to HR or IT when you need backend or account help.'
-                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them when you reach out — that speeds things up.',
+                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them when you reach out. That speeds things up.',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,

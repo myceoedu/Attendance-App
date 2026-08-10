@@ -73,8 +73,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
               ],
               title: 'All leave requests',
               subtitle:
-                  'Every employee in one inbox — filter by status, type, or '
-                  'person. Ideal for approvals and triage.',
+                  'All employees in one inbox. Filter by status, type, or '
+                  'person for approvals and triage.',
               onTap: () =>
                   pushAppPage(context, const LeaveManagementScreen()),
             ),

@@ -41,7 +41,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _busy = false;
       _success = result == null;
       _message = result ??
-          'Reset email sent. Open the link in the email — you will set a new password, then sign in.';
+          'Reset email sent. Open the link to set a new password, then sign in.';
     });
   }
 

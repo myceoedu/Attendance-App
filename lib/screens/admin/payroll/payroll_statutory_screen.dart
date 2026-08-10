@@ -860,7 +860,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                                   : 'Delete')
                             : (isDefault
                                   ? 'Add another rate set first'
-                                  : 'Used by $usedCount run${usedCount > 1 ? 's' : ''} — replace usage first');
+                                  : 'Used by $usedCount run${usedCount > 1 ? 's' : ''}. Replace usage first');
                         return Material(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),

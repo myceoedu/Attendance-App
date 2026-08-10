@@ -154,7 +154,7 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
                     context,
                     icon: Icons.gavel_rounded,
                     title: 'Statutory rates',
-                    subtitle: 'EPF, SOCSO, EIS — effective-dated',
+                    subtitle: 'EPF, SOCSO, EIS (effective-dated)',
                     onTap: () async {
                       await pushAppPage(
                         context,

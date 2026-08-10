@@ -226,7 +226,7 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
         return _previewPanel(
           title: 'Allowance preview',
           message:
-              'Monthly pool ${_money0.format(allow)} — divided by calendar days; approved leave reduces pay. No statutory deductions.',
+              'Monthly pool ${_money0.format(allow)}. Divided by calendar days. Approved leave reduces pay. No statutory deductions.',
           color: AppColors.teal,
           fill: AppColors.tealLight.withValues(alpha: 0.5),
         );
@@ -431,7 +431,7 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                 _blockTitle(
                   'Intern pay',
                   subtitle:
-                      'Step 1 — enter the full monthly allowance. No basic salary or statutory rows.',
+                      'Step 1. Enter the full monthly allowance. No basic salary or statutory rows.',
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -652,11 +652,11 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                 items: [
                   DropdownMenuItem(
                     value: 'active',
-                    child: _dropdownLabel('Active — include in runs'),
+                    child: _dropdownLabel('Active (include in runs)'),
                   ),
                   DropdownMenuItem(
                     value: 'hold',
-                    child: _dropdownLabel('Hold — pause payroll'),
+                    child: _dropdownLabel('Hold (pause payroll)'),
                   ),
                 ],
                 onChanged: (v) => setState(() => _status = v ?? 'active'),

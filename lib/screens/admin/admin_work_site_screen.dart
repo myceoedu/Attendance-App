@@ -414,7 +414,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                           subtitle: Text(
                             _isActive
                                 ? 'Employees must be inside the radius to clock in.'
-                                : 'Location check is off — clock-in is allowed from anywhere.',
+                                : 'Location check is off. Clock-in is allowed from anywhere.',
                             style: const TextStyle(fontSize: 13),
                           ),
                           value: _isActive,

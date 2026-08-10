@@ -254,7 +254,7 @@ class _ClaimDetailScreenState extends State<ClaimDetailScreen> {
                     if (_claim!.attachments.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(12),
-                        child: Text('No files linked (unusual — contact support).'),
+                        child: Text('No files linked. Contact support if this looks wrong.'),
                       )
                     else
                       for (final a in _claim!.attachments)
