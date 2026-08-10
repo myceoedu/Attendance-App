@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../constants/app_theme.dart';
 import '../../utils/error_messages.dart';
 import '../../utils/leave_catalog.dart';
@@ -31,8 +30,36 @@ class LeaveManagementScreen extends StatefulWidget {
 
 class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   static const _pageSize = 50;
+  static final DateFormat _dateFmt = DateFormat('d MMM yyyy');
+  static final DateFormat _submittedFmt = DateFormat('d MMM yyyy · HH:mm');
+
+  /// Leave types are a fixed catalogue, so the menu is built once per process.
+  static final List<DropdownMenuItem<String>> _leaveTypeMenuItems = [
+    const DropdownMenuItem(value: 'all', child: Text('All types')),
+    ...LeaveCatalog.orderedAllTypes.map(
+      (t) => DropdownMenuItem<String>(
+        value: t,
+        child: Text(
+          LeaveCatalog.displayName(t),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+    ),
+  ];
+
   List<LeaveRequest> _requests = [];
   Map<String, AnnualLeaveSummary> _annualByUserId = {};
+
+  /// Everything below is derived from [_requests] plus the active filters.
+  /// It used to be recomputed by getters on every rebuild, which meant six
+  /// full passes over the page for each debounced keystroke.
+  List<LeaveRequest> _visibleRequests = const [];
+  int _pendingCount = 0;
+  int _approvedCount = 0;
+  int _rejectedCount = 0;
+  bool _selectedEmployeeHasRequests = false;
+  Map<String, String> _employeeNames = const {};
+  List<DropdownMenuItem<String>> _employeeMenuItems = const [];
 
   /// Calendar year for [_annualByUserId] (Malaysia leave year label).
   int _annualSummaryYear = AppTime.malaysiaNow().year;
@@ -43,17 +70,20 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   String _filter = 'all'; // 'all', 'pending', 'approved', 'rejected'
   String _typeFilter = 'all';
   Timer? _realtimeDebounce;
-  RealtimeChannel? _leaveChannel;
+  RealtimeSubscription? _leaveChannel;
   final TextEditingController _searchCtrl = TextEditingController();
   final Debouncer _searchDebounce = Debouncer();
-  List<AppUser> _employees = [];
 
   /// `null` = all employees; otherwise filter leaves to this user id.
   String? _selectedEmployeeId;
 
   /// First successful load only: if there are pending requests, start on Pending.
   bool _didApplyInitialPendingFilter = false;
-  final Map<String, bool> _requestDetailExpanded = {};
+
+  /// Ids whose "Details" block is open. Held in a notifier so expanding one
+  /// card repaints only the detail blocks instead of every visible card.
+  final ValueNotifier<Set<String>> _expandedRequestIds =
+      ValueNotifier<Set<String>>(const <String>{});
 
   @override
   void initState() {
@@ -69,6 +99,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   void dispose() {
     _searchDebounce.dispose();
     _searchCtrl.dispose();
+    _expandedRequestIds.dispose();
     _realtimeDebounce?.cancel();
     AppRealtime.disposeChannel(_leaveChannel);
     super.dispose();
@@ -76,7 +107,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 
   void _attachRealtime() {
     _leaveChannel = AppRealtime.subscribeAdminLeaves(
-      channelSuffix: 'manage',
       onReload: () {
         _realtimeDebounce?.cancel();
         _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
@@ -108,7 +138,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 
       setState(() {
         _requests = data;
-        _employees = employees;
+        _setEmployees(employees);
         _annualByUserId = batch;
         _annualSummaryYear = year;
         _loading = false;
@@ -126,6 +156,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
           }
           _didApplyInitialPendingFilter = true;
         }
+        _recomputeDerived();
       });
 
       final selected = _selectedEmployeeId;
@@ -168,24 +199,38 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
         _annualByUserId = {..._annualByUserId, ...summaries};
         _hasMore = next.length == _pageSize;
         _loadingMore = false;
+        _recomputeDerived();
       });
     } catch (_) {
       if (mounted) setState(() => _loadingMore = false);
     }
   }
 
-  String _employeeNameById(String id) {
-    for (final e in _employees) {
-      if (e.id == id) return e.name;
-    }
-    return 'Employee';
+  void _setEmployees(List<AppUser> employees) {
+    _employeeNames = {for (final e in employees) e.id: e.name};
+    _employeeMenuItems = [
+      const DropdownMenuItem(value: 'all', child: Text('Everyone')),
+      ...employees.map(
+        (e) => DropdownMenuItem(
+          value: e.id,
+          child: Text(e.name, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+    ];
+  }
+
+  String _employeeNameById(String id) => _employeeNames[id] ?? 'Employee';
+
+  void _toggleDetails(String requestId) {
+    final next = Set<String>.of(_expandedRequestIds.value);
+    if (!next.remove(requestId)) next.add(requestId);
+    _expandedRequestIds.value = next;
   }
 
   String _emptyStateSubtitle() {
     final id = _selectedEmployeeId;
     if (id == null) return 'No requests match the selected filters';
-    final hasAny = _requests.any((r) => r.userId == id);
-    if (!hasAny) {
+    if (!_selectedEmployeeHasRequests) {
       return 'No leave requests on file for ${_employeeNameById(id)} yet. '
           'Their annual snapshot is still shown above.';
     }
@@ -207,38 +252,61 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     }
   }
 
-  List<LeaveRequest> get _requestsForStats {
-    final id = _selectedEmployeeId;
-    if (id == null) return _requests;
-    return _requests.where((r) => r.userId == id).toList();
-  }
-
-  List<LeaveRequest> get _filteredSorted {
-    final list = _filteredRaw;
-    final sorted = List<LeaveRequest>.from(list);
-    if (_filter == 'pending') {
-      sorted.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-    } else {
-      sorted.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    }
-    return sorted;
-  }
-
-  List<LeaveRequest> get _filteredRaw {
+  /// One pass over the loaded page produces the visible list, the status
+  /// counters shown in the stat pills, and the empty-state hint.
+  void _recomputeDerived() {
     final query = _searchCtrl.text.trim().toLowerCase();
+    final hasQuery = query.isNotEmpty;
     final employeeId = _selectedEmployeeId;
-    return _requests.where((request) {
-      if (employeeId != null && request.userId != employeeId) return false;
-      if (_filter != 'all' && request.status != _filter) return false;
-      if (_typeFilter != 'all' && request.leaveType != _typeFilter) {
-        return false;
+    final statusAll = _filter == 'all';
+    final typeAll = _typeFilter == 'all';
+
+    var pending = 0;
+    var approved = 0;
+    var rejected = 0;
+    var employeeHasRequests = false;
+    final visible = <LeaveRequest>[];
+
+    for (final request in _requests) {
+      if (employeeId != null && request.userId != employeeId) continue;
+      employeeHasRequests = true;
+
+      switch (request.status) {
+        case 'pending':
+          pending++;
+        case 'approved':
+          approved++;
+        case 'rejected':
+          rejected++;
       }
-      if (query.isEmpty) return true;
-      final name = request.userName?.toLowerCase() ?? '';
-      return name.contains(query) ||
-          request.reason.toLowerCase().contains(query) ||
-          request.leaveTypeDisplay.toLowerCase().contains(query);
-    }).toList();
+
+      if (!statusAll && request.status != _filter) continue;
+      if (!typeAll && request.leaveType != _typeFilter) continue;
+      if (hasQuery) {
+        final name = request.userName?.toLowerCase() ?? '';
+        if (!name.contains(query) &&
+            !request.reason.toLowerCase().contains(query) &&
+            !request.leaveTypeDisplay.toLowerCase().contains(query)) {
+          continue;
+        }
+      }
+      visible.add(request);
+    }
+
+    // Pending is a work queue (oldest first); everything else reads as history.
+    if (_filter == 'pending') {
+      visible.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    } else {
+      visible.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+
+    _visibleRequests = visible;
+    _pendingCount = pending;
+    _approvedCount = approved;
+    _rejectedCount = rejected;
+    _selectedEmployeeHasRequests = employeeId == null
+        ? _requests.isNotEmpty
+        : employeeHasRequests;
   }
 
   Future<void> _onApproveTapped(LeaveRequest r) async {
@@ -310,11 +378,10 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('d MMM yyyy');
-    final submittedFmt = DateFormat('d MMM yyyy · HH:mm');
-    final filtered = _filteredSorted;
-    final statsScope = _requestsForStats;
-    final pendingCount = statsScope.where((r) => r.status == 'pending').length;
+    final dateFmt = _dateFmt;
+    final submittedFmt = _submittedFmt;
+    final filtered = _visibleRequests;
+    final pendingCount = _pendingCount;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppChrome.onBrand,
@@ -493,7 +560,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
           TextField(
             controller: _searchCtrl,
             onChanged: (_) => _searchDebounce(() {
-              if (mounted) setState(() {});
+              if (mounted) setState(_recomputeDerived);
             }),
             textInputAction: TextInputAction.search,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
@@ -548,7 +615,10 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                 return Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () => setState(() => _filter = v.$1),
+                    onTap: () => setState(() {
+                      _filter = v.$1;
+                      _recomputeDerived();
+                    }),
                     borderRadius: BorderRadius.circular(999),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
@@ -655,19 +725,14 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   Icons.expand_more_rounded,
                   color: AppColors.textHint.withValues(alpha: 0.95),
                 ),
-                items: [
-                  const DropdownMenuItem(value: 'all', child: Text('Everyone')),
-                  ..._employees.map(
-                    (e) => DropdownMenuItem(
-                      value: e.id,
-                      child: Text(e.name, overflow: TextOverflow.ellipsis),
-                    ),
-                  ),
-                ],
+                items: _employeeMenuItems,
                 onChanged: (value) async {
                   if (value == null) return;
                   final id = value == 'all' ? null : value;
-                  setState(() => _selectedEmployeeId = id);
+                  setState(() {
+                    _selectedEmployeeId = id;
+                    _recomputeDerived();
+                  });
                   if (id != null) await _ensureAnnualSummaryForUser(id);
                 },
                 style: const TextStyle(
@@ -711,24 +776,13 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   Icons.expand_more_rounded,
                   color: AppColors.textHint.withValues(alpha: 0.95),
                 ),
-                items: [
-                  const DropdownMenuItem(
-                    value: 'all',
-                    child: Text('All types'),
-                  ),
-                  ...LeaveCatalog.orderedAllTypes.map(
-                    (t) => DropdownMenuItem<String>(
-                      value: t,
-                      child: Text(
-                        LeaveCatalog.displayName(t),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ],
+                items: _leaveTypeMenuItems,
                 onChanged: (value) {
                   if (value == null) return;
-                  setState(() => _typeFilter = value);
+                  setState(() {
+                    _typeFilter = value;
+                    _recomputeDerived();
+                  });
                 },
                 style: const TextStyle(
                   fontSize: 12,
@@ -746,10 +800,9 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   }
 
   Widget _leaveStatsPills() {
-    final scope = _requestsForStats;
-    final pending = scope.where((r) => r.status == 'pending').length;
-    final approved = scope.where((r) => r.status == 'approved').length;
-    final rejected = scope.where((r) => r.status == 'rejected').length;
+    final pending = _pendingCount;
+    final approved = _approvedCount;
+    final rejected = _rejectedCount;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -1055,7 +1108,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
         : '?';
     final typeAccent = _adminLeaveTypeAccent(r.leaveType);
     final typeIcon = _adminLeaveTypeIcon(r.leaveType);
-    final detailsExpanded = _requestDetailExpanded[r.id] ?? false;
     final hasMc =
         LeaveCatalog.requiresMcAttachment(r.leaveType) &&
         r.attachmentPath != null &&
@@ -1226,154 +1278,182 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-                          decoration: BoxDecoration(
-                            color: typeAccent.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: typeAccent.withValues(alpha: 0.12),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.notes_rounded,
-                                    size: 14,
-                                    color: typeAccent.withValues(alpha: 0.9),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Reason',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textSecondary.withValues(
-                                        alpha: 0.88,
-                                      ),
-                                      letterSpacing: 0.4,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                r.reason,
-                                maxLines: detailsExpanded ? null : 2,
-                                overflow: detailsExpanded
-                                    ? TextOverflow.visible
-                                    : TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  height: 1.4,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (!detailsExpanded && hasMc) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.attach_file_rounded,
-                                size: 16,
-                                color: AppColors.pink,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'MC / attachment on file — tap Details to open.',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    height: 1.3,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.pink.withValues(
-                                      alpha: 0.92,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                            onPressed: () => setState(() {
-                              _requestDetailExpanded[r.id] = !detailsExpanded;
-                            }),
-                            icon: Icon(
-                              detailsExpanded
-                                  ? Icons.expand_less_rounded
-                                  : Icons.expand_more_rounded,
-                              size: 20,
-                            ),
-                            label: Text(
-                              detailsExpanded ? 'Hide details' : 'Details',
-                            ),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.indigo,
-                              minimumSize: const Size(0, 44),
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                            ),
-                          ),
-                        ),
-                        if (detailsExpanded) ...[
-                          _employeeAnnualBalancePanel(r.userId, r.leaveType),
-                          attachmentRow,
-                          const SizedBox(height: 4),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: OutlinedButton.icon(
-                              onPressed: () => showLeaveAuditHistorySheet(
-                                context,
-                                leaveRequestId: r.id,
-                              ),
-                              icon: const Icon(Icons.history, size: 16),
-                              label: const Text('Audit history'),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size(0, 40),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
-                                ),
-                              ),
-                            ),
-                          ),
-                          if (r.adminComment != null &&
-                              r.adminComment!.isNotEmpty) ...[
-                            const Divider(height: 20),
-                            Row(
+                        // Everything below reacts to the per-card "Details"
+                        // toggle, so it is scoped to a listenable subtree.
+                        ValueListenableBuilder<Set<String>>(
+                          valueListenable: _expandedRequestIds,
+                          builder: (context, expandedIds, _) {
+                            final detailsExpanded = expandedIds.contains(r.id);
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.comment_outlined,
-                                  size: 15,
-                                  color: AppColors.textSecondary,
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    10,
+                                    10,
+                                    10,
+                                    10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: typeAccent.withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: typeAccent.withValues(alpha: 0.12),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.notes_rounded,
+                                            size: 14,
+                                            color: typeAccent.withValues(
+                                              alpha: 0.9,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Reason',
+                                            style: TextStyle(
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.textSecondary
+                                                  .withValues(alpha: 0.88),
+                                              letterSpacing: 0.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        r.reason,
+                                        maxLines: detailsExpanded ? null : 2,
+                                        overflow: detailsExpanded
+                                            ? TextOverflow.visible
+                                            : TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          height: 1.4,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    r.adminComment!,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontStyle: FontStyle.italic,
-                                      color: AppColors.textSecondary,
-                                      height: 1.35,
+                                if (!detailsExpanded && hasMc) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.attach_file_rounded,
+                                        size: 16,
+                                        color: AppColors.pink,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          'MC / attachment on file — tap Details to open.',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            height: 1.3,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.pink.withValues(
+                                              alpha: 0.92,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: () => _toggleDetails(r.id),
+                                    icon: Icon(
+                                      detailsExpanded
+                                          ? Icons.expand_less_rounded
+                                          : Icons.expand_more_rounded,
+                                      size: 20,
+                                    ),
+                                    label: Text(
+                                      detailsExpanded
+                                          ? 'Hide details'
+                                          : 'Details',
+                                    ),
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: AppColors.indigo,
+                                      minimumSize: const Size(0, 44),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 2,
+                                      ),
                                     ),
                                   ),
                                 ),
+                                if (detailsExpanded) ...[
+                                  _employeeAnnualBalancePanel(
+                                    r.userId,
+                                    r.leaveType,
+                                  ),
+                                  attachmentRow,
+                                  const SizedBox(height: 4),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () =>
+                                          showLeaveAuditHistorySheet(
+                                            context,
+                                            leaveRequestId: r.id,
+                                          ),
+                                      icon: const Icon(Icons.history, size: 16),
+                                      label: const Text('Audit history'),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 40),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (r.adminComment != null &&
+                                      r.adminComment!.isNotEmpty) ...[
+                                    const Divider(height: 20),
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Icon(
+                                          Icons.comment_outlined,
+                                          size: 15,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            r.adminComment!,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontStyle: FontStyle.italic,
+                                              color: AppColors.textSecondary,
+                                              height: 1.35,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
                               ],
-                            ),
-                          ],
-                        ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),

@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -81,7 +82,9 @@ class _SubmitClaimScreenState extends State<SubmitClaimScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: true,
-        withData: true,
+        // Claims allow up to 8 files at 10 MB each. Native uploads stream from
+        // the file path, so only web needs the bytes held in memory.
+        withData: kIsWeb,
       );
       if (result == null || result.files.isEmpty) return;
 

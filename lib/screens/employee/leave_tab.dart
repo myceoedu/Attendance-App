@@ -4,7 +4,6 @@ import '../../utils/app_route.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../constants/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/annual_leave_summary.dart';
@@ -33,6 +32,8 @@ class LeaveTab extends StatefulWidget {
 
 class _LeaveTabState extends State<LeaveTab> {
   static const int _pageSize = 40;
+  static final DateFormat _dateFmt = DateFormat('d MMM yyyy');
+  static final DateFormat _submittedFmt = DateFormat('d MMM yyyy · HH:mm');
 
   List<LeaveRequest> _requests = [];
   int _nextOffset = 0;
@@ -44,7 +45,7 @@ class _LeaveTabState extends State<LeaveTab> {
   bool _loading = true;
   String? _error;
   Timer? _realtimeDebounce;
-  RealtimeChannel? _leaveChannel;
+  RealtimeSubscription? _leaveChannel;
   String _statusFilter = 'all';
   _LeaveHomeSection _section = _LeaveHomeSection.annual;
   String _otherTypeFilter = 'all';
@@ -169,7 +170,6 @@ class _LeaveTabState extends State<LeaveTab> {
     if (uid == null) return;
     _leaveChannel = AppRealtime.subscribeMyLeaves(
       userId: uid,
-      channelSuffix: 'tab',
       onReload: () {
         _realtimeDebounce?.cancel();
         _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
@@ -229,7 +229,7 @@ class _LeaveTabState extends State<LeaveTab> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('d MMM yyyy');
+    final dateFmt = _dateFmt;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -698,7 +698,7 @@ class _LeaveTabState extends State<LeaveTab> {
 
   Widget _leaveRequestTile(LeaveRequest r, DateFormat dateFmt) {
     final accent = _leaveAccent(r.leaveType);
-    final submittedFmt = DateFormat('d MMM yyyy · HH:mm');
+    final submittedFmt = _submittedFmt;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -708,135 +708,136 @@ class _LeaveTabState extends State<LeaveTab> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 4, color: accent),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 16, 16, 16),
-                  child: Column(
+        // A stacked accent bar stretches to the content height without the
+        // extra intrinsic-sizing layout pass an `IntrinsicHeight` row needs.
+        child: Stack(
+          children: [
+            PositionedDirectional(
+              top: 0,
+              bottom: 0,
+              start: 0,
+              child: SizedBox(width: 4, child: ColoredBox(color: accent)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _leaveTypeIcon(r.leaveType),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  r.leaveTypeDisplay,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                    letterSpacing: -0.2,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textHint,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          StatusChip.fromStatus(r.status),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _detailTag(
-                            icon: Icons.calendar_today_outlined,
-                            label:
-                                '${dateFmt.format(r.startDate)} – ${dateFmt.format(r.endDate)}',
-                          ),
-                          _detailTag(
-                            icon: Icons.timelapse_outlined,
-                            label: r.durationDisplayLabel,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.divider),
-                        ),
-                        child: Text(
-                          r.reason,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      LeaveAttachmentRow(attachmentPath: r.attachmentPath),
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: OutlinedButton.icon(
-                          onPressed: () => showLeaveAuditHistorySheet(
-                            context,
-                            leaveRequestId: r.id,
-                          ),
-                          icon: const Icon(Icons.history, size: 16),
-                          label: const Text('History'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size(0, 38),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (r.adminComment != null &&
-                          r.adminComment!.isNotEmpty) ...[
-                        const Divider(height: 20),
-                        Row(
+                      _leaveTypeIcon(r.leaveType),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Icon(
-                              Icons.comment_outlined,
-                              size: 14,
-                              color: AppColors.textSecondary,
+                            Text(
+                              r.leaveTypeDisplay,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                                letterSpacing: -0.2,
+                              ),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                r.adminComment!,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                  color: AppColors.textSecondary,
-                                ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
+                              style: const TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textHint,
                               ),
                             ),
                           ],
                         ),
-                      ],
+                      ),
+                      StatusChip.fromStatus(r.status),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _detailTag(
+                        icon: Icons.calendar_today_outlined,
+                        label:
+                            '${dateFmt.format(r.startDate)} – ${dateFmt.format(r.endDate)}',
+                      ),
+                      _detailTag(
+                        icon: Icons.timelapse_outlined,
+                        label: r.durationDisplayLabel,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.divider),
+                    ),
+                    child: Text(
+                      r.reason,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  LeaveAttachmentRow(attachmentPath: r.attachmentPath),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: () => showLeaveAuditHistorySheet(
+                        context,
+                        leaveRequestId: r.id,
+                      ),
+                      icon: const Icon(Icons.history, size: 16),
+                      label: const Text('History'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 38),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (r.adminComment != null && r.adminComment!.isNotEmpty) ...[
+                    const Divider(height: 20),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.comment_outlined,
+                          size: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            r.adminComment!,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

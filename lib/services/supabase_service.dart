@@ -23,6 +23,7 @@ import '../models/payroll_statutory_config.dart';
 import '../models/work_site.dart';
 import '../utils/app_time.dart';
 import '../utils/geofence.dart';
+import 'app_realtime.dart';
 import 'payroll_engine.dart';
 
 class SupabaseService {
@@ -96,6 +97,8 @@ class SupabaseService {
   static Future<void> signOut() async {
     _invalidateEmployeesCache();
     _invalidateWorkSiteCache();
+    // Pooled realtime topics are scoped to the signed-in account.
+    AppRealtime.disposeAll();
     await client.auth.signOut();
   }
 
@@ -242,14 +245,6 @@ class SupabaseService {
         _employeeCountInFlight = null;
       }
     }
-  }
-
-  static Future<List<AppUser>> getAllUsers() async {
-    final data = await client
-        .from('users')
-        .select(_appUserSelect)
-        .order('name');
-    return data.map<AppUser>((e) => AppUser.fromMap(e)).toList();
   }
 
   static Future<AppUser?> getUserById(String userId) async {
@@ -894,6 +889,8 @@ class SupabaseService {
     return (checkedIn: results[0].count, completed: results[1].count);
   }
 
+  /// Month view **with** employee names, for admin screens that display them.
+  /// Payroll and summaries use [_getAttendanceRowsByMonth] instead.
   static Future<List<Attendance>> getAttendanceByMonth(DateTime month) async {
     final monthStart = DateTime(month.year, month.month);
     final monthEnd = DateTime(month.year, month.month + 1);
@@ -1403,6 +1400,23 @@ class SupabaseService {
     return data.map<ExpenseClaim>((e) => ExpenseClaim.fromMap(e)).toList();
   }
 
+  /// Paged variant of [getMyExpenseClaims]. Long-tenured employees can
+  /// accumulate years of claims, so the list screen pulls one page at a time
+  /// instead of holding the whole history in memory.
+  static Future<List<ExpenseClaim>> getMyExpenseClaimsPage(
+    String userId, {
+    int offset = 0,
+    int limit = 40,
+  }) async {
+    final data = await client
+        .from('expense_claims')
+        .select(_claimSelect)
+        .eq('user_id', userId)
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+    return data.map<ExpenseClaim>((e) => ExpenseClaim.fromMap(e)).toList();
+  }
+
   static Future<ExpenseClaim?> getExpenseClaimById(String claimId) async {
     final data = await client
         .from('expense_claims')
@@ -1422,27 +1436,6 @@ class SupabaseService {
       });
     }
     return ExpenseClaim.fromMap(m);
-  }
-
-  static Future<List<ExpenseClaim>> getAllExpenseClaims() async {
-    final data = await client
-        .from('expense_claims')
-        .select(_claimWithUserAndAttachmentsSelect)
-        .order('created_at', ascending: false);
-    return data.map<ExpenseClaim>((row) {
-      final m = Map<String, dynamic>.from(row);
-      final att = m['claim_attachments'];
-      if (att is List) {
-        att.sort((a, b) {
-          final ma = a as Map<String, dynamic>;
-          final mb = b as Map<String, dynamic>;
-          return (ma['created_at'] as String).compareTo(
-            mb['created_at'] as String,
-          );
-        });
-      }
-      return ExpenseClaim.fromMap(m);
-    }).toList();
   }
 
   /// Admin inbox page. Keep the initial payload bounded as attachments can be
@@ -1490,14 +1483,6 @@ class SupabaseService {
         .from('expense_claims')
         .update({'status': status, 'admin_comment': adminComment})
         .eq('id', claimId);
-  }
-
-  static Future<List<LeaveRequest>> getAllLeaveRequests() async {
-    final data = await client
-        .from('leave_requests')
-        .select(_leaveWithUserSelect)
-        .order('created_at', ascending: false);
-    return data.map<LeaveRequest>((e) => LeaveRequest.fromMap(e)).toList();
   }
 
   /// Admin inbox page, newest first. Callers can append further history only
@@ -1879,6 +1864,25 @@ class SupabaseService {
         .toList();
   }
 
+  /// Config for a run: fetches the referenced row directly instead of pulling
+  /// the whole version history and scanning it in Dart. Falls back to the
+  /// latest config when the run predates the reference column.
+  static Future<PayrollStatutoryConfig?> _resolvePayrollStatutoryConfig(
+    String? configId,
+  ) async {
+    if (configId != null) {
+      final row = await client
+          .from('payroll_statutory_config')
+          .select(_payrollStatutorySelect)
+          .eq('id', configId)
+          .maybeSingle();
+      if (row != null) {
+        return PayrollStatutoryConfig.fromMap(Map<String, dynamic>.from(row));
+      }
+    }
+    return getLatestPayrollStatutoryConfig();
+  }
+
   static Future<PayrollStatutoryConfig?>
   getLatestPayrollStatutoryConfig() async {
     final data = await client
@@ -2122,14 +2126,19 @@ class SupabaseService {
 
   /// Employee self-service: own [PayrollItem]s whose run is **approved** or **paid**
   /// (enforced in Supabase RLS). Newest payroll periods first.
-  static Future<List<PayrollHistoryEntry>> getMyPayrollHistory() async {
+  /// [limit] bounds the payload for long-tenured staff — payslips accumulate
+  /// twelve rows a year and the screen only shows recent periods.
+  static Future<List<PayrollHistoryEntry>> getMyPayrollHistory({
+    int limit = 36,
+  }) async {
     final uid = currentUserId;
     if (uid == null) return [];
     final data = await client
         .from('payroll_items')
         .select(_payrollHistorySelect)
         .eq('user_id', uid)
-        .order('updated_at', ascending: false);
+        .order('updated_at', ascending: false)
+        .limit(limit);
     final list = data as List<dynamic>;
     final out = <PayrollHistoryEntry>[];
     for (final raw in list) {
@@ -2163,28 +2172,21 @@ class SupabaseService {
     if (run.status == 'paid' || run.status == 'cancelled') {
       throw Exception('Cannot recalculate a closed run');
     }
-    final allConfigs = await getPayrollStatutoryConfigs();
-    PayrollStatutoryConfig? config;
-    if (run.statutoryConfigId != null) {
-      for (final c in allConfigs) {
-        if (c.id == run.statutoryConfigId) {
-          config = c;
-          break;
-        }
-      }
-    }
-    config ??= allConfigs.isNotEmpty ? allConfigs.first : null;
+    final config = await _resolvePayrollStatutoryConfig(run.statutoryConfigId);
     if (config == null) {
       throw Exception(
         'No statutory configuration. Add one in Payroll settings.',
       );
     }
 
+    // The `_rows` variants skip the `users(name)` join: payroll only needs
+    // user ids and dates, and the join multiplies the month payload by the
+    // employee name on every attendance and leave row.
     final month = DateTime(run.periodYear, run.periodMonth);
     final results = await Future.wait<Object>([
       getAllEmployees(),
-      getAttendanceByMonth(month),
-      getApprovedLeavesByMonth(month),
+      _getAttendanceRowsByMonth(month),
+      _getApprovedLeaveRowsByMonth(month),
       getPayrollSalarySettings(),
     ]);
     final employees = results[0] as List<AppUser>;

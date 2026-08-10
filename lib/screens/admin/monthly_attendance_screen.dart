@@ -18,21 +18,32 @@ class MonthlyAttendanceScreen extends StatefulWidget {
 }
 
 class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
+  static final DateFormat _monthFmt = DateFormat('MMMM yyyy');
+  static final DateFormat _dayLongFmt = DateFormat('d MMM yyyy');
+
   final TextEditingController _searchCtrl = TextEditingController();
   final Debouncer _searchDebounce = Debouncer();
-  DateTime _selectedMonth = DateTime(
-    AppTime.malaysiaNow().year,
-    AppTime.malaysiaNow().month,
-  );
+  DateTime _selectedMonth = _currentMonth();
   List<MonthlyAttendanceSummary> _summaries = [];
   bool _loading = true;
   String? _error;
   String _reviewFilter = 'all';
 
+  /// Filtered view, recomputed only when the roster, chip, or debounced search
+  /// text changes rather than on every rebuild.
+  List<MonthlyAttendanceSummary> _visibleSummaries = const [];
+
+  static DateTime _currentMonth() {
+    final now = AppTime.malaysiaNow();
+    return DateTime(now.year, now.month);
+  }
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   @override
@@ -53,6 +64,7 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
         _summaries = data;
         _loading = false;
         _error = null;
+        _recomputeFiltered();
       });
     } catch (e) {
       if (!mounted) return;
@@ -63,20 +75,27 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
     }
   }
 
-  List<MonthlyAttendanceSummary> get _filteredSummaries {
+  void _recomputeFiltered() {
     final query = _searchCtrl.text.trim().toLowerCase();
-    return _summaries.where((summary) {
-      if (_reviewFilter == 'clean' && !summary.isClean) {
-        return false;
-      }
-      if (_reviewFilter == 'no_attendance' && !summary.hasNoAttendance) {
-        return false;
-      }
-      if (query.isEmpty) return true;
-      return summary.displayName.toLowerCase().contains(query) ||
-          summary.username.toLowerCase().contains(query) ||
-          summary.email.toLowerCase().contains(query);
-    }).toList();
+    final hasQuery = query.isNotEmpty;
+    if (!hasQuery && _reviewFilter == 'all') {
+      _visibleSummaries = _summaries;
+      return;
+    }
+    _visibleSummaries = _summaries
+        .where((summary) {
+          if (_reviewFilter == 'clean' && !summary.isClean) {
+            return false;
+          }
+          if (_reviewFilter == 'no_attendance' && !summary.hasNoAttendance) {
+            return false;
+          }
+          if (!hasQuery) return true;
+          return summary.displayName.toLowerCase().contains(query) ||
+              summary.username.toLowerCase().contains(query) ||
+              summary.email.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
   }
 
   void _changeMonth(int delta) {
@@ -86,18 +105,16 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
         _selectedMonth.month + delta,
       );
     });
-WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
-  bool get _canMoveForward {
-    final now = AppTime.malaysiaNow();
-    final current = DateTime(now.year, now.month);
-    return _selectedMonth.isBefore(current);
-  }
+  bool get _canMoveForward => _selectedMonth.isBefore(_currentMonth());
 
   @override
   Widget build(BuildContext context) {
-    final filtered = _filteredSummaries;
+    final filtered = _visibleSummaries;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -127,7 +144,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
                           AppFilterBar(
                             searchController: _searchCtrl,
                             onSearchChanged: (_) => _searchDebounce(() {
-                              if (mounted) setState(() {});
+                              if (mounted) setState(_recomputeFiltered);
                             }),
                             searchHint: 'Search employee, username, or email',
                             chipOptions: const [
@@ -140,7 +157,10 @@ WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
                             ],
                             selectedChip: _reviewFilter,
                             onChipSelected: (value) {
-                              setState(() => _reviewFilter = value);
+                              setState(() {
+                                _reviewFilter = value;
+                                _recomputeFiltered();
+                              });
                             },
                             margin: const EdgeInsets.only(top: 14),
                           ),
@@ -165,9 +185,13 @@ WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
                       sliver: SliverList.separated(
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) => RepaintBoundary(
-                          child: _summaryCard(filtered[index]),
-                        ),
+                        itemBuilder: (context, index) {
+                          final summary = filtered[index];
+                          return RepaintBoundary(
+                            key: ValueKey<String>(summary.employeeId),
+                            child: _summaryCard(summary),
+                          );
+                        },
                       ),
                     ),
                 ],
@@ -177,7 +201,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
   }
 
   Widget _monthHeader() {
-    final label = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final label = _monthFmt.format(_selectedMonth);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -241,7 +265,7 @@ WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
   Widget _summaryCard(MonthlyAttendanceSummary summary) {
     final lastAttendance = summary.lastAttendanceDate == null
         ? 'No attendance yet'
-        : DateFormat('d MMM yyyy').format(summary.lastAttendanceDate!);
+        : _dayLongFmt.format(summary.lastAttendanceDate!);
     final badgeColor = switch (summary.reviewState) {
       MonthlyAttendanceReviewState.clean => AppColors.success,
       MonthlyAttendanceReviewState.noAttendance => AppColors.textHint,

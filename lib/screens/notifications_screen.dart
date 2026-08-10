@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 
 import '../constants/app_theme.dart';
@@ -23,7 +22,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<AppNotification> _items = [];
   bool _loading = true;
   String? _error;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
   Timer? _debounce;
 
   @override
@@ -45,7 +44,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (uid == null) return;
     _channel = AppRealtime.subscribeMyNotifications(
       userId: uid,
-      channelSuffix: 'screen',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 350), () {

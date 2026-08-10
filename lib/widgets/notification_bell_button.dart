@@ -3,7 +3,6 @@ import '../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../providers/auth_provider.dart';
 import '../screens/notifications_screen.dart';
@@ -24,7 +23,7 @@ class NotificationBellButton extends StatefulWidget {
 
 class _NotificationBellButtonState extends State<NotificationBellButton> {
   int _count = 0;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
   Timer? _debounce;
 
   @override
@@ -46,7 +45,6 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
     if (uid == null) return;
     _channel = AppRealtime.subscribeMyNotifications(
       userId: uid,
-      channelSuffix: 'badge',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 350), () {

@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/app_user.dart';
@@ -53,9 +52,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
 
   Timer? _realtimeDebounce;
   Timer? _announcementBadgeDebounce;
-  RealtimeChannel? _attendanceChannel;
-  RealtimeChannel? _leaveChannel;
-  RealtimeChannel? _announcementsChannel;
+  RealtimeSubscription? _attendanceChannel;
+  RealtimeSubscription? _leaveChannel;
+  RealtimeSubscription? _announcementsChannel;
   final _loadGuard = AsyncLoadGuard();
 
   late final ValueNotifier<DateTime> _clockNow = ValueNotifier<DateTime>(
@@ -136,19 +135,16 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     if (uid == null) return;
     _attendanceChannel = AppRealtime.subscribeMyAttendance(
       userId: uid,
-      channelSuffix: 'dashboard',
       onReload: _scheduleReload,
     );
     _leaveChannel = AppRealtime.subscribeMyLeaves(
       userId: uid,
-      channelSuffix: 'dashboard',
       onReload: _scheduleReload,
     );
   }
 
   void _attachAnnouncementsRealtime() {
     _announcementsChannel = AppRealtime.subscribeCompanyAnnouncements(
-      channelSuffix: 'employee_home_badge',
       onReload: () {
         _announcementBadgeDebounce?.cancel();
         _announcementBadgeDebounce = Timer(

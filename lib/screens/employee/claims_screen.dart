@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/expense_claim.dart';
@@ -28,17 +27,30 @@ class ClaimsScreen extends StatefulWidget {
 }
 
 class _ClaimsScreenState extends State<ClaimsScreen> {
-  List<ExpenseClaim> _claims = [];
+  static const int _pageSize = 40;
+  static final NumberFormat _moneyFmt = NumberFormat('#,##0.00');
+  static final DateFormat _dateFmt = DateFormat('d MMM yyyy');
+
+  final List<ExpenseClaim> _claims = [];
+
+  /// Filtered view held in state so chip changes and rebuilds do not re-scan
+  /// the loaded pages.
+  List<ExpenseClaim> _visibleClaims = const [];
+
   bool _loading = true;
+  bool _loadingMore = false;
+  bool _hasMore = true;
   String? _error;
   String _statusFilter = 'all';
   Timer? _debounce;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
   final _loadGuard = AsyncLoadGuard();
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _load();
       _attachRealtime();
@@ -48,6 +60,8 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
   @override
   void dispose() {
     _loadGuard.invalidate();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _debounce?.cancel();
     AppRealtime.disposeChannel(_channel);
     super.dispose();
@@ -58,7 +72,6 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
     if (uid == null) return;
     _channel = AppRealtime.subscribeMyClaims(
       userId: uid,
-      channelSuffix: 'list',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 400), () {
@@ -70,16 +83,30 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
 
   Future<void> _load({bool showSpinner = true}) async {
     final gen = _loadGuard.begin();
-    if (showSpinner && mounted) setState(() => _loading = true);
+    if (showSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _hasMore = true;
+      });
+    }
     try {
       final uid = context.read<AuthProvider>().user!.id;
-      final data = await SupabaseService.getMyExpenseClaims(uid);
+      final data = await SupabaseService.getMyExpenseClaimsPage(
+        uid,
+        limit: _pageSize,
+      );
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
-        _claims = data;
+        _claims
+          ..clear()
+          ..addAll(data);
+        _hasMore = data.length >= _pageSize;
         _loading = false;
+        _loadingMore = false;
         _error = null;
+        _recomputeFiltered();
       });
+      _fillViewport();
     } catch (e) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       setState(() {
@@ -89,16 +116,63 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
     }
   }
 
-  List<ExpenseClaim> get _filtered {
-    if (_statusFilter == 'all') return _claims;
-    return _claims.where((c) => c.status == _statusFilter).toList();
+  void _onScroll() {
+    if (!_scrollController.hasClients || _loading || _loadingMore) return;
+    if (!_hasMore) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 320) _loadMore();
+  }
+
+  /// A short first page can leave the list unscrollable, which would strand the
+  /// user with no way to reach older claims.
+  void _fillViewport() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      if (!_hasMore || _loading || _loadingMore) return;
+      if (_scrollController.position.maxScrollExtent < 100) _loadMore();
+    });
+  }
+
+  Future<void> _loadMore() async {
+    if (_loading || _loadingMore || !_hasMore) return;
+    setState(() => _loadingMore = true);
+    final gen = _loadGuard.begin();
+    try {
+      final uid = context.read<AuthProvider>().user!.id;
+      final data = await SupabaseService.getMyExpenseClaimsPage(
+        uid,
+        offset: _claims.length,
+        limit: _pageSize,
+      );
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
+      setState(() {
+        _claims.addAll(data);
+        _hasMore = data.length >= _pageSize;
+        _loadingMore = false;
+        _recomputeFiltered();
+      });
+      _fillViewport();
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _recomputeFiltered() {
+    if (_statusFilter == 'all') {
+      _visibleClaims = _claims;
+      return;
+    }
+    _visibleClaims = _claims
+        .where((c) => c.status == _statusFilter)
+        .toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final money = NumberFormat('#,##0.00');
-    final dateFmt = DateFormat('d MMM yyyy');
-    final filteredClaims = _filtered;
+    final money = _moneyFmt;
+    final dateFmt = _dateFmt;
+    final filteredClaims = _visibleClaims;
+    final showLoadMoreRow = _loadingMore || _hasMore;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -145,12 +219,20 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                         AppFilterOption(value: 'rejected', label: 'Rejected'),
                       ],
                       selectedChip: _statusFilter,
-                      onChipSelected: (v) => setState(() => _statusFilter = v),
+                      onChipSelected: (v) => setState(() {
+                        _statusFilter = v;
+                        _recomputeFiltered();
+                        // Filtering happens over loaded pages, so a narrow
+                        // filter can empty the viewport while older matching
+                        // claims are still unfetched.
+                        _fillViewport();
+                      }),
                     ),
                   ),
                   Expanded(
                     child: filteredClaims.isEmpty
                         ? ListView(
+                            controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             children: const [
                               SizedBox(height: 48),
@@ -163,11 +245,32 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                             ],
                           )
                         : ListView.builder(
+                            controller: _scrollController,
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                             addAutomaticKeepAlives: false,
                             cacheExtent: 400,
-                            itemCount: filteredClaims.length,
+                            itemCount:
+                                filteredClaims.length +
+                                (showLoadMoreRow ? 1 : 0),
                             itemBuilder: (context, i) {
+                              if (i >= filteredClaims.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 20,
+                                  ),
+                                  child: Center(
+                                    child: _loadingMore
+                                        ? const SizedBox(
+                                            width: 24,
+                                            height: 24,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                            ),
+                                          )
+                                        : const SizedBox.shrink(),
+                                  ),
+                                );
+                              }
                               final c = filteredClaims[i];
                               return KeyedSubtree(
                                 key: ValueKey<String>(c.id),

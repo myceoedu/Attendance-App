@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../constants/app_theme.dart';
@@ -25,18 +24,38 @@ class AttendanceHistoryScreen extends StatefulWidget {
 }
 
 class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
-  DateTime _selectedMonth = DateTime(
-    AppTime.malaysiaNow().year,
-    AppTime.malaysiaNow().month,
-  );
+  // Shared across the whole month grid: `DateFormat` parses its pattern on
+  // construction and up to 42 cells render per calendar rebuild.
+  static final DateFormat _monthFmt = DateFormat('MMMM yyyy');
+  static final DateFormat _dowFmt = DateFormat('EEE');
+  static final DateFormat _dayShortFmt = DateFormat('d MMM');
+  static final DateFormat _dayLongFmt = DateFormat('d MMM yyyy');
+  static final DateFormat _fullDateFmt = DateFormat('EEEE, d MMMM yyyy');
+  static final DateFormat _timeFmt = DateFormat('h:mm a');
+
+  DateTime _selectedMonth = _currentMonth();
   final ValueNotifier<DateTime?> _selectedDayN = ValueNotifier<DateTime?>(null);
   EmployeeMonthlyCalendarData? _calendarData;
   bool _loading = true;
   String? _error;
 
+  /// Midnight today in Malaysia time, refreshed on each load so day cells do
+  /// not each recompute "now".
+  DateTime _today = _todayInMalaysia();
+
+  static DateTime _currentMonth() {
+    final now = AppTime.malaysiaNow();
+    return DateTime(now.year, now.month);
+  }
+
+  static DateTime _todayInMalaysia() {
+    final now = AppTime.malaysiaNow();
+    return DateTime(now.year, now.month, now.day);
+  }
+
   Timer? _realtimeDebounce;
-  RealtimeChannel? _attendanceChannel;
-  RealtimeChannel? _leaveChannel;
+  RealtimeSubscription? _attendanceChannel;
+  RealtimeSubscription? _leaveChannel;
 
   @override
   void initState() {
@@ -61,12 +80,10 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     if (uid == null) return;
     _attendanceChannel = AppRealtime.subscribeMyAttendance(
       userId: uid,
-      channelSuffix: 'history_cal',
       onReload: _scheduleReload,
     );
     _leaveChannel = AppRealtime.subscribeMyLeaves(
       userId: uid,
-      channelSuffix: 'history_cal',
       onReload: _scheduleReload,
     );
   }
@@ -79,7 +96,12 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   }
 
   Future<void> _loadCalendar({bool showSpinner = true}) async {
-    if (showSpinner && mounted) setState(() { _loading = true; _error = null; });
+    if (showSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final uid = context.read<AuthProvider>().user!.id;
       final data = await SupabaseService.getEmployeeMonthlyCalendar(
@@ -89,6 +111,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
       if (!mounted) return;
       setState(() {
         _calendarData = data;
+        _today = _todayInMalaysia();
         final sel = _selectedDayN.value;
         if (sel != null &&
             (sel.year != _selectedMonth.year ||
@@ -100,14 +123,15 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() { _loading = false; _error = 'Failed to load: $e'; });
+      setState(() {
+        _loading = false;
+        _error = 'Failed to load: $e';
+      });
     }
   }
 
-  bool get _canMoveForward {
-    final now = AppTime.malaysiaNow();
-    return _selectedMonth.isBefore(DateTime(now.year, now.month));
-  }
+  bool get _canMoveForward =>
+      _selectedMonth.isBefore(DateTime(_today.year, _today.month));
 
   void _changeMonth(int delta) {
     setState(() {
@@ -120,18 +144,12 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     _loadCalendar();
   }
 
-  // ── monthly totals ────────────────────────────────────────────────────────
-  int get _presentDays =>
-      _calendarData?.days.where((d) => d.isCountedAsPresentDay).length ?? 0;
-  int get _leaveDays =>
-      _calendarData?.days.where((d) => d.hasApprovedLeave).length ?? 0;
-  int get _openRecords =>
-      _calendarData?.days.where((d) => d.isCountedAsOpenDay).length ?? 0;
+  // ── monthly totals (computed once per loaded month, not per rebuild) ──────
+  int get _presentDays => _calendarData?.presentDayCount ?? 0;
+  int get _leaveDays => _calendarData?.leaveDayCount ?? 0;
+  int get _openRecords => _calendarData?.openDayCount ?? 0;
 
-  EmployeeCalendarDay? _dayDataFor(DateTime d) {
-    if (_calendarData == null) return null;
-    return _calendarData!.dayFor(d);
-  }
+  EmployeeCalendarDay? _dayDataFor(DateTime d) => _calendarData?.dayFor(d);
 
   // ── build ─────────────────────────────────────────────────────────────────
   @override
@@ -200,13 +218,14 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
 
   // ── calendar card ─────────────────────────────────────────────────────────
   Widget _buildCalendarCard() {
-    final now = AppTime.malaysiaNow();
-    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final now = _today;
+    final monthLabel = _monthFmt.format(_selectedMonth);
 
     return ValueListenableBuilder<DateTime?>(
       valueListenable: _selectedDayN,
       builder: (context, selectedDay, _) {
-        final focusedDay = selectedDay ??
+        final focusedDay =
+            selectedDay ??
             DateTime(_selectedMonth.year, _selectedMonth.month, 1);
         return RepaintBoundary(
           child: Container(
@@ -238,8 +257,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                         ),
                       ),
                       IconButton(
-                        onPressed:
-                            _canMoveForward ? () => _changeMonth(1) : null,
+                        onPressed: _canMoveForward
+                            ? () => _changeMonth(1)
+                            : null,
                         icon: Icon(
                           Icons.chevron_right,
                           color: _canMoveForward
@@ -276,16 +296,19 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                           sel.month != _selectedMonth.month) {
                         return;
                       }
-                      _selectedDayN.value =
-                          DateTime(sel.year, sel.month, sel.day);
+                      _selectedDayN.value = DateTime(
+                        sel.year,
+                        sel.month,
+                        sel.day,
+                      );
                     },
                     calendarBuilders: CalendarBuilders<EmployeeCalendarDay>(
                       defaultBuilder: (ctx, day, _) =>
                           _buildDayCell(day, isSelected: false),
                       todayBuilder: (ctx, day, _) => _buildDayCell(
                         day,
-                        isSelected: selectedDay != null &&
-                            isSameDay(day, selectedDay),
+                        isSelected:
+                            selectedDay != null && isSameDay(day, selectedDay),
                         isToday: true,
                       ),
                       selectedBuilder: (ctx, day, _) =>
@@ -293,7 +316,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                       outsideBuilder: (ctx, day, _) => _buildOutsideCell(day),
                       dowBuilder: (ctx, day) => Center(
                         child: Text(
-                          DateFormat('EEE').format(day),
+                          _dowFmt.format(day),
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -317,10 +340,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     required bool isSelected,
     bool isToday = false,
   }) {
-    final normalized = DateTime(day.year, day.month, day.day);
-    final data = _calendarData?.dayFor(normalized);
-    final now = AppTime.malaysiaNow();
-    final isPast = normalized.isBefore(DateTime(now.year, now.month, now.day));
+    final data = _calendarData?.dayFor(day);
+    final isPast = DateTime(day.year, day.month, day.day).isBefore(_today);
 
     Color cellBg;
     Color cellBorder;
@@ -376,7 +397,10 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           decoration: BoxDecoration(
             color: cellBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: cellBorder, width: isSelected ? 2.0 : 1.0),
+            border: Border.all(
+              color: cellBorder,
+              width: isSelected ? 2.0 : 1.0,
+            ),
           ),
           alignment: Alignment.center,
           child: Text(
@@ -507,7 +531,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     final dayData = _dayDataFor(selectedDay);
     final attendance = dayData?.primaryAttendance;
     final leave = dayData?.approvedLeave;
-    final dateLabel = DateFormat('EEEE, d MMMM yyyy').format(selectedDay);
+    final dateLabel = _fullDateFmt.format(selectedDay);
 
     Color accent;
     IconData accentIcon;
@@ -538,8 +562,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.08),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
             ),
             child: Row(
               children: [
@@ -585,7 +610,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     'Clock in',
                     attendance.clockInTime == null
                         ? '—'
-                        : DateFormat('h:mm a').format(
+                        : _timeFmt.format(
                             AppTime.toMalaysia(attendance.clockInTime!),
                           ),
                     AppColors.primary,
@@ -595,7 +620,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     'Clock out',
                     attendance.clockOutTime == null
                         ? 'Not yet'
-                        : DateFormat('h:mm a').format(
+                        : _timeFmt.format(
                             AppTime.toMalaysia(attendance.clockOutTime!),
                           ),
                     attendance.clockOutTime == null
@@ -622,8 +647,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                   _infoRow(
                     Icons.date_range_outlined,
                     'Date range',
-                    '${DateFormat('d MMM').format(leave.startDate)} – '
-                        '${DateFormat('d MMM yyyy').format(leave.endDate)}',
+                    '${_dayShortFmt.format(leave.startDate)} – '
+                        '${_dayLongFmt.format(leave.endDate)}',
                     AppColors.leave,
                   ),
                 ],
@@ -647,18 +672,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
 
   // ── month leave list ──────────────────────────────────────────────────────
   Widget _buildMonthLeaveList() {
-    final seen = <String>{};
-    final leaves = <LeaveRequest>[];
-    if (_calendarData != null) {
-      for (final day in _calendarData!.days) {
-        final leave = day.approvedLeave;
-        if (leave != null && seen.add(leave.id)) {
-          leaves.add(leave);
-        }
-      }
-    }
-
-    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final leaves = _calendarData?.monthLeaves ?? const <LeaveRequest>[];
+    final monthLabel = _monthFmt.format(_selectedMonth);
 
     return Container(
       decoration: BoxDecoration(
@@ -673,8 +688,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: AppColors.leaveLight.withValues(alpha: 0.7),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
             ),
             child: Row(
               children: [
@@ -695,8 +711,10 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.leave.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
@@ -741,8 +759,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     final typeColor = st.color;
     final typeIcon = st.icon;
 
-    final range = '${DateFormat('d MMM').format(leave.startDate)} – '
-        '${DateFormat('d MMM yyyy').format(leave.endDate)}';
+    final range =
+        '${_dayShortFmt.format(leave.startDate)} – '
+        '${_dayLongFmt.format(leave.endDate)}';
     final duration = leave.durationDisplayLabel;
 
     return Padding(
@@ -799,12 +818,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   }
 
   // ── helpers ───────────────────────────────────────────────────────────────
-  Widget _infoRow(
-    IconData icon,
-    String label,
-    String value,
-    Color iconColor,
-  ) {
+  Widget _infoRow(IconData icon, String label, String value, Color iconColor) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Row(

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../constants/app_theme.dart';
@@ -26,19 +25,40 @@ class EmployeeAttendanceCalendarScreen extends StatefulWidget {
 
 class _EmployeeAttendanceCalendarScreenState
     extends State<EmployeeAttendanceCalendarScreen> {
-  DateTime _selectedMonth = DateTime(
-    AppTime.malaysiaNow().year,
-    AppTime.malaysiaNow().month,
-  );
+  // `DateFormat` parses its pattern on construction. The month grid renders up
+  // to 42 cells plus 7 weekday labels per rebuild, so these are shared.
+  static final DateFormat _monthFmt = DateFormat('MMMM yyyy');
+  static final DateFormat _dowFmt = DateFormat('EEE');
+  static final DateFormat _dayShortFmt = DateFormat('d MMM');
+  static final DateFormat _dayLongFmt = DateFormat('d MMM yyyy');
+  static final DateFormat _fullDateFmt = DateFormat('EEEE, d MMMM yyyy');
+  static final DateFormat _timeFmt = DateFormat('h:mm a');
+
+  DateTime _selectedMonth = _currentMonth();
   final ValueNotifier<DateTime?> _selectedDayN = ValueNotifier<DateTime?>(null);
   List<AppUser> _employees = [];
   String? _selectedEmployeeId;
+  AppUser? _selectedEmployee;
   EmployeeMonthlyCalendarData? _calendarData;
   bool _loading = true;
   String? _error;
   Timer? _realtimeDebounce;
-  RealtimeChannel? _attendanceChannel;
-  RealtimeChannel? _leaveChannel;
+  RealtimeSubscription? _attendanceChannel;
+  RealtimeSubscription? _leaveChannel;
+
+  /// Midnight today in Malaysia time. Cached because every cell compared
+  /// against a freshly computed "now"; refreshed on each load.
+  DateTime _today = _todayInMalaysia();
+
+  static DateTime _currentMonth() {
+    final now = AppTime.malaysiaNow();
+    return DateTime(now.year, now.month);
+  }
+
+  static DateTime _todayInMalaysia() {
+    final now = AppTime.malaysiaNow();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   @override
   void initState() {
@@ -58,11 +78,9 @@ class _EmployeeAttendanceCalendarScreenState
 
   void _attachRealtime() {
     _attendanceChannel = AppRealtime.subscribeAdminAttendance(
-      channelSuffix: 'employee_calendar',
       onReload: _scheduleReload,
     );
     _leaveChannel = AppRealtime.subscribeAdminLeaves(
-      channelSuffix: 'employee_calendar',
       onReload: _scheduleReload,
     );
   }
@@ -92,6 +110,7 @@ class _EmployeeAttendanceCalendarScreenState
       setState(() {
         _employees = employees;
         _selectedEmployeeId = selected;
+        _selectedEmployee = _findEmployee(employees, selected);
       });
       if (selected == null) {
         setState(() => _loading = false);
@@ -124,6 +143,7 @@ class _EmployeeAttendanceCalendarScreenState
       if (!mounted) return;
       setState(() {
         _calendarData = data;
+        _today = _todayInMalaysia();
         final sel = _selectedDayN.value;
         if (sel != null &&
             (sel.year != _selectedMonth.year ||
@@ -142,24 +162,18 @@ class _EmployeeAttendanceCalendarScreenState
     }
   }
 
-  AppUser? get _selectedEmployee {
-    final id = _selectedEmployeeId;
+  static AppUser? _findEmployee(List<AppUser> employees, String? id) {
     if (id == null) return null;
-    for (final e in _employees) {
+    for (final e in employees) {
       if (e.id == id) return e;
     }
     return null;
   }
 
-  EmployeeCalendarDay? _dayDataFor(DateTime d) {
-    if (_calendarData == null) return null;
-    return _calendarData!.dayFor(d);
-  }
+  EmployeeCalendarDay? _dayDataFor(DateTime d) => _calendarData?.dayFor(d);
 
-  bool get _canMoveForward {
-    final now = AppTime.malaysiaNow();
-    return _selectedMonth.isBefore(DateTime(now.year, now.month));
-  }
+  bool get _canMoveForward =>
+      _selectedMonth.isBefore(DateTime(_today.year, _today.month));
 
   void _changeMonth(int delta) {
     setState(() {
@@ -176,18 +190,16 @@ class _EmployeeAttendanceCalendarScreenState
     if (id == _selectedEmployeeId) return;
     setState(() {
       _selectedEmployeeId = id;
+      _selectedEmployee = _findEmployee(_employees, id);
     });
     _selectedDayN.value = null;
     _loadCalendar();
   }
 
-  // ── monthly totals ─────────────────────────────────────────────────────────
-  int get _presentDays =>
-      _calendarData?.days.where((d) => d.isCountedAsPresentDay).length ?? 0;
-  int get _leaveDays =>
-      _calendarData?.days.where((d) => d.hasApprovedLeave).length ?? 0;
-  int get _openRecords =>
-      _calendarData?.days.where((d) => d.isCountedAsOpenDay).length ?? 0;
+  // ── monthly totals (computed once per loaded month, not per rebuild) ───────
+  int get _presentDays => _calendarData?.presentDayCount ?? 0;
+  int get _leaveDays => _calendarData?.leaveDayCount ?? 0;
+  int get _openRecords => _calendarData?.openDayCount ?? 0;
 
   // ── build ──────────────────────────────────────────────────────────────────
   @override
@@ -432,13 +444,14 @@ class _EmployeeAttendanceCalendarScreenState
   }
 
   Widget _buildCalendarCard() {
-    final now = AppTime.malaysiaNow();
-    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final now = _today;
+    final monthLabel = _monthFmt.format(_selectedMonth);
 
     return ValueListenableBuilder<DateTime?>(
       valueListenable: _selectedDayN,
       builder: (context, selectedDay, _) {
-        final focusedDay = selectedDay ??
+        final focusedDay =
+            selectedDay ??
             DateTime(_selectedMonth.year, _selectedMonth.month, 1);
         return RepaintBoundary(
           child: Container(
@@ -470,8 +483,9 @@ class _EmployeeAttendanceCalendarScreenState
                         ),
                       ),
                       IconButton(
-                        onPressed:
-                            _canMoveForward ? () => _changeMonth(1) : null,
+                        onPressed: _canMoveForward
+                            ? () => _changeMonth(1)
+                            : null,
                         icon: Icon(
                           Icons.chevron_right,
                           color: _canMoveForward
@@ -508,16 +522,19 @@ class _EmployeeAttendanceCalendarScreenState
                           sel.month != _selectedMonth.month) {
                         return;
                       }
-                      _selectedDayN.value =
-                          DateTime(sel.year, sel.month, sel.day);
+                      _selectedDayN.value = DateTime(
+                        sel.year,
+                        sel.month,
+                        sel.day,
+                      );
                     },
                     calendarBuilders: CalendarBuilders<EmployeeCalendarDay>(
                       defaultBuilder: (ctx, day, _) =>
                           _buildDayCell(day, isSelected: false),
                       todayBuilder: (ctx, day, _) => _buildDayCell(
                         day,
-                        isSelected: selectedDay != null &&
-                            isSameDay(day, selectedDay),
+                        isSelected:
+                            selectedDay != null && isSameDay(day, selectedDay),
                         isToday: true,
                       ),
                       selectedBuilder: (ctx, day, _) =>
@@ -525,7 +542,7 @@ class _EmployeeAttendanceCalendarScreenState
                       outsideBuilder: (ctx, day, _) => _buildOutsideCell(day),
                       dowBuilder: (ctx, day) => Center(
                         child: Text(
-                          DateFormat('EEE').format(day),
+                          _dowFmt.format(day),
                           style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -549,10 +566,8 @@ class _EmployeeAttendanceCalendarScreenState
     required bool isSelected,
     bool isToday = false,
   }) {
-    final normalized = DateTime(day.year, day.month, day.day);
-    final data = _calendarData?.dayFor(normalized);
-    final now = AppTime.malaysiaNow();
-    final isPast = normalized.isBefore(DateTime(now.year, now.month, now.day));
+    final data = _calendarData?.dayFor(day);
+    final isPast = DateTime(day.year, day.month, day.day).isBefore(_today);
 
     // Priority: approved leave > open record > completed attendance >
     // past-no-record > future (leave wins when both leave and attendance exist).
@@ -745,7 +760,7 @@ class _EmployeeAttendanceCalendarScreenState
     final dayData = _dayDataFor(selectedDay);
     final attendance = dayData?.primaryAttendance;
     final leave = dayData?.approvedLeave;
-    final dateLabel = DateFormat('EEEE, d MMMM yyyy').format(selectedDay);
+    final dateLabel = _fullDateFmt.format(selectedDay);
 
     // Derive accent colour from the day state
     Color accent;
@@ -841,9 +856,9 @@ class _EmployeeAttendanceCalendarScreenState
                     'Clock in',
                     attendance.clockInTime == null
                         ? '—'
-                        : DateFormat(
-                            'h:mm a',
-                          ).format(AppTime.toMalaysia(attendance.clockInTime!)),
+                        : _timeFmt.format(
+                            AppTime.toMalaysia(attendance.clockInTime!),
+                          ),
                     AppColors.primary,
                   ),
                   _infoRow(
@@ -851,7 +866,7 @@ class _EmployeeAttendanceCalendarScreenState
                     'Clock out',
                     attendance.clockOutTime == null
                         ? 'Not yet'
-                        : DateFormat('h:mm a').format(
+                        : _timeFmt.format(
                             AppTime.toMalaysia(attendance.clockOutTime!),
                           ),
                     attendance.clockOutTime == null
@@ -881,8 +896,8 @@ class _EmployeeAttendanceCalendarScreenState
                   _infoRow(
                     Icons.date_range_outlined,
                     'Date range',
-                    '${DateFormat('d MMM').format(leave.startDate)} – '
-                        '${DateFormat('d MMM yyyy').format(leave.endDate)}',
+                    '${_dayShortFmt.format(leave.startDate)} – '
+                        '${_dayLongFmt.format(leave.endDate)}',
                     AppColors.leave,
                   ),
                 ],
@@ -926,8 +941,9 @@ class _EmployeeAttendanceCalendarScreenState
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: AppColors.primaryLight.withValues(alpha: 0.5),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
             ),
             child: const Row(
               children: [
@@ -1013,19 +1029,8 @@ class _EmployeeAttendanceCalendarScreenState
 
   // ── month leave list ───────────────────────────────────────────────────────
   Widget _buildMonthLeaveList() {
-    // Collect unique approved leaves for the month from calendarData.
-    final seen = <String>{};
-    final leaves = <LeaveRequest>[];
-    if (_calendarData != null) {
-      for (final day in _calendarData!.days) {
-        final leave = day.approvedLeave;
-        if (leave != null && seen.add(leave.id)) {
-          leaves.add(leave);
-        }
-      }
-    }
-
-    final monthLabel = DateFormat('MMMM yyyy').format(_selectedMonth);
+    final leaves = _calendarData?.monthLeaves ?? const <LeaveRequest>[];
+    final monthLabel = _monthFmt.format(_selectedMonth);
 
     return Container(
       decoration: BoxDecoration(
@@ -1041,8 +1046,9 @@ class _EmployeeAttendanceCalendarScreenState
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             decoration: BoxDecoration(
               color: AppColors.leaveLight.withValues(alpha: 0.7),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(18)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(18),
+              ),
             ),
             child: Row(
               children: [
@@ -1088,21 +1094,16 @@ class _EmployeeAttendanceCalendarScreenState
               padding: EdgeInsets.all(16),
               child: Text(
                 'No approved leave for this month.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                ),
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
             )
           else
-            ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: leaves.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1, indent: 16, endIndent: 16),
-              itemBuilder: (_, i) => _buildLeaveListItem(leaves[i]),
-            ),
+            // Already inside a scrollable; building the rows directly avoids a
+            // nested viewport that would lay out every row twice.
+            for (var i = 0; i < leaves.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+              _buildLeaveListItem(leaves[i]),
+            ],
         ],
       ),
     );
@@ -1114,8 +1115,8 @@ class _EmployeeAttendanceCalendarScreenState
     final typeIcon = st.icon;
 
     final range =
-        '${DateFormat('d MMM').format(leave.startDate)} – '
-        '${DateFormat('d MMM yyyy').format(leave.endDate)}';
+        '${_dayShortFmt.format(leave.startDate)} – '
+        '${_dayLongFmt.format(leave.endDate)}';
     final duration = leave.durationDisplayLabel;
 
     return Padding(

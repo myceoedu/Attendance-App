@@ -3,7 +3,6 @@ import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/expense_claim.dart';
@@ -26,7 +25,14 @@ class ClaimManagementScreen extends StatefulWidget {
 
 class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
   static const _pageSize = 50;
+  static final NumberFormat _moneyFmt = NumberFormat('#,##0.00');
+  static final DateFormat _dateFmt = DateFormat('d MMM yyyy');
+
   List<ExpenseClaim> _claims = [];
+
+  /// Filtered view kept in state so a debounced keystroke does not re-scan the
+  /// whole page on every rebuild.
+  List<ExpenseClaim> _visibleClaims = const [];
   bool _loading = true;
   bool _loadingMore = false;
   bool _hasMore = true;
@@ -35,7 +41,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
   final _searchCtrl = TextEditingController();
   final Debouncer _searchDebouncer = Debouncer();
   Timer? _debounce;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
 
   @override
   void initState() {
@@ -57,7 +63,6 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
 
   void _attachRealtime() {
     _channel = AppRealtime.subscribeAdminClaims(
-      channelSuffix: 'manage',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 400), () {
@@ -78,6 +83,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
         _loadingMore = false;
         _hasMore = data.length == _pageSize;
         _error = null;
+        _recomputeFiltered();
       });
     } catch (e) {
       if (!mounted) return;
@@ -101,23 +107,31 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
         _claims = [..._claims, ...next];
         _hasMore = next.length == _pageSize;
         _loadingMore = false;
+        _recomputeFiltered();
       });
     } catch (_) {
       if (mounted) setState(() => _loadingMore = false);
     }
   }
 
-  List<ExpenseClaim> get _filtered {
+  void _recomputeFiltered() {
     final q = _searchCtrl.text.trim().toLowerCase();
-    return _claims.where((c) {
-      if (_filter != 'all' && c.status != _filter) return false;
-      if (q.isEmpty) return true;
-      final name = c.userName?.toLowerCase() ?? '';
-      return name.contains(q) ||
-          c.title.toLowerCase().contains(q) ||
-          c.description.toLowerCase().contains(q) ||
-          c.categoryDisplay.toLowerCase().contains(q);
-    }).toList();
+    final hasQuery = q.isNotEmpty;
+    if (!hasQuery && _filter == 'all') {
+      _visibleClaims = _claims;
+      return;
+    }
+    _visibleClaims = _claims
+        .where((c) {
+          if (_filter != 'all' && c.status != _filter) return false;
+          if (!hasQuery) return true;
+          final name = c.userName?.toLowerCase() ?? '';
+          return name.contains(q) ||
+              c.title.toLowerCase().contains(q) ||
+              c.description.toLowerCase().contains(q) ||
+              c.categoryDisplay.toLowerCase().contains(q);
+        })
+        .toList(growable: false);
   }
 
   Future<void> _setStatus(ExpenseClaim claim, String status) async {
@@ -168,15 +182,15 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
       'SGD' => 'S\$',
       _ => c.currency,
     };
-    return '$sym ${NumberFormat('#,##0.00').format(c.amount)}';
+    return '$sym ${_moneyFmt.format(c.amount)}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final dateFmt = DateFormat('d MMM yyyy');
+    final dateFmt = _dateFmt;
     final filteredClaims = _loading || _error != null
         ? const <ExpenseClaim>[]
-        : _filtered;
+        : _visibleClaims;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -207,7 +221,7 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
                   searchController: _searchCtrl,
                   searchHint: 'Employee, title, category…',
                   onSearchChanged: (_) => _searchDebouncer(() {
-                    if (mounted) setState(() {});
+                    if (mounted) setState(_recomputeFiltered);
                   }),
                   chipOptions: const [
                     AppFilterOption(value: 'all', label: 'All'),
@@ -216,7 +230,10 @@ class _ClaimManagementScreenState extends State<ClaimManagementScreen> {
                     AppFilterOption(value: 'rejected', label: 'Rejected'),
                   ],
                   selectedChip: _filter,
-                  onChipSelected: (v) => setState(() => _filter = v),
+                  onChipSelected: (v) => setState(() {
+                    _filter = v;
+                    _recomputeFiltered();
+                  }),
                 ),
                 Expanded(
                   child: RefreshIndicator(

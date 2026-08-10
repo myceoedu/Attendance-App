@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/company_announcement.dart';
@@ -22,7 +21,7 @@ class AdminAnnouncementsScreen extends StatefulWidget {
 class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
   List<CompanyAnnouncement> _items = [];
   bool _loading = true;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
   Timer? _debounce;
 
   @override
@@ -43,7 +42,6 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
 
   void _attachRealtime() {
     _channel = AppRealtime.subscribeCompanyAnnouncements(
-      channelSuffix: 'admin',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 350), () {

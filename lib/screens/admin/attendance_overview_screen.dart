@@ -3,7 +3,6 @@ import '../../utils/app_route.dart';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../constants/app_theme.dart';
 import '../../models/attendance.dart';
 import '../../services/app_realtime.dart';
@@ -31,7 +30,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   bool _loading = true;
   String? _error;
   Timer? _realtimeDebounce;
-  RealtimeChannel? _attendanceChannel;
+  RealtimeSubscription? _attendanceChannel;
   final TextEditingController _searchCtrl = TextEditingController();
   final Debouncer _searchDebounce = Debouncer();
   final _loadGuard = AsyncLoadGuard();
@@ -39,6 +38,13 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   bool _tabActive = true;
   static const int _tabIndex = 1;
   static final _timeFmt = DateFormat('h:mm a');
+  static final _titleDateFmt = DateFormat('d MMM');
+
+  /// Derived view state. Recomputed only when the source data, the status chip,
+  /// or the debounced search text changes — not on every rebuild.
+  List<Attendance> _visibleRecords = const [];
+  int _completedCount = 0;
+  int _inProgressCount = 0;
 
   @override
   void initState() {
@@ -82,7 +88,6 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
 
   void _attachRealtime() {
     _attendanceChannel = AppRealtime.subscribeAdminAttendance(
-      channelSuffix: 'overview',
       onReload: () {
         if (!_tabActive) return;
         _realtimeDebounce?.cancel();
@@ -103,6 +108,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
         _records = data;
         _loading = false;
         _error = null;
+        _recomputeDerived();
       });
     } catch (e) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
@@ -113,30 +119,39 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
     }
   }
 
-  List<Attendance> get _filteredRecords {
+  /// Single pass over today's records producing both the filtered list and the
+  /// summary counts.
+  void _recomputeDerived() {
     final query = _searchCtrl.text.trim().toLowerCase();
-    return _records.where((record) {
-      if (_statusFilter != 'all' && record.status != _statusFilter) {
-        return false;
+    final hasQuery = query.isNotEmpty;
+    final filterAll = _statusFilter == 'all';
+
+    var completed = 0;
+    var inProgress = 0;
+    final visible = <Attendance>[];
+
+    for (final record in _records) {
+      if (record.status == 'completed') {
+        completed++;
+      } else if (record.status == 'in_progress') {
+        inProgress++;
       }
-      if (query.isEmpty) return true;
-      final name = record.userName?.toLowerCase() ?? '';
-      return name.contains(query);
-    }).toList();
+      if (!filterAll && record.status != _statusFilter) continue;
+      if (hasQuery) {
+        final name = record.userName?.toLowerCase() ?? '';
+        if (!name.contains(query)) continue;
+      }
+      visible.add(record);
+    }
+
+    _completedCount = completed;
+    _inProgressCount = inProgress;
+    _visibleRecords = visible;
   }
 
   @override
   Widget build(BuildContext context) {
-    var completed = 0;
-    var inProgress = 0;
-    for (final r in _records) {
-      if (r.status == 'completed') {
-        completed++;
-      } else if (r.status == 'in_progress') {
-        inProgress++;
-      }
-    }
-    final filteredRecords = _filteredRecords;
+    final filteredRecords = _visibleRecords;
 
     // No nested [Scaffold] — shell already owns one.
     return SizedBox.expand(
@@ -147,7 +162,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
           children: [
             AppBar(
               title: Text(
-                'Attendance — ${DateFormat('d MMM').format(AppTime.malaysiaNow())}',
+                'Attendance — ${_titleDateFmt.format(AppTime.malaysiaNow())}',
               ),
               actions: [
                 IconButton(
@@ -199,12 +214,12 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                               ),
                               _summaryItem(
                                 'In Progress',
-                                '$inProgress',
+                                '$_inProgressCount',
                                 AppColors.inProgress,
                               ),
                               _summaryItem(
                                 'Completed',
-                                '$completed',
+                                '$_completedCount',
                                 AppColors.success,
                               ),
                             ],
@@ -213,7 +228,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                         AppFilterBar(
                           searchController: _searchCtrl,
                           onSearchChanged: (_) => _searchDebounce(() {
-                            if (mounted) setState(() {});
+                            if (mounted) setState(_recomputeDerived);
                           }),
                           searchHint: 'Search employee name',
                           chipOptions: const [
@@ -229,7 +244,10 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                           ],
                           selectedChip: _statusFilter,
                           onChipSelected: (value) {
-                            setState(() => _statusFilter = value);
+                            setState(() {
+                              _statusFilter = value;
+                              _recomputeDerived();
+                            });
                           },
                         ),
                         Expanded(

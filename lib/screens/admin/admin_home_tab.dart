@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/app_user.dart';
@@ -40,9 +39,9 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
   int _pendingLeaveCount = 0;
   int _pendingClaimCount = 0;
   Timer? _realtimeDebounce;
-  RealtimeChannel? _attendanceChannel;
-  RealtimeChannel? _leaveChannel;
-  RealtimeChannel? _claimChannel;
+  RealtimeSubscription? _attendanceChannel;
+  RealtimeSubscription? _leaveChannel;
+  RealtimeSubscription? _claimChannel;
   final _loadGuard = AsyncLoadGuard();
 
   static final _dateFmt = DateFormat('EEEE, d MMMM yyyy');
@@ -113,15 +112,12 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
 
   void _attachRealtime() {
     _attendanceChannel = AppRealtime.subscribeAdminAttendance(
-      channelSuffix: 'home',
       onReload: _onRealtimeEvent,
     );
     _leaveChannel = AppRealtime.subscribeAdminLeaves(
-      channelSuffix: 'home',
       onReload: _onRealtimeEvent,
     );
     _claimChannel = AppRealtime.subscribeAdminClaims(
-      channelSuffix: 'home',
       onReload: _onRealtimeEvent,
     );
   }

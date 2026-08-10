@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../constants/app_theme.dart';
 import '../models/company_announcement.dart';
@@ -26,7 +25,7 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
   List<CompanyAnnouncement> _items = [];
   bool _loading = true;
   String? _error;
-  RealtimeChannel? _channel;
+  RealtimeSubscription? _channel;
   Timer? _debounce;
 
   @override
@@ -45,7 +44,6 @@ class _AnnouncementsScreenState extends State<AnnouncementsScreen> {
 
   void _attachRealtime() {
     _channel = AppRealtime.subscribeCompanyAnnouncements(
-      channelSuffix: 'inbox',
       onReload: () {
         _debounce?.cancel();
         _debounce = Timer(const Duration(milliseconds: 350), () {

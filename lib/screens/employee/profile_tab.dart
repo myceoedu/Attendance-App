@@ -26,6 +26,8 @@ Set<_ProfileSectionKey> _defaultExpandedForView() => {
   _ProfileSectionKey.employment,
 };
 
+final DateFormat _dateFmtLong = DateFormat('d MMM yyyy');
+
 String _profileSectionSubtitle(_ProfileSectionKey section, AppUser u) {
   switch (section) {
     case _ProfileSectionKey.personal:
@@ -42,7 +44,7 @@ String _profileSectionSubtitle(_ProfileSectionKey section, AppUser u) {
       if (d.isNotEmpty) return d;
       final jd = u.employmentStartDate;
       if (jd != null) {
-        return 'Joined ${DateFormat('d MMM yyyy').format(jd)}';
+        return 'Joined ${_dateFmtLong.format(jd)}';
       }
       return 'Role & employment details';
     case _ProfileSectionKey.statutory:
@@ -110,6 +112,13 @@ class _ProfileTabState extends State<ProfileTab> {
   Set<_ProfileSectionKey> _expandedSections = _defaultExpandedForView();
   String? _expansionUserId;
 
+  /// Derived labels for the six section headers plus the completion ring.
+  /// Recomputed only when the profile itself changes — every section toggle
+  /// used to re-derive all of them.
+  AppUser? _derivedFrom;
+  int _completion = 0;
+  Map<_ProfileSectionKey, String> _sectionSubtitles = const {};
+
   @override
   void initState() {
     super.initState();
@@ -137,6 +146,30 @@ class _ProfileTabState extends State<ProfileTab> {
     } else {
       final n = AppTime.malaysiaNow();
       _joinDate = DateTime(n.year, n.month, n.day);
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reacting to a profile swap here (rather than in `build`) keeps expansion
+    // state out of the build phase, where mutating it forced an extra frame.
+    _syncForUser(context.read<AuthProvider>().user);
+  }
+
+  void _syncForUser(AppUser? user) {
+    if (user == null) return;
+    if (_expansionUserId != user.id) {
+      _expansionUserId = user.id;
+      _expandedSections = _defaultExpandedForView();
+    }
+    if (!identical(_derivedFrom, user)) {
+      _derivedFrom = user;
+      _completion = _completionPercent(user);
+      _sectionSubtitles = {
+        for (final key in _ProfileSectionKey.values)
+          key: _profileSectionSubtitle(key, user),
+      };
     }
   }
 
@@ -225,7 +258,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
   String _joinDateLabel(AppUser u) {
     final d = u.employmentStartDate ?? u.createdAt;
-    return DateFormat('d MMM yyyy').format(d);
+    return _dateFmtLong.format(d);
   }
 
   Future<void> _pickDob() async {
@@ -368,13 +401,12 @@ class _ProfileTabState extends State<ProfileTab> {
     final user = context.select<AuthProvider, AppUser?>((a) => a.user);
     if (user == null) return const SizedBox.shrink();
 
-    if (_expansionUserId != user.id) {
-      _expansionUserId = user.id;
-      _expandedSections = _defaultExpandedForView();
-    }
+    // Cheap memo guard: covers the first build, before any dependency change.
+    if (!identical(_derivedFrom, user)) _syncForUser(user);
 
-    final dateFmtLong = DateFormat('d MMM yyyy');
-    final pct = _completionPercent(user);
+    final dateFmtLong = _dateFmtLong;
+    final pct = _completion;
+    final subtitles = _sectionSubtitles;
 
     Widget body = CustomScrollView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -426,10 +458,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Personal information',
                     icon: Icons.person_outline_rounded,
                     accent: AppColors.indigo,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.personal,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.personal]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.personal,
                     ),
@@ -596,10 +625,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Employment information',
                     icon: Icons.work_outline_rounded,
                     accent: AppColors.teal,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.employment,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.employment]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.employment,
                     ),
@@ -713,10 +739,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Statutory (Malaysia)',
                     icon: Icons.account_balance_outlined,
                     accent: AppColors.sky,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.statutory,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.statutory]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.statutory,
                     ),
@@ -767,10 +790,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Bank information',
                     icon: Icons.account_balance_wallet_outlined,
                     accent: AppColors.violet,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.bank,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.bank]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.bank,
                     ),
@@ -825,10 +845,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Education',
                     icon: Icons.school_outlined,
                     accent: AppColors.orange,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.education,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.education]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.education,
                     ),
@@ -880,10 +897,7 @@ class _ProfileTabState extends State<ProfileTab> {
                     title: 'Emergency contact',
                     icon: Icons.contact_phone_outlined,
                     accent: AppColors.danger,
-                    subtitle: _profileSectionSubtitle(
-                      _ProfileSectionKey.emergency,
-                      user,
-                    ),
+                    subtitle: subtitles[_ProfileSectionKey.emergency]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.emergency,
                     ),

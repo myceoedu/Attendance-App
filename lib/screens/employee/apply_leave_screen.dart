@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -280,7 +281,9 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        withData: true,
+        // Native platforms upload straight from the file path, so pulling the
+        // bytes in would pin up to 5 MB in memory until submit.
+        withData: kIsWeb,
       );
       if (result == null || result.files.isEmpty) return;
 

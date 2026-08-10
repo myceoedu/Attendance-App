@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../constants/app_theme.dart';
 import '../../models/attendance.dart';
@@ -52,8 +51,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   bool _loading = true;
   Timer? _ticker;
   Timer? _realtimeDebounce;
-  RealtimeChannel? _channel;
-  RealtimeChannel? _leaveChannel;
+  RealtimeSubscription? _channel;
+  RealtimeSubscription? _leaveChannel;
   final _loadGuard = AsyncLoadGuard();
   bool _tabActive = true;
   late final ValueNotifier<DateTime> _now = ValueNotifier<DateTime>(
@@ -144,7 +143,6 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     if (uid == null) return;
     _channel = AppRealtime.subscribeMyAttendance(
       userId: uid,
-      channelSuffix: 'clock',
       onReload: () {
         _realtimeDebounce?.cancel();
         _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
@@ -154,7 +152,6 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
     _leaveChannel = AppRealtime.subscribeMyLeaves(
       userId: uid,
-      channelSuffix: 'clock',
       onReload: () {
         _realtimeDebounce?.cancel();
         _realtimeDebounce = Timer(const Duration(milliseconds: 400), () {
