@@ -1,34 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../utils/open_signed_url.dart';
 
 /// Opens a leave supporting document (MC) via a short-lived signed URL.
-Future<void> openLeaveAttachment(BuildContext context, String? storagePath) async {
+Future<void> openLeaveAttachment(
+  BuildContext context,
+  String? storagePath,
+) async {
   if (storagePath == null || storagePath.isEmpty) return;
-  try {
-    final url = await SupabaseService.getLeaveAttachmentSignedUrl(storagePath);
-    final uri = Uri.parse(url);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the file'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load attachment: $e'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-    }
-  }
+  await openSignedStorageUrl(
+    context: context,
+    fetchUrl: () => SupabaseService.getLeaveAttachmentSignedUrl(storagePath),
+  );
 }
 
 /// Compact row: "View MC / attachment" chip.

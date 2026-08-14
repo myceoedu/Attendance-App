@@ -1,36 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../constants/app_theme.dart';
 import '../services/supabase_service.dart';
+import '../utils/open_signed_url.dart';
 
 Future<void> openClaimAttachment(
   BuildContext context,
   String storagePath,
 ) async {
-  try {
-    final url =
-        await SupabaseService.getClaimAttachmentSignedUrl(storagePath);
-    final uri = Uri.parse(url);
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open the file'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-    }
-  } catch (e) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not load file: $e'),
-          backgroundColor: AppColors.danger,
-        ),
-      );
-    }
-  }
+  await openSignedStorageUrl(
+    context: context,
+    fetchUrl: () => SupabaseService.getClaimAttachmentSignedUrl(storagePath),
+    loadFailedPrefix: 'Could not load file',
+  );
 }
 
 IconData iconForClaimFileName(String name) {

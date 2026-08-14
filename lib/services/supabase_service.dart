@@ -1018,6 +1018,10 @@ class SupabaseService {
     required int maxBytes,
     required String sizeErrorMessage,
   }) async {
+    final options = FileOptions(
+      upsert: false,
+      contentType: _contentTypeForFileName(file.name),
+    );
     final bytes = file.bytes;
     if (bytes != null) {
       if (bytes.length > maxBytes) {
@@ -1025,11 +1029,7 @@ class SupabaseService {
       }
       await client.storage
           .from(bucket)
-          .uploadBinary(
-            objectPath,
-            bytes,
-            fileOptions: const FileOptions(upsert: false),
-          );
+          .uploadBinary(objectPath, bytes, fileOptions: options);
       return;
     }
 
@@ -1049,7 +1049,28 @@ class SupabaseService {
     }
     await client.storage
         .from(bucket)
-        .upload(objectPath, f, fileOptions: const FileOptions(upsert: false));
+        .upload(objectPath, f, fileOptions: options);
+  }
+
+  static String? _contentTypeForFileName(String name) {
+    final ext = _fileExtensionLower(name);
+    return switch (ext) {
+      '.pdf' => 'application/pdf',
+      '.jpg' || '.jpeg' => 'image/jpeg',
+      '.png' => 'image/png',
+      '.webp' => 'image/webp',
+      '.gif' => 'image/gif',
+      '.txt' => 'text/plain',
+      '.csv' => 'text/csv',
+      '.zip' => 'application/zip',
+      '.doc' => 'application/msword',
+      '.docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls' => 'application/vnd.ms-excel',
+      '.xlsx' =>
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      _ => null,
+    };
   }
 
   static Future<LeaveRequest> applyLeave({
