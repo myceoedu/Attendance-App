@@ -244,7 +244,7 @@ class _ClaimDetailScreenState extends State<ClaimDetailScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${_claim!.attachments.length} file(s). Tap to open in your viewer or browser.',
+                      '${_claim!.attachments.length} file(s). Open to view.',
                       style: const TextStyle(
                         fontSize: 12.5,
                         color: AppColors.textSecondary,

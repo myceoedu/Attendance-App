@@ -1,7 +1,7 @@
 # Admin guide
 
 This guide is for **HR / administrators**.  
-Use it to manage staff, attendance, leave, claims, payroll, and workplace location.
+Use it to manage staff, attendance, leave, claims, payroll, and work location.
  
 ---
 
@@ -54,7 +54,7 @@ Pull down to refresh.
 ### Important
 
 - **Email** and **username** are set at registration and are not edited on this screen
-- To make someone an admin, set **Role** to Admin and save  
+- To make someone an admin, set **Role** to Admin IN SUPABASE and save  
   (or ask a developer to update `public.users.role` in Supabase)
 - **Nobody can view a user’s real password** (passwords are stored hashed). In an emergency you can only **set a new temporary password** (see below).
 
@@ -84,7 +84,7 @@ Needs a **developer or project owner** with access to the Supabase **service_rol
 2. Supabase → **Project Settings → API** → copy **`service_role`** (secret — never put this in the Flutter app or git)  
 3. Project ref / ID is the subdomain of your API URL, e.g. `dxsnvtiwqmexarqjbwdd` from  
    `https://dxsnvtiwqmexarqjbwdd.supabase.co`  
-4. On a trusted PC, open **PowerShell** and run (replace the three placeholders):
+4. On a trusted PC, open **TERMINAL IN YOUR VS CODE OR TOOLS YOU USE** and run (replace the three placeholders):
 
 ```powershell
 $PROJECT = "YOUR_PROJECT_REF"

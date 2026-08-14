@@ -8,10 +8,10 @@ This document is for a **new developer** taking over myRekod.
 
 | Item | Detail |
 |------|--------|
-| Product | myRekod — attendance, leave, claims, payroll, announcements, geofence |
-| Client | Flutter app (`attendance_app`) |
+| Product | myRekod — attendance, leave, claims, payroll, announcements, location required to clock in (if open) |
+| Client | Flutter app (`attendance_app`(FILE)) |
 | Backend | Supabase (Auth, Postgres, Storage, Realtime) |
-| Primary UI target | Web (Chrome / Safari PWA), also runnable on Android/iOS/desktop |
+| Primary UI target | Web (Chrome), also runnable on Android/iOS/desktop | better running on chrome choose(2) after write flutter run in terminal.
 | State | Provider (`AuthProvider`) |
 | Navigation | Custom `AppRoute` / `pushAppPage` (instant on web) |
 
@@ -22,17 +22,17 @@ This document is for a **new developer** taking over myRekod.
 ```text
 attendance_app/
   lib/                         Flutter app source
-    config/app_config.dart     Supabase URL + anon key defaults / env
+    config/app_config.dart     Supabase URL + anon key defaults / env (ada 2 key saja yang perlu copy dari supabase untk connect dgn supabase)
     constants/                 Theme, help support config
     models/                    Data models
     providers/                 AuthProvider
     screens/                   UI (admin/ + employee/)
     services/                  SupabaseService, payroll, realtime
-    utils/                     Routes, time, geofence, validators
+    utils/                     Routes, time, location(open-location required/ close-location no need), validators
     widgets/                   Shared UI (OSM map, tiles, etc.)
   supabase_bundles/            Ordered SQL for NEW projects
   supabase_migration_*.sql     One-off migrations for EXISTING projects
-  docs/                        This handover documentation
+  UserManual & Guide/          This handover documentation
   pubspec.yaml                 Dependencies
 ```
 
@@ -42,7 +42,7 @@ attendance_app/
 
 1. **Auth** — email/password, username login, password recovery UI
 2. **Attendance** — clock in/out, history, admin overview
-3. **Geofence** — one `work_site`, clock-in only
+3. **work location** — one `work_site`, clock-in only
 4. **Leave** — apply, approve, attachments, balances
 5. **Claims** — MYR expenses + attachments
 6. **Payroll** — salary settings, statutory, runs, payslips
@@ -58,12 +58,12 @@ Stored in `public.users.role`:
 - `employee` → `EmployeeShell`
 - `admin` → `AdminShell`
 
-Promote an admin in SQL:
+Promote an admin in SQL: CARA SET USER JADI ADMIN (SUPABASE-SQL EDITOR-CREATE NEW SNIPPET- PASTE & CLICK RUN)
 
 ```sql
 UPDATE public.users
 SET role = 'admin'
-WHERE email = 'someone@company.com';
+WHERE email = 'someone@gmail.com';
 ```
 
 ---
@@ -78,8 +78,9 @@ WHERE email = 'someone@company.com';
 | [04_features_and_key_files.md](04_features_and_key_files.md) | Where each feature lives |
 | [05_deploy_and_auth.md](05_deploy_and_auth.md) | Vercel + Auth redirect URLs |
 | [06_handover_checklist.md](06_handover_checklist.md) | Day-1 checklist |
+| [SAMBUNGAN FILE] |
 
-Also read user docs under `docs/user/` so you understand the product.
+Also read user docs under `UserManual&Guide/user/` so you understand the product.
 
 ---
 

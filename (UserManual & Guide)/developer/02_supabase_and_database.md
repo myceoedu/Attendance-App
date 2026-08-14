@@ -8,8 +8,8 @@ This page explains how the backend is set up.
 
 | Location | Use when |
 |----------|----------|
-| `supabase_bundles/` | **New** empty Supabase project (run in order) |
-| Root `supabase_migration_*.sql` | **Existing** project feature patches |
+| `supabase bundles/` | Supabase project (run in order) - COPY YANG NI PON DAH OKAY FROM (01-LATEST)
+| `supabase migration` | **Existing** project feature patches |
 
 Always read:
 
@@ -30,24 +30,10 @@ In Supabase → **SQL Editor**, run:
 | 5 | `05_claims.sql` |
 | 6 | `06_payroll.sql` |
 | 7 | `07_indexes.sql` |
-| 8 | `09_work_site.sql` (geofence) |
+| 8 | `09_work_site.sql` (WORK LOCATION) |
 | Optional | `08_seed_payroll_test_data_OPTIONAL.sql` |
 
-Wait for success before the next file.
-
----
-
-## Existing project — important migrations
-
-Examples (root folder):
-
-| File | Purpose |
-|------|---------|
-| `supabase_migration_work_site_geofence.sql` | One-site geofence + updates `clock_in_if_allowed` |
-| `supabase_migration_payroll_rls_fix_recursion.sql` | Fixes payslip RLS recursion (`42P17`) |
-| Username-related migrations | Flexible usernames / login helpers |
-
-If a feature “exists in the app but fails in production”, check whether the matching SQL was applied on **that** Supabase project.
+#MAKE SURE RUNNING SUCCESS SEBELUM RUNNING NEXT FILE#
 
 ---
 
@@ -55,13 +41,13 @@ If a feature “exists in the app but fails in production”, check whether the 
 
 ### Email provider
 
-Supabase → Authentication → Providers → Email enabled.
+Supabase → Authentication → Providers → Email CONFIRM -> enabled.
 
 ### URL configuration
 
 Supabase → Authentication → URL configuration:
 
-- **Site URL** = production app URL  
+- **Site URL** = production app URL  (LICK WEB/APP YG KITA RUNNING)-DOMAIN
   Example: `https://attendance-app-peach-rho.vercel.app`
 - **Redirect URLs** must include:
   - Production `https://your-app.vercel.app/**`
@@ -75,6 +61,7 @@ Password reset emails use `redirectTo` with `?passwordReset=1`
 For testing, many teams disable “Confirm email”.  
 For production, decide with the client and test the full flow.
 
+*CLOSE CONFIRM EMAIL KALAU NAK REGISTER RAMAI USER IF GUNA SUPABASE YANG FREE NOT PRO VERSION*
 ---
 
 ## Core tables (high level)
@@ -121,7 +108,7 @@ Created by claims/leave SQL bundles (or manually if missing).
 ```sql
 UPDATE public.users
 SET role = 'admin'
-WHERE email = 'hr@company.com';
+WHERE email = 'ADMIN-EMAIL@gmail.com';
 ```
 
 ---

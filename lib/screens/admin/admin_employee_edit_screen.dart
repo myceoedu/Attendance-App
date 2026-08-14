@@ -726,7 +726,7 @@ class _AdminEmployeeEditScreenState extends State<AdminEmployeeEditScreen> {
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        'Leave empty to use company tiers; sets HR override when filled.',
+                        'Leave empty for company tiers. Enter a value to set an HR override.',
                         style: TextStyle(
                           fontSize: 11.5,
                           height: 1.35,

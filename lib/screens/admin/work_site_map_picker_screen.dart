@@ -128,7 +128,7 @@ class _WorkSiteMapPickerScreenState extends State<WorkSiteMapPickerScreen> {
               child: Text(
                 _pin == null
                     ? 'Tap the map to set the office location. You can drag and zoom.'
-                    : 'Location set · tap elsewhere to move · radius preview $radius m',
+                    : 'Location set. Tap the map to move. Radius $radius m',
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.35,

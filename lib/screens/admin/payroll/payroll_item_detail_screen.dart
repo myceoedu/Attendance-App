@@ -235,10 +235,8 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               intern
-                  ? 'Allowance and any commission are divided by calendar days. Any approved leave in this period reduces pay (half-day annual = 0.5 day). No EPF, SOCSO, or EIS for interns.'
-                  : 'Note: Only approved unpaid leave reduces pay here. Sick, emergency, '
-                      'and annual leave are treated as paid. Absence without leave does not '
-                      'reduce pay in this payroll run.',
+                  ? 'Allowance and commission are divided by calendar days. Approved leave reduces pay. Half-day annual counts as 0.5. No EPF, SOCSO, or EIS for interns.'
+                  : 'Only approved unpaid leave reduces pay. Sick, emergency, and annual leave are paid. Missing clock-in does not cut pay in this run.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.35,

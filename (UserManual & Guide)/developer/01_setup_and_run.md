@@ -37,8 +37,9 @@ Config lives in:
 It supports:
 
 1. Compile-time env:
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_URL` (DARI SUPABASE-BERUBAH KALAU TUKAR ACC SUPABASE YG LAIN-PROJECT SETTING->DATA API)
+   -  SUPABASE URL COPY SAMPAI .supabase.co SAHAJA
+   - `SUPABASE_ANON_KEY`(DARI SUPABASE-BERUBAH KALAU TUKAR ACC SUPABASE YG LAIN-PROJECT SETTING->API KEY)
 2. Fallback defaults inside `app_config.dart` when env is empty
 
 ### Local run with defaults
@@ -79,7 +80,7 @@ flutter run -d windows
 flutter run -d edge
 ```
 
-After adding packages (e.g. `flutter_map`), do a **full restart**, not only hot reload.
+After adding packages (e.g. `flutter_map`), do a **full restart(Ctrl+C -> flutter run) or (Shift + R)*.
 
 ---
 
@@ -91,7 +92,7 @@ After adding packages (e.g. `flutter_map`), do a **full restart**, not only hot 
 ```sql
 UPDATE public.users
 SET role = 'admin'
-WHERE email = 'your-admin@email.com';
+WHERE email = 'admin-email@gmail.com';
 ```
 
 3. Sign out and sign in again
@@ -112,7 +113,7 @@ dart analyze lib
 ## 6. Common first-day issues
 
 | Problem | Fix |
-|---------|-----|
+
 | Blank / config error | Set Supabase URL + anon key |
 | Signup fails | Run auth SQL bundles / triggers |
 | Password reset lands on login only | Fix Auth Redirect URLs (see deploy doc) |

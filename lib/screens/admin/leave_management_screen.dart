@@ -484,7 +484,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   if (!_loading && _error == null) ...[
                     _selectedEmployeeHero(),
                     _leaveStatsPills(),
-                    _annualBalanceHelpTile(),
                   ],
                   Expanded(
                     child: filtered.isEmpty
@@ -1026,62 +1025,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     );
   }
 
-  Widget _annualBalanceHelpTile() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-          visualDensity: VisualDensity.compact,
-          dense: true,
-          collapsedShape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          backgroundColor: Colors.white,
-          collapsedBackgroundColor: Colors.white,
-          title: Row(
-            children: [
-              Icon(
-                Icons.lightbulb_outline_rounded,
-                size: 16,
-                color: AppColors.sky.withValues(alpha: 0.95),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Why annual balance shows on cards',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary.withValues(alpha: 0.88),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          children: [
-            Text(
-              'Each request can show that employee\'s $_annualSummaryYear annual '
-              'totals, including sick or emergency, so you can check '
-              'entitlement while you review.',
-              style: TextStyle(
-                fontSize: 11.5,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary.withValues(alpha: 0.95),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   static Color _adminLeaveTypeAccent(String type) =>
       LeaveCatalog.uiStyle(type).color;
 
@@ -1601,8 +1544,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                         border: Border.all(color: AppColors.divider),
                       ),
                       child: Text(
-                        'This request is not annual leave. It does not use the '
-                        'remaining days above. The numbers are for context only.',
+                        'This leave does not use annual balance.',
                         style: TextStyle(
                           fontSize: 11,
                           height: 1.3,

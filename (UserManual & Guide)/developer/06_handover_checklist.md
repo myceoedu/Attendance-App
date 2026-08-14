@@ -83,14 +83,6 @@ Use this on day 1 of taking over the project.
 3. Add/adjust SQL migration if schema/RPC changes  
 4. Redeploy web + confirm Auth URLs if domain changes  
 
----
 
-## Support config quick edit
-
-`lib/constants/help_support_config.dart`
-
-- Phone, email, office hours shown in Help & support
-
----
 
 You’re ready when the checkboxes above are done and you can demo employee + admin happy paths without guessing.

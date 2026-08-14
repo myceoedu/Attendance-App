@@ -210,8 +210,8 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             intern
-                ? 'Intern payslip: allowance and leave only. Contact HR with questions.'
-                : 'Malaysia statutory rules are applied for EPF/KWSP, SOCSO/PERKESO, and EIS/SIP. For questions, contact HR.',
+                ? 'Intern payslip. Allowance and leave only. Contact HR if you need help.'
+                : 'EPF, SOCSO, and EIS use Malaysia rules. Contact HR if you need help.',
             style: const TextStyle(
               fontSize: 11,
               color: AppColors.textHint,

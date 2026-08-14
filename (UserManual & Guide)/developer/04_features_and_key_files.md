@@ -14,7 +14,7 @@ Use this as a map when you need to change a feature quickly.
 | Set new password (email link) | `lib/screens/set_new_password_screen.dart` |
 | Auth state | `lib/providers/auth_provider.dart` |
 | Redirect / recovery URL | `lib/utils/auth_redirect.dart`, `lib/utils/auth_link_bootstrap.dart` |
-| App entry / AuthGate | `lib/main.dart` |
+| App entry(MAIN) / AuthGate | `lib/main.dart` |
 | Config | `lib/config/app_config.dart` |
 
 ---
@@ -23,7 +23,7 @@ Use this as a map when you need to change a feature quickly.
 
 | Feature | Key files |
 |---------|-----------|
-| Shell / tabs | `lib/screens/employee/employee_shell.dart` |
+| Shell(3 BUTTON YG BAWAH TU) / tabs | `lib/screens/employee/employee_shell.dart` |
 | Home | `lib/screens/employee/employee_home_tab.dart` |
 | Clock in/out | `lib/screens/employee/employee_attendance_tab.dart` |
 | Attendance history/log | `attendance_history_screen.dart`, `employee_attendance_log_screen.dart` |

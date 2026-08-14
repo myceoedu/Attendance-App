@@ -292,7 +292,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
                                       ),
                                       const SizedBox(height: 8),
                                       Text(
-                                        '$author · ${dateFmt.format(a.createdAt.toLocal())} · tap to delete',
+                                        '$author · ${dateFmt.format(a.createdAt.toLocal())}',
                                         style: const TextStyle(
                                           fontSize: 11.5,
                                           color: AppColors.textHint,

@@ -11,7 +11,7 @@ Try the steps in order.
 
 1. Check email and password are valid
 2. Try a username that is not already taken
-3. If you see “too many attempts”, wait 15–60 minutes and try **once**
+3. If you see “too many attempts”, wait 2 hours and try **once**
 4. Ask an admin/developer to check Supabase **Authentication → Users** for stuck accounts
 
 ### “An account with this email already exists”

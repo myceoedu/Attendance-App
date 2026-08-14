@@ -94,7 +94,7 @@ Platform: ${_platformLabel()}'''.trim();
       const _Faq(
         q: 'Where do I approve leave and claims?',
         a:
-            'From Admin Home → open Leave hub or Claims. Pending counts appear on your dashboard cards. Approve or reject with remarks; employees see the outcome in real time.',
+            'From Admin Home, open Leave hub or Claims. Approve or reject with remarks. Employees see the update when it is done.',
       ),
       const _Faq(
         q: 'How do payroll runs and salary settings work?',
@@ -353,8 +353,8 @@ Platform: ${_platformLabel()}'''.trim();
           const SizedBox(height: 12),
           Text(
             adminView
-                ? 'Quick answers for administrators, plus a direct line to HR or IT when you need backend or account help.'
-                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them when you reach out. That speeds things up.',
+                ? 'Answers for admins. Contact HR or IT if you need account or system help.'
+                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them.',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,

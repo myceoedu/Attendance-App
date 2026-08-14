@@ -363,8 +363,8 @@ class _LeaveTabState extends State<LeaveTab> {
                               const SizedBox(width: 6),
                               IconButton(
                                 tooltip: _section == _LeaveHomeSection.annual
-                                    ? 'Annual leave: dates, reason, optional proof. Days count once approved.'
-                                    : 'Other leave: sick MC, emergency, unpaid, statutory. Separate from annual balance.',
+                                    ? 'Annual leave'
+                                    : 'Other leave',
                                 onPressed: () {
                                   showModalBottomSheet<void>(
                                     context: context,
@@ -378,8 +378,8 @@ class _LeaveTabState extends State<LeaveTab> {
                                       ),
                                       child: Text(
                                         _section == _LeaveHomeSection.annual
-                                            ? 'You submit dates, reason, and optional proof. Days count against your annual balance once approved.'
-                                            : 'Other leave uses separate policies (sick MC, unpaid payroll, maternity/paternity/marriage/PH replacement, etc.). These types do not use your annual leave balance.',
+                                            ? 'Submit dates and a reason. Optional proof can be attached. Approved days use your annual balance.'
+                                            : 'Sick, emergency, unpaid, and statutory leave. These do not use your annual balance.',
                                         style: TextStyle(
                                           fontSize: 14,
                                           height: 1.45,
@@ -625,7 +625,7 @@ class _LeaveTabState extends State<LeaveTab> {
               ),
             ),
             subtitle: Text(
-              'Sick, emergency, unpaid, statutory. Tap to expand',
+              'Sick, emergency, unpaid, statutory',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -638,29 +638,29 @@ class _LeaveTabState extends State<LeaveTab> {
               _introBullet(
                 Icons.medical_services_rounded,
                 AppColors.pink,
-                'Sick leave. Describe your situation and attach an MC or doctor\'s note (required).',
+                'Sick leave needs an MC or doctor\'s note.',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.warning_amber_rounded,
                 AppColors.orange,
-                'Emergency leave. For urgent personal matters. Attach proof if you can.',
+                'Emergency leave for urgent personal matters.',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.payments_outlined,
                 AppColors.textSecondary,
-                'Unpaid leave. May reduce pay for those days in payroll.',
+                'Unpaid leave may reduce pay.',
               ),
               const SizedBox(height: 6),
               _introBullet(
                 Icons.family_restroom_rounded,
                 AppColors.primary,
-                'Maternity, paternity, marriage, or PH replacement. Add clear dates and optional documents.',
+                'Maternity, paternity, marriage, or PH replacement.',
               ),
               const SizedBox(height: 8),
               Text(
-                'These types do not use your annual leave balance.',
+                'These do not use your annual balance.',
                 style: TextStyle(
                   fontSize: 11.5,
                   height: 1.35,

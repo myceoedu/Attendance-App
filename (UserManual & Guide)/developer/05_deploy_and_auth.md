@@ -8,7 +8,7 @@ How production web hosting and Supabase Auth redirects fit together.
 
 Example used in this project:
 
-`https://attendance-app-peach-rho.vercel.app`
+`https://attendance-app-peach-rho.vercel.app` (CURRENT DOMAIN/LINK WEBSITE OR APP)
 
 Update this doc if the production domain changes.
 
@@ -16,7 +16,7 @@ Update this doc if the production domain changes.
 
 ## Vercel (or similar) env vars
 
-Set for the Flutter web build:
+Set for the Flutter web build: *GO TO ENVIRONMENT VARIABLES DAN EDIT URL & ANON KEY KPD YG LATEST IF GUNA NEW ACC SUPABASE DAN SAVE* - *LEPAS TU REDEPLOY DEKAT DEPLOYMENTS*
 
 | Variable | Purpose |
 |----------|---------|
@@ -36,36 +36,18 @@ After changing env vars → **redeploy**.
 Dashboard → **Authentication** → **URL configuration**
 
 ### Site URL
-
-```text
 https://attendance-app-peach-rho.vercel.app
-```
-
-(No trailing path required; use your real production origin.)
 
 ### Redirect URLs (examples)
-
-```text
 https://attendance-app-peach-rho.vercel.app/**
-http://localhost:4840/**
-http://127.0.0.1:4840/**
-```
-
-Add any other local Flutter web ports you use (`flutter run` often changes ports).
+http://localhost:(follow current running local host)/**
+http://127.0.0.1:(follow current running local host)/**
 
 Wildcard form `http://localhost:**` may not always be accepted depending on Supabase UI — prefer explicit ports or `/**` patterns Supabase allows.
 
 ---
 
 ## Password reset redirect
-
-App code builds redirect like:
-
-```text
-{APP_ORIGIN}?passwordReset=1
-```
-
-See:
 
 - `lib/utils/auth_redirect.dart`
 - `AuthProvider.sendPasswordResetEmail`
@@ -75,28 +57,12 @@ If redirect URL is not allow-listed, users click the email and only see login �
 
 ### Built-in email rate limit (common in testing)
 
-Supabase’s default email provider allows about **2 auth emails per hour project-wide** (`/auth/v1/recover`, signup, etc.). Symptom: **429** / `email rate limit exceeded`. Changing network or email often does **not** help until the window resets.
+Supabase’s default email provider allows about **2 auth emails per hour project-wide (FREE VERSION)** (`/auth/v1/recover`, signup, etc.). Symptom: **429** / `email rate limit exceeded`. Changing network or email often does **not** help until the window resets.
 
-**Production:** configure **Custom SMTP** (Project Settings → Auth → SMTP).
-
-**Emergency unlock (no email):** Admin API `PUT /auth/v1/admin/users/{uid}` with `service_role` and `{ "password": "..." }`. Full steps for HR/admins: [user/02_admin_guide.md §2b](../user/02_admin_guide.md#2b-emergency-set-a-users-password-admin--developer).
+**Emergency unlock (no email):** Full steps for HR/admins: [user/02_admin_guide.md §2b](../user/02_admin_guide.md#2b-emergency-set-a-users-password-admin--developer).
 
 Never put `service_role` in the Flutter client. Rotate the key if it was exposed.
-
----
-
-## Help & support contact
-
-Edit:
-
-`lib/constants/help_support_config.dart`
-
-| Field | Current idea |
-|-------|----------------|
-| `supportPhone` | `+60 11-7078 7014` |
-| `supportEmail` | empty (hidden) |
-| `officeHours` | Mon–Fri 9:00–18:00 MYT |
-
+*SERVICE ROLE KEY BOLEH COPY DEKAT (SUPABASE-PROJECT SETTING-API KEY)*
 ---
 
 ## Storage

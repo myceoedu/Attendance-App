@@ -204,6 +204,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                     key: ValueKey<String>(_debugEpfCategory),
                     initialValue: _debugEpfCategory,
                     isDense: true,
+                    isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'KWSP age band',
                       isDense: true,
@@ -227,50 +228,43 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    key: ValueKey<String>(_debugSocsoCategory),
-                    initialValue: _debugSocsoCategory,
-                    isDense: true,
-                    decoration: const InputDecoration(
-                      labelText: 'SOCSO category',
-                      isDense: true,
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'standard',
-                        child: Text('First category'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'second',
-                        child: Text('Second category'),
-                      ),
-                    ],
-                    onChanged: (v) {
-                      if (v == null) return;
-                      setState(() => _debugSocsoCategory = v);
-                    },
-                  ),
+            DropdownButtonFormField<String>(
+              key: ValueKey<String>(_debugSocsoCategory),
+              initialValue: _debugSocsoCategory,
+              isDense: true,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'SOCSO category',
+                isDense: true,
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'standard',
+                  child: Text('First category'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'EIS eligible',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    dense: true,
-                    value: _debugEisEligible,
-                    onChanged: (v) => setState(() => _debugEisEligible = v),
-                  ),
+                DropdownMenuItem(
+                  value: 'second',
+                  child: Text('Second category'),
                 ),
               ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _debugSocsoCategory = v);
+              },
+            ),
+            const SizedBox(height: 4),
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                'EIS eligible',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              dense: true,
+              value: _debugEisEligible,
+              onChanged: (v) => setState(() => _debugEisEligible = v),
             ),
             const Divider(height: 16),
             const Padding(
@@ -820,7 +814,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                       const SizedBox(width: 6),
                       const Expanded(
                         child: Text(
-                          'The top item is the default for NEW payroll runs (latest effective date). EPF/KWSP, SOCSO/PERKESO, and EIS/SIP amounts use Malaysia wage-band rules; saved percentage fields are retained as reference/legacy settings.',
+                          'The top item is the default for new payroll runs (latest effective date). EPF, SOCSO, and EIS use Malaysia wage-band rules. Saved percentage fields are kept for reference only.',
                           style: TextStyle(
                             fontSize: 11,
                             color: AppColors.textHint,

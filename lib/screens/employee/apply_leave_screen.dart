@@ -482,8 +482,8 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   step: 1,
                   title: _otherLeaveOnly ? 'Type of leave' : 'Leave type',
                   subtitle: _otherLeaveOnly
-                      ? 'Sick leave requires an MC. Other types need a clear reason; attach documents when helpful.'
-                      : 'Includes annual (full or half-day), unpaid, and statutory leave types.',
+                      ? 'Sick leave needs an MC. Other types need a clear reason.'
+                      : 'Annual, unpaid, and statutory leave types.',
                   child: DropdownButtonFormField<String>(
                     // ignore: deprecated_member_use
                     value: _leaveType,
@@ -508,7 +508,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                   step: 1,
                   title: 'Annual leave type',
                   subtitle:
-                      'Full day uses more balance; half-day counts as 0.5. Same date for AM or PM half.',
+                      'Full day uses more balance. Half-day counts as 0.5. AM and PM use the same date.',
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1001,50 +1001,47 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     late final Color bg;
     switch (_leaveType) {
       case LeaveCatalog.annual:
-        msg = 'Annual (full): plan ahead. Documents optional.';
+        msg = 'Full-day annual leave. Documents are optional.';
         bg = AppColors.skyLight;
         break;
       case LeaveCatalog.annualHalfAm:
-        msg =
-            'Half-day morning: same date for start/end. Does not block clock-in.';
+        msg = 'Half-day morning. Start and end use the same date. Clock-in is still allowed.';
         bg = AppColors.skyLight;
         break;
       case LeaveCatalog.annualHalfPm:
-        msg =
-            'Half-day afternoon: same date for start/end. Does not block clock-in.';
+        msg = 'Half-day afternoon. Start and end use the same date. Clock-in is still allowed.';
         bg = AppColors.skyLight;
         break;
       case LeaveCatalog.sick:
-        msg = 'Sick: describe symptoms; MC or doctor\'s note is required.';
+        msg = 'Describe your symptoms. An MC or doctor\'s note is required.';
         bg = AppColors.pinkLight;
         break;
       case LeaveCatalog.emergency:
-        msg = 'Emergency: explain the urgent matter; attach proof if you can.';
+        msg = 'Explain the urgent matter. Attach proof if you can.';
         bg = AppColors.orangeLight;
         break;
       case LeaveCatalog.unpaid:
-        msg =
-            'Unpaid: no pay for approved working days. Payroll reflects this.';
+        msg = 'Approved unpaid working days are unpaid in payroll.';
         bg = AppColors.surface;
         break;
       case LeaveCatalog.maternity:
-        msg = 'Statutory family leave: give expected dates and key details.';
+        msg = 'Add expected dates and key details.';
         bg = AppColors.pinkLight;
         break;
       case LeaveCatalog.paternity:
-        msg = 'Statutory family leave: give expected dates and key details.';
+        msg = 'Add expected dates and key details.';
         bg = AppColors.pinkLight;
         break;
       case LeaveCatalog.marriage:
-        msg = 'Marriage leave: state your wedding or ceremony details.';
+        msg = 'Add wedding or ceremony details.';
         bg = AppColors.pinkLight;
         break;
       case LeaveCatalog.publicHoliday:
-        msg = 'Replacement or observed public holiday. Note which holiday.';
+        msg = 'Note which public holiday this replaces.';
         bg = AppColors.successLight;
         break;
       default:
-        msg = 'Provide clear dates and a detailed reason.';
+        msg = 'Add clear dates and a reason.';
         bg = AppColors.surface;
     }
 

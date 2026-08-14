@@ -26,29 +26,6 @@ main.dart
 
 Do **not** assume Riverpod/Bloc — this project uses Provider.
 
----
-
-## Navigation
-
-File: `lib/utils/app_route.dart`
-
-| Platform | Behaviour |
-|----------|-----------|
-| Web | Instant push/pop (`_InstantPageRoute`) — avoids sluggish animated transitions |
-| iOS native | Instant push, short Cupertino reverse |
-| Android / desktop | Short fade |
-
-Helpers:
-
-- `pushAppPage(context, page)`
-- `popApp(context)`
-
-Prefer these over raw `MaterialPageRoute` for consistency.
-
-> Note: On web/PWA, **browser edge-swipe back** uses History API and can feel slower than the AppBar back button. This is expected with the current route strategy.
-
----
-
 ## Shells (tabs)
 
 ### Employee (`EmployeeShell`)
@@ -139,12 +116,6 @@ Model: `lib/models/work_site.dart`
 ---
 
 ## Performance patterns already used
-
-- In-flight request dedupe / short caches (employees, work site)
-- `AsyncLoadGuard` on loads
-- `ValueNotifier` for clocks (avoid full rebuild every second)
-- Home dashboards: count queries + `RepaintBoundary` + skip unchanged `setState`
-- Lazy tab creation in shells
 
 When adding features, avoid:
 
