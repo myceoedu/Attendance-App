@@ -13,10 +13,12 @@ import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
 import '../../utils/async_load_guard.dart';
 import '../../utils/leave_catalog.dart';
+import '../../utils/error_messages.dart';
 import '../../widgets/status_chip.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/leave_audit_history_sheet.dart';
 import '../../widgets/leave_attachment_link.dart';
+import '../../widgets/app_confirm_dialog.dart';
 import 'apply_leave_screen.dart';
 
 enum _LeaveHomeSection { annual, other }
@@ -49,8 +51,12 @@ class _LeaveTabState extends State<LeaveTab> {
   String _statusFilter = 'all';
   _LeaveHomeSection _section = _LeaveHomeSection.annual;
   String _otherTypeFilter = 'all';
+  bool _annualEligible = true;
+  String? _deletingId;
   late final ScrollController _listScrollController;
   final _loadGuard = AsyncLoadGuard();
+  final ValueNotifier<Set<String>> _expandedRequestIds =
+      ValueNotifier<Set<String>>(const <String>{});
 
   List<String> get _queryLeaveTypes {
     if (_section == _LeaveHomeSection.annual) {
@@ -82,6 +88,7 @@ class _LeaveTabState extends State<LeaveTab> {
     _loadGuard.invalidate();
     _listScrollController.removeListener(_onLeaveListScroll);
     _listScrollController.dispose();
+    _expandedRequestIds.dispose();
     _realtimeDebounce?.cancel();
     AppRealtime.disposeChannel(_leaveChannel);
     super.dispose();
@@ -185,9 +192,17 @@ class _LeaveTabState extends State<LeaveTab> {
     try {
       final uid = context.read<AuthProvider>().user!.id;
       final year = AppTime.malaysiaNow().year;
+      final eligible = await SupabaseService.userHasAnnualLeave(uid);
+      if (!mounted || !_loadGuard.isCurrent(gen)) return;
+      if (!eligible) {
+        _section = _LeaveHomeSection.other;
+      }
 
       final results = await Future.wait<Object?>([
-        SupabaseService.getAnnualLeaveSummary(uid, year: year),
+        if (eligible)
+          SupabaseService.getAnnualLeaveSummary(uid, year: year)
+        else
+          Future<AnnualLeaveSummary?>.value(null),
         SupabaseService.getMyLeaveRequestsPage(
           uid,
           offset: 0,
@@ -199,6 +214,7 @@ class _LeaveTabState extends State<LeaveTab> {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
       final page = results[1] as List<LeaveRequest>;
       setState(() {
+        _annualEligible = eligible;
         _summary = results[0] as AnnualLeaveSummary?;
         _leaveYear = year;
         _requests = page;
@@ -220,11 +236,59 @@ class _LeaveTabState extends State<LeaveTab> {
   Future<void> _openApply() async {
     await pushAppPage(
       context,
-      _section == _LeaveHomeSection.annual
+      _section == _LeaveHomeSection.annual && _annualEligible
           ? const ApplyLeaveScreen(annualOnly: true)
           : const ApplyLeaveScreen(otherLeaveOnly: true),
     );
     if (mounted) _load(showSpinner: true);
+  }
+
+  void _toggleDetails(String requestId) {
+    final next = Set<String>.of(_expandedRequestIds.value);
+    if (!next.remove(requestId)) next.add(requestId);
+    _expandedRequestIds.value = next;
+  }
+
+  Future<void> _confirmDelete(LeaveRequest r) async {
+    if (r.status != 'pending' || _deletingId != null) return;
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete this leave request?',
+      message:
+          'This removes the request and any attached MC. '
+          'You can apply again with the correct dates, reason, or file.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      emphasis: AppConfirmEmphasis.safe,
+      confirmColor: AppColors.danger,
+    );
+    if (ok == true && mounted) await _deletePending(r);
+  }
+
+  Future<void> _deletePending(LeaveRequest r) async {
+    if (_deletingId != null) return;
+    setState(() => _deletingId = r.id);
+    try {
+      await SupabaseService.deleteMyPendingLeave(r.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Leave request deleted. You can apply again.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      await _load(showSpinner: false);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(friendlyLeaveError(e)),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
+    }
   }
 
   @override
@@ -240,9 +304,9 @@ class _LeaveTabState extends State<LeaveTab> {
             padding: const EdgeInsets.only(right: 12),
             child: Center(
               child: Tooltip(
-                message: _section == _LeaveHomeSection.annual
+                message: _section == _LeaveHomeSection.annual && _annualEligible
                     ? 'Apply for annual leave'
-                    : 'Apply for other leave',
+                    : 'Apply for leave',
                 child: SizedBox(
                   height: 32,
                   child: FilledButton.icon(
@@ -257,9 +321,9 @@ class _LeaveTabState extends State<LeaveTab> {
                       ),
                     ),
                     style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.teal,
+                      backgroundColor: AppColors.primaryDark,
                       foregroundColor: AppColors.onBrand,
-                      disabledBackgroundColor: AppColors.teal.withValues(
+                      disabledBackgroundColor: AppColors.primaryDark.withValues(
                         alpha: 0.75,
                       ),
                       disabledForegroundColor: AppColors.onBrand,
@@ -267,9 +331,8 @@ class _LeaveTabState extends State<LeaveTab> {
                       shadowColor: Colors.transparent,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       minimumSize: Size.zero,
-                      fixedSize: const Size(72, 32),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(999),
                       ),
@@ -301,112 +364,47 @@ class _LeaveTabState extends State<LeaveTab> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 cacheExtent: 480,
                 slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: SegmentedButton<_LeaveHomeSection>(
-                                  style: SegmentedButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: AppColors.textPrimary,
-                                    selectedForegroundColor: AppColors.onBrand,
-                                    selectedBackgroundColor:
-                                        AppColors.primaryDark,
-                                    side: const BorderSide(
-                                      color: AppColors.divider,
-                                    ),
-                                  ),
-                                  showSelectedIcon: false,
-                                  segments: const [
-                                    ButtonSegment(
-                                      value: _LeaveHomeSection.annual,
-                                      label: Text('Annual'),
-                                      tooltip: 'Annual leave balance & history',
-                                      icon: Icon(
-                                        Icons.beach_access_rounded,
-                                        size: 16,
-                                      ),
-                                    ),
-                                    ButtonSegment(
-                                      value: _LeaveHomeSection.other,
-                                      label: Text('Other'),
-                                      tooltip:
-                                          'Sick, unpaid, maternity, marriage, PH, etc.',
-                                      icon: Icon(
-                                        Icons.folder_shared_rounded,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ],
-                                  selected: {_section},
-                                  onSelectionChanged: (next) {
-                                    setState(() => _section = next.first);
-                                    if (!_loading) {
-                                      unawaited(_reloadLeaveListFromFilters());
-                                    }
-                                  },
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              IconButton(
-                                tooltip: _section == _LeaveHomeSection.annual
-                                    ? 'Annual leave'
-                                    : 'Other leave',
-                                onPressed: () {
-                                  showModalBottomSheet<void>(
-                                    context: context,
-                                    showDragHandle: true,
-                                    builder: (ctx) => Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        8,
-                                        20,
-                                        24,
-                                      ),
-                                      child: Text(
-                                        _section == _LeaveHomeSection.annual
-                                            ? 'Submit dates and a reason. Optional proof can be attached. Approved days use your annual balance.'
-                                            : 'Sick, emergency, unpaid, and statutory leave. These do not use your annual balance.',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          height: 1.45,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textPrimary
-                                              .withValues(alpha: 0.92),
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                                icon: Icon(
-                                  Icons.info_outline_rounded,
-                                  size: 22,
-                                  color: AppColors.textSecondary.withValues(
-                                    alpha: 0.9,
-                                  ),
-                                ),
-                              ),
-                            ],
+                  if (_annualEligible)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                        child: SegmentedButton<_LeaveHomeSection>(
+                          style: SegmentedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.textPrimary,
+                            selectedForegroundColor: AppColors.onBrand,
+                            selectedBackgroundColor: AppColors.primaryDark,
+                            side: const BorderSide(color: AppColors.divider),
                           ),
-                        ],
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(
+                              value: _LeaveHomeSection.annual,
+                              label: Text('Annual'),
+                            ),
+                            ButtonSegment(
+                              value: _LeaveHomeSection.other,
+                              label: Text('Other'),
+                            ),
+                          ],
+                          selected: {_section},
+                          onSelectionChanged: (next) {
+                            setState(() => _section = next.first);
+                            if (!_loading) {
+                              unawaited(_reloadLeaveListFromFilters());
+                            }
+                          },
+                        ),
                       ),
                     ),
-                  ),
-                  if (_section == _LeaveHomeSection.annual)
-                    SliverToBoxAdapter(child: _annualDashboard(context))
+                  if (_annualEligible && _section == _LeaveHomeSection.annual)
+                    SliverToBoxAdapter(child: _annualDashboard())
                   else
                     SliverToBoxAdapter(child: _otherLeaveIntroCard()),
                   SliverToBoxAdapter(child: _leaveFilterStrip()),
@@ -428,7 +426,7 @@ class _LeaveTabState extends State<LeaveTab> {
                     )
                   else ...[
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, i) {
@@ -482,64 +480,63 @@ class _LeaveTabState extends State<LeaveTab> {
       (value: 'rejected', label: 'Rejected'),
     ];
 
-    Widget statusChip(String value, String label) {
-      final selected = _statusFilter == value;
-      return Padding(
-        padding: const EdgeInsets.only(right: 6),
-        child: ChoiceChip(
-          label: Text(label),
-          selected: selected,
-          onSelected: (_) {
-            setState(() => _statusFilter = value);
-            if (!_loading) unawaited(_reloadLeaveListFromFilters());
-          },
-          selectedColor: AppColors.primaryLight,
-          backgroundColor: AppColors.surface,
-          showCheckmark: false,
-          visualDensity: VisualDensity.compact,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-          side: BorderSide(
-            color: selected ? AppColors.primary : AppColors.border,
-          ),
-          labelStyle: TextStyle(
-            fontSize: 12,
-            color: selected ? AppColors.primary : AppColors.textSecondary,
-            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-          ),
-        ),
-      );
-    }
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [for (final o in options) statusChip(o.value, o.label)],
-            ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final o in options)
+                ChoiceChip(
+                  label: Text(o.label),
+                  selected: _statusFilter == o.value,
+                  onSelected: (_) {
+                    setState(() => _statusFilter = o.value);
+                    if (!_loading) unawaited(_reloadLeaveListFromFilters());
+                  },
+                  selectedColor: AppColors.primaryLight,
+                  backgroundColor: Colors.white,
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  side: BorderSide(
+                    color: _statusFilter == o.value
+                        ? AppColors.primaryDark
+                        : AppColors.divider,
+                  ),
+                  labelStyle: TextStyle(
+                    fontSize: 13,
+                    color: _statusFilter == o.value
+                        ? AppColors.primaryDark
+                        : AppColors.textSecondary,
+                    fontWeight: _statusFilter == o.value
+                        ? FontWeight.w600
+                        : FontWeight.w500,
+                  ),
+                ),
+            ],
           ),
           if (_section == _LeaveHomeSection.other) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               key: ValueKey<String>(_otherTypeFilter),
               initialValue: _otherTypeFilter,
               isDense: true,
               isExpanded: true,
               decoration: InputDecoration(
-                labelText: 'Leave type',
+                hintText: 'Leave type',
                 filled: true,
                 fillColor: Colors.white,
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 12,
-                  vertical: 8,
+                  vertical: 10,
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
+                  borderSide: const BorderSide(color: AppColors.divider),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -571,6 +568,7 @@ class _LeaveTabState extends State<LeaveTab> {
   }
 
   String _emptyTitle() {
+    if (!_annualEligible) return 'No leave matches filters';
     if (_section == _LeaveHomeSection.annual) {
       return 'No annual leave matches filters';
     }
@@ -579,323 +577,217 @@ class _LeaveTabState extends State<LeaveTab> {
 
   String _emptySubtitle() {
     if (_section == _LeaveHomeSection.annual) {
-      return 'Try another status filter, or tap Apply annual to request days off.';
+      return 'Try another status filter, or tap Apply to request days off.';
     }
-    return 'Change type or status filter, or tap Apply other to submit a request.';
+    return 'Change type or status filter, or tap Apply to submit a request.';
   }
 
   Widget _otherLeaveIntroCard() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-      child: Material(
-        color: Colors.white,
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.divider),
-        ),
-        child: Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            initiallyExpanded: false,
-            tilePadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 2,
-            ),
-            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            leading: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: AppColors.tealLight.withValues(alpha: 0.65),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.info_outline_rounded,
-                color: AppColors.teal,
-                size: 18,
-              ),
-            ),
-            title: const Text(
-              'Other leave policies',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.2,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            subtitle: Text(
-              'Sick, emergency, unpaid, statutory',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary.withValues(alpha: 0.92),
-              ),
-            ),
-            children: [
-              _introBullet(
-                Icons.medical_services_rounded,
-                AppColors.pink,
-                'Sick leave needs an MC or doctor\'s note.',
-              ),
-              const SizedBox(height: 6),
-              _introBullet(
-                Icons.warning_amber_rounded,
-                AppColors.orange,
-                'Emergency leave for urgent personal matters.',
-              ),
-              const SizedBox(height: 6),
-              _introBullet(
-                Icons.payments_outlined,
-                AppColors.textSecondary,
-                'Unpaid leave may reduce pay.',
-              ),
-              const SizedBox(height: 6),
-              _introBullet(
-                Icons.family_restroom_rounded,
-                AppColors.primary,
-                'Maternity, paternity, marriage, or PH replacement.',
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'These do not use your annual balance.',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  height: 1.35,
-                  color: AppColors.textSecondary.withValues(alpha: 0.95),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+      child: Text(
+        _annualEligible
+            ? 'Sick, emergency, unpaid, and statutory leave. These do not use your annual balance.'
+            : 'Interns use sick, unpaid, and other leave. Annual leave is for permanent and contract staff only.',
+        style: const TextStyle(
+          fontSize: 13.5,
+          height: 1.45,
+          fontWeight: FontWeight.w400,
+          color: AppColors.textSecondary,
         ),
       ),
-    );
-  }
-
-  static Widget _introBullet(IconData icon, Color color, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 12.5,
-              height: 1.35,
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
   Widget _leaveRequestTile(LeaveRequest r, DateFormat dateFmt) {
-    final accent = _leaveAccent(r.leaveType);
     final submittedFmt = _submittedFmt;
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: AppElevation.cardOnSurface,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        // Accent stripe without IntrinsicHeight.
-        child: Stack(
-          children: [
-            PositionedDirectional(
-              top: 0,
-              bottom: 0,
-              start: 0,
-              child: SizedBox(width: 4, child: ColoredBox(color: accent)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _leaveTypeIcon(r.leaveType),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              r.leaveTypeDisplay,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
-                              style: const TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textHint,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      StatusChip.fromStatus(r.status),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _detailTag(
-                        icon: Icons.calendar_today_outlined,
-                        label:
-                            '${dateFmt.format(r.startDate)} – ${dateFmt.format(r.endDate)}',
-                      ),
-                      _detailTag(
-                        icon: Icons.timelapse_outlined,
-                        label: r.durationDisplayLabel,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.divider),
-                    ),
-                    child: Text(
-                      r.reason,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
-                        height: 1.4,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  LeaveAttachmentRow(attachmentPath: r.attachmentPath),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: OutlinedButton.icon(
-                      onPressed: () => showLeaveAuditHistorySheet(
-                        context,
-                        leaveRequestId: r.id,
-                      ),
-                      icon: const Icon(Icons.history, size: 16),
-                      label: const Text('History'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 38),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (r.adminComment != null && r.adminComment!.isNotEmpty) ...[
-                    const Divider(height: 20),
+    final hasAttachment =
+        r.attachmentPath != null && r.attachmentPath!.isNotEmpty;
+    final sameDay =
+        r.startDate.year == r.endDate.year &&
+        r.startDate.month == r.endDate.month &&
+        r.startDate.day == r.endDate.day;
+    final dateLine = sameDay
+        ? dateFmt.format(r.startDate)
+        : '${dateFmt.format(r.startDate)} – ${dateFmt.format(r.endDate)}';
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => _toggleDetails(r.id),
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 16, 14),
+            child: ValueListenableBuilder<Set<String>>(
+              valueListenable: _expandedRequestIds,
+              builder: (context, expandedIds, _) {
+                final expanded = expandedIds.contains(r.id);
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.comment_outlined,
-                          size: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 6),
                         Expanded(
-                          child: Text(
-                            r.adminComment!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                              color: AppColors.textSecondary,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                r.leaveTypeDisplay,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.25,
+                                  height: 1.2,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$dateLine · ${r.durationDisplayLabel}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        StatusChip.fromStatus(r.status),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      r.reason,
+                      maxLines: expanded ? null : 2,
+                      overflow: expanded
+                          ? TextOverflow.visible
+                          : TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        height: 1.45,
+                        fontWeight: FontWeight.w400,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (hasAttachment)
+                          TextButton.icon(
+                            onPressed: () =>
+                                openLeaveAttachment(context, r.attachmentPath),
+                            icon: const Icon(
+                              Icons.attach_file_rounded,
+                              size: 18,
+                            ),
+                            label: const Text('Attachment'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primaryDark,
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
                             ),
                           ),
+                        const Spacer(),
+                        Icon(
+                          expanded
+                              ? Icons.expand_less_rounded
+                              : Icons.expand_more_rounded,
+                          color: AppColors.textHint,
                         ),
                       ],
                     ),
+                    if (r.status == 'pending') ...[
+                      const SizedBox(height: 10),
+                      OutlinedButton(
+                        onPressed: _deletingId == r.id
+                            ? null
+                            : () => _confirmDelete(r),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.danger,
+                          side: const BorderSide(color: AppColors.danger),
+                          minimumSize: const Size(0, 44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(
+                          _deletingId == r.id ? 'Deleting…' : 'Delete request',
+                        ),
+                      ),
+                    ],
+                    if (expanded) ...[
+                      Text(
+                        'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textHint,
+                        ),
+                      ),
+                      if (r.adminComment != null &&
+                          r.adminComment!.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          r.adminComment!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () => showLeaveAuditHistorySheet(
+                            context,
+                            leaveRequestId: r.id,
+                          ),
+                          icon: const Icon(Icons.history, size: 16),
+                          label: const Text('History'),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                );
+              },
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static Color _leaveAccent(String type) => LeaveCatalog.uiStyle(type).color;
-
-  static Widget _leaveTypeIcon(String type) {
-    final st = LeaveCatalog.uiStyle(type);
-    final color = st.color;
-    final icon = st.icon;
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
           ),
-        ],
+        ),
       ),
-      child: Icon(icon, size: 18, color: Colors.white),
     );
   }
 
-  Widget _annualDashboard(BuildContext context) {
+  Widget _annualDashboard() {
     final s = _summary;
     final used = s?.used;
     final ent = s?.entitlement;
-    final usedStr = used == null
-        ? '—'
-        : used == used.roundToDouble()
-        ? '${used.round()}'
-        : used.toString();
-    final entStr = ent == null
-        ? '—'
-        : ent == ent.roundToDouble()
-        ? '${ent.round()}'
-        : ent.toString();
-
     final rem = s?.remaining;
-    final remStr = rem == null
-        ? '—'
-        : rem == rem.roundToDouble()
-        ? '${rem.round()}'
-        : rem.toString();
-    final pendStr = s?.pending == null
-        ? '—'
-        : s!.pending == s.pending.roundToDouble()
-        ? '${s.pending.round()}'
-        : s.pending.toString();
+    String fmt(double? n) {
+      if (n == null) return '—';
+      return n == n.roundToDouble() ? '${n.round()}' : n.toString();
+    }
 
+    final remStr = fmt(rem);
+    final usedStr = fmt(used);
+    final entStr = fmt(ent);
+    final pendStr = fmt(s?.pending);
     final entVal = ent;
     final usedVal = used ?? 0.0;
     final usedRatio = (entVal != null && entVal > 0)
@@ -903,152 +795,64 @@ class _LeaveTabState extends State<LeaveTab> {
         : null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.divider),
-          boxShadow: AppElevation.cardOnSurface,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Annual leave balance',
-                        style: AppTypography.employeeCardOverline(
-                          AppColors.textSecondary.withValues(alpha: 0.8),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Leave year $_leaveYear',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          height: 1.16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.35,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withValues(alpha: 0.58),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.12),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        remStr,
-                        style: const TextStyle(
-                          fontSize: 23,
-                          height: 1,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.8,
-                          color: AppColors.primaryDark,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'left',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryDark.withValues(alpha: 0.78),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Leave year $_leaveYear',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
             ),
-            if (usedRatio != null) ...[
-              const SizedBox(height: 14),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(999),
-                child: LinearProgressIndicator(
-                  value: usedRatio,
-                  minHeight: 5,
-                  backgroundColor: AppColors.surface,
-                  color: AppColors.primary,
+          ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                remStr,
+                style: const TextStyle(
+                  fontSize: 36,
+                  height: 1,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -1,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'days left',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _detailTag(
-                  icon: Icons.assignment_turned_in_outlined,
-                  label: '$usedStr used',
-                ),
-                _detailTag(
-                  icon: Icons.event_available_outlined,
-                  label: '$entStr entitlement',
-                ),
-                _detailTag(
-                  icon: Icons.hourglass_top_rounded,
-                  label: '$pendStr pending',
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Balances update after HR approval.',
-              style: TextStyle(
-                fontSize: 11.5,
-                height: 1.3,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-                fontWeight: FontWeight.w600,
+          ),
+          if (usedRatio != null) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: usedRatio,
+                minHeight: 4,
+                backgroundColor: AppColors.divider,
+                color: AppColors.primaryDark,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _detailTag({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.textSecondary),
-          const SizedBox(width: 6),
+          const SizedBox(height: 10),
           Text(
-            label,
+            '$usedStr used of $entStr'
+            '${s != null && s.pending > 0 ? ' · $pendStr pending' : ''}',
             style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              height: 1.4,
+              fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
           ),

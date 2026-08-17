@@ -281,10 +281,15 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                                     ),
                                     child: InkWell(
                                       borderRadius: BorderRadius.circular(16),
-                                      onTap: () => pushAppPage(
-                                        context,
-                                        ClaimDetailScreen(claimId: c.id),
-                                      ),
+                                      onTap: () async {
+                                        final deleted = await pushAppPage<bool>(
+                                          context,
+                                          ClaimDetailScreen(claimId: c.id),
+                                        );
+                                        if (deleted == true && mounted) {
+                                          _load(showSpinner: false);
+                                        }
+                                      },
                                       child: Padding(
                                         padding: const EdgeInsets.all(16),
                                         child: Column(

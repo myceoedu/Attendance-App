@@ -3,11 +3,39 @@ import 'package:intl/intl.dart';
 class AppTime {
   static const Duration malaysiaOffset = Duration(hours: 8);
 
-  /// Current time in Malaysia (UTC+8), independent of the emulator/device timezone.
-  static DateTime malaysiaNow() => DateTime.now().toUtc().add(malaysiaOffset);
+  /// Current Malaysia wall-clock time (UTC+8), independent of device timezone.
+  ///
+  /// Returns a timezone-agnostic [DateTime] (`isUtc == false`) whose fields are
+  /// already Malaysia local. Do **not** pass this through [toMalaysia] again.
+  static DateTime malaysiaNow() {
+    final m = DateTime.now().toUtc().add(malaysiaOffset);
+    return DateTime(
+      m.year,
+      m.month,
+      m.day,
+      m.hour,
+      m.minute,
+      m.second,
+      m.millisecond,
+      m.microsecond,
+    );
+  }
 
-  /// Converts a stored timestamp into Malaysia time for display.
-  static DateTime toMalaysia(DateTime value) => value.toUtc().add(malaysiaOffset);
+  /// Converts a stored absolute timestamp (usually UTC from the DB) into
+  /// Malaysia wall-clock fields for display.
+  static DateTime toMalaysia(DateTime value) {
+    final m = value.toUtc().add(malaysiaOffset);
+    return DateTime(
+      m.year,
+      m.month,
+      m.day,
+      m.hour,
+      m.minute,
+      m.second,
+      m.millisecond,
+      m.microsecond,
+    );
+  }
 
   static String malaysiaDateString() => dateOnly(malaysiaNow());
 

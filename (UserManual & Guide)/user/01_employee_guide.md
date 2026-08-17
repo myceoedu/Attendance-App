@@ -69,19 +69,15 @@ Location is **not** required for clock out.
 ### Apply for leave
 
 1. From **Home**, open **Leave**
-2. Start a new leave request
-3. Choose:
-   - Leave type
-   - Start and end dates
-   - Reason
-4. Attach a file if needed  
-   (example: medical certificate / MC for sick leave)
-5. Submit
+2. Choose **Annual** or **Other**, then tap **Apply**
+3. Pick dates, add a reason, attach an MC if needed, and submit
 
 ### After you submit
 
 - Status is usually **pending** until a manager/admin reviews it
+- If the MC or details are wrong, delete the **pending** request and apply again
 - You will see when it becomes **approved** or **rejected**
+- Approved or rejected leave cannot be deleted
 - Approved leave for today can block clock-in
 
 ---

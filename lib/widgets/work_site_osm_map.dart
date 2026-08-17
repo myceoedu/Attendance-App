@@ -82,7 +82,7 @@ class WorkSiteOsmMap extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: const Icon(
                     Icons.location_on_rounded,
-                    color: Color(0xFFE11D48),
+                    color: AppColors.danger,
                     size: 40,
                   ),
                 ),

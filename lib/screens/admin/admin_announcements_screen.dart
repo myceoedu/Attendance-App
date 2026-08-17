@@ -8,6 +8,7 @@ import '../../models/company_announcement.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/app_confirm_dialog.dart';
 
 /// Create, list, and remove **company announcements** (admin only).
 class AdminAnnouncementsScreen extends StatefulWidget {
@@ -79,7 +80,8 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             left: 20,
             right: 20,
             top: 16,
-            bottom: MediaQuery.paddingOf(ctx).bottom +
+            bottom:
+                MediaQuery.paddingOf(ctx).bottom +
                 MediaQuery.viewInsetsOf(ctx).bottom +
                 20,
           ),
@@ -89,10 +91,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
             children: [
               const Text(
                 'New announcement',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -172,37 +171,28 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
   }
 
   Future<void> _confirmDelete(CompanyAnnouncement a) async {
-    final go = await showDialog<bool>(
+    final go = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove announcement?'),
-        content: Text('“${a.title}” will be hidden from all staff.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Remove announcement?',
+      message: '“${a.title}” will be hidden from all staff.',
+      cancelLabel: 'Keep',
+      confirmLabel: 'Remove',
+      emphasis: AppConfirmEmphasis.safe,
+      confirmColor: AppColors.danger,
     );
     if (go != true || !mounted) return;
     try {
       await SupabaseService.deleteCompanyAnnouncement(a.id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Announcement removed')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Announcement removed')));
       _load(showSpinner: false);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not delete: $e')));
     }
   }
 
@@ -211,9 +201,7 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
     final dateFmt = DateFormat('d MMM yyyy, h:mm a');
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Announcements'),
-      ),
+      appBar: AppBar(title: const Text('Announcements')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openComposer,
         icon: const Icon(Icons.add_rounded),
@@ -222,98 +210,94 @@ class _AdminAnnouncementsScreenState extends State<AdminAnnouncementsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-              ? const EmptyState(
-                  icon: Icons.campaign_outlined,
-                  title: 'No announcements',
-                  subtitle:
-                      'Tap “New” to post a notice. Staff see it under Announcements on home.',
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _load(showSpinner: true),
-                  child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (_, i) {
-                      final a = _items[i];
-                      final author = a.authorName?.trim().isNotEmpty == true
-                          ? a.authorName!
-                          : 'Admin';
-                      return Material(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
+          ? const EmptyState(
+              icon: Icons.campaign_outlined,
+              title: 'No announcements',
+              subtitle:
+                  'Tap “New” to post a notice. Staff see it under Announcements on home.',
+            )
+          : RefreshIndicator(
+              onRefresh: () => _load(showSpinner: true),
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+                itemCount: _items.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (_, i) {
+                  final a = _items[i];
+                  final author = a.authorName?.trim().isNotEmpty == true
+                      ? a.authorName!
+                      : 'Admin';
+                  return Material(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () => _confirmDelete(a),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () => _confirmDelete(a),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.divider),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.accent
-                                        .withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Icon(
-                                    Icons.campaign_rounded,
-                                    color: AppColors.accent
-                                        .withValues(alpha: 0.95),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        a.title,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 15.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        a.body,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary,
-                                          height: 1.4,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        '$author · ${dateFmt.format(a.createdAt.toLocal())}',
-                                        style: const TextStyle(
-                                          fontSize: 11.5,
-                                          color: AppColors.textHint,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.delete_outline_rounded,
-                                  color:
-                                      AppColors.textHint.withValues(alpha: 0.8),
-                                ),
-                              ],
-                            ),
-                          ),
+                          border: Border.all(color: AppColors.divider),
                         ),
-                      );
-                    },
-                  ),
-                ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                Icons.campaign_rounded,
+                                color: AppColors.accent.withValues(alpha: 0.95),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    a.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    a.body,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '$author · ${dateFmt.format(a.createdAt.toLocal())}',
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.textHint.withValues(alpha: 0.8),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }

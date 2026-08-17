@@ -65,7 +65,19 @@ Never put `service_role` in the Flutter client. Rotate the key if it was exposed
 *SERVICE ROLE KEY BOLEH COPY DEKAT (SUPABASE-PROJECT SETTING-API KEY)*
 ---
 
-## Storage
+## Edge Function: admin-create-user
+
+Admin **Add employee** calls this function so the admin session is not replaced.
+
+```bash
+supabase functions deploy admin-create-user --no-verify-jwt
+```
+
+Source: `supabase/functions/admin-create-user/index.ts`
+
+Never put `service_role` in the Flutter client.
+
+---
 
 Production Supabase project must have buckets:
 

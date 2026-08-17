@@ -30,3 +30,11 @@ CREATE POLICY "leave_attachments_select_own_or_admin"
       OR EXISTS (SELECT 1 FROM public.users u WHERE u.id = auth.uid() AND u.role = 'admin')
     )
   );
+
+DROP POLICY IF EXISTS "leave_attachments_delete_own_folder" ON storage.objects;
+CREATE POLICY "leave_attachments_delete_own_folder"
+  ON storage.objects FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'leave-attachments'
+    AND split_part(name, '/', 1) = auth.uid()::text
+  );

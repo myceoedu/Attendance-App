@@ -1,0 +1,27 @@
+---
+description: Semantic color from AppColors — delete is danger, approve is success, never invent hex
+globs: lib/**/*.dart
+alwaysApply: true
+---
+
+# UI color (meaning, not decoration)
+
+Act as a senior product designer and Flutter engineer. Use only `AppColors` / `AppGradients` in `lib/constants/app_theme.dart`. Do not add new hex unless no token fits.
+
+| Meaning | Token |
+|---------|--------|
+| Delete, remove, reject, error snackbar | `AppColors.danger` |
+| Safe action in a destructive dialog (Keep / Stay) | Filled `primaryDark`; destructive is **outline** danger, equal 48px height |
+| Approve, saved, done | `AppColors.success` |
+| Pending, warning, future | `AppColors.warning` / `pending` |
+| Primary proceed (save, apply, clock in) | `AppColors.primaryDark` |
+| Admin chrome | `AppGradients.adminBrandHeader` |
+| Employee chrome | `AppGradients.brandHeader` / `employeeHeroHeader` |
+| Auth / login | `AppGradients.authBackground`, `authNavy` / `authBlue` |
+| Clock / wordmark | `teal` / `tealBright` / `AppGradients.tealBadge` |
+| Text | `textPrimary` / `textSecondary` / `textHint` |
+| Surfaces | `surface`, `cardBg`, `divider`, `cardShadowFaint` |
+
+Confirms: reuse `showAppConfirmDialog` / `AppDialogActions`. Do not use `AlertDialog` actions that stack on a phone.
+
+Status color once (chip or one button). No extra magenta/pink/teal stripes. Unread badges use `danger`, not `Colors.red`.

@@ -6,6 +6,7 @@ import '../../../models/payroll_salary_setting.dart';
 import '../../../payroll/payroll_calculator.dart';
 import '../../../models/payroll_statutory_config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../widgets/app_confirm_dialog.dart';
 
 class PayrollStatutoryScreen extends StatefulWidget {
   const PayrollStatutoryScreen({super.key});
@@ -257,10 +258,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
               contentPadding: EdgeInsets.zero,
               title: const Text(
                 'EIS eligible',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
               dense: true,
               value: _debugEisEligible,
@@ -633,23 +631,14 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
         ? 'Delete "${c.label}"?\n\n"${nextDefault.label}" (effective ${_fmtDate(nextDefault.effectiveFrom)}) will become the new default for future payroll runs.\n\nThis cannot be undone.'
         : 'Delete "${c.label}"?\n\nThis cannot be undone.';
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete rate set?'),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete rate set?',
+      message: body,
+      cancelLabel: 'Keep',
+      confirmLabel: 'Delete',
+      emphasis: AppConfirmEmphasis.safe,
+      confirmColor: AppColors.danger,
     );
     if (confirmed != true || !mounted) return;
 
@@ -938,7 +927,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                                                       vertical: 1,
                                                     ),
                                                 decoration: BoxDecoration(
-                                                  color: Colors.orange
+                                                  color: AppColors.warning
                                                       .withValues(alpha: 0.12),
                                                   borderRadius:
                                                       BorderRadius.circular(8),
@@ -948,7 +937,7 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
                                                   style: TextStyle(
                                                     fontSize: 9,
                                                     fontWeight: FontWeight.w700,
-                                                    color: Colors.orange,
+                                                    color: AppColors.warning,
                                                     letterSpacing: 0.4,
                                                   ),
                                                 ),

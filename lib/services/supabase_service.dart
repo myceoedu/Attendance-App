@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io' show File;
 
 import 'package:file_picker/file_picker.dart';
@@ -23,6 +24,7 @@ import '../models/payroll_statutory_config.dart';
 import '../models/work_site.dart';
 import '../utils/app_time.dart';
 import '../utils/geofence.dart';
+import '../utils/monthly_attendance_rollup.dart';
 import 'app_realtime.dart';
 import 'payroll_engine.dart';
 
@@ -92,6 +94,136 @@ class SupabaseService {
       password: password,
       data: {'username': normalizedUsername, 'name': name},
     );
+  }
+
+  /// Admin creates a staff Auth account without changing the admin session.
+  /// Requires Edge Function `admin-create-user`.
+  static Future<AppUser> createEmployeeAsAdmin({
+    required String name,
+    required String email,
+    required String username,
+    required String password,
+  }) async {
+    final trimmedName = name.trim();
+    final trimmedEmail = email.trim().toLowerCase();
+    final normUser = normalizeUsername(username);
+    if (trimmedName.length < 2) {
+      throw Exception('Enter the employee\'s full name');
+    }
+    if (trimmedEmail.isEmpty || !trimmedEmail.contains('@')) {
+      throw Exception('Enter a valid email');
+    }
+    if (normUser.length < 3) {
+      throw Exception('Username must be at least 3 characters');
+    }
+    if (password.length < 6) {
+      throw Exception('Password must be at least 6 characters');
+    }
+
+    try {
+      final res = await client.functions
+          .invoke(
+            'admin-create-user',
+            body: {
+              'name': trimmedName,
+              'email': trimmedEmail,
+              'username': normUser,
+              'password': password,
+            },
+          )
+          .timeout(const Duration(seconds: 20));
+
+      if (res.status >= 400) {
+        throw Exception(
+          _errorFromFunctionDetails(res.data) ??
+              'Could not create employee. Try again.',
+        );
+      }
+
+      final data = res.data;
+      Map<String, dynamic>? userMap;
+      if (data is Map) {
+        final user = data['user'];
+        if (user is Map) {
+          userMap = Map<String, dynamic>.from(user);
+        }
+      }
+      if (userMap == null) {
+        throw Exception('Could not create employee');
+      }
+      _invalidateEmployeesCache();
+      return AppUser.fromMap(userMap);
+    } on TimeoutException {
+      throw Exception(
+        'Request timed out. Check your connection and try again.',
+      );
+    } catch (e) {
+      if (e is TimeoutException) rethrow;
+      throw Exception(_friendlyCreateEmployeeError(e));
+    }
+  }
+
+  static String _friendlyCreateEmployeeError(Object e) {
+    if (e is FunctionException) {
+      final fromBody = _errorFromFunctionDetails(e.details);
+      if (fromBody != null) return fromBody;
+      if (e.status == 404) {
+        return 'Add employee is not set up on the server yet. '
+            'Deploy the admin-create-user function.';
+      }
+      if (e.status == 401) return 'Please sign in again';
+      if (e.status == 403) return 'Only admins can add employees';
+      if (e.status == 409) {
+        return 'Email or username is already in use';
+      }
+    }
+    final raw = e.toString().toLowerCase();
+    if (raw.contains('404') || raw.contains('not found')) {
+      return 'Add employee is not set up on the server yet. '
+          'Deploy the admin-create-user function.';
+    }
+    if (raw.contains('failed host lookup') ||
+        raw.contains('socket') ||
+        raw.contains('network') ||
+        raw.contains('timed out') ||
+        raw.contains('timeout')) {
+      return 'Network error. Check your connection and try again.';
+    }
+    if (raw.contains('already') && raw.contains('email')) {
+      return 'An account with this email already exists';
+    }
+    if (raw.contains('username is already taken')) {
+      return 'Username is already taken';
+    }
+    final prefixed = e.toString();
+    if (prefixed.startsWith('Exception: ')) {
+      final msg = prefixed.substring(11).trim();
+      if (msg.isNotEmpty && msg.length < 160 && !msg.contains('Exception')) {
+        return msg;
+      }
+    }
+    return 'Could not create employee. Try again.';
+  }
+
+  static String? _errorFromFunctionDetails(dynamic details) {
+    if (details is Map) {
+      final err = details['error'];
+      if (err is String && err.trim().isNotEmpty) return err.trim();
+    }
+    if (details is String && details.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(details);
+        if (decoded is Map && decoded['error'] is String) {
+          final err = (decoded['error'] as String).trim();
+          if (err.isNotEmpty) return err;
+        }
+      } catch (_) {}
+      if (details.length < 160 &&
+          !details.toLowerCase().contains('exception')) {
+        return details.trim();
+      }
+    }
+    return null;
   }
 
   static Future<void> signOut() async {
@@ -485,6 +617,21 @@ class SupabaseService {
       params: {'p_user_id': userId, 'p_year': y},
     );
     return _parseAnnualLeaveSummaryRpc(res);
+  }
+
+  /// Permanent and contract only. Intern / intern-pay / other statuses are false.
+  /// Returns true if the RPC is missing so existing staff are not locked out.
+  static Future<bool> userHasAnnualLeave(String userId) async {
+    try {
+      final raw = await client.rpc(
+        'user_has_annual_leave',
+        params: {'p_user_id': userId},
+      );
+      if (raw is bool) return raw;
+      return raw != false;
+    } catch (_) {
+      return true;
+    }
   }
 
   /// Admin-only batch summaries for roster chips.
@@ -1098,6 +1245,46 @@ class SupabaseService {
     return LeaveRequest.fromMap(data);
   }
 
+  /// Employee deletes their own pending leave (wrong MC or details).
+  /// Approved / rejected leave cannot be deleted.
+  static Future<void> deleteMyPendingLeave(String leaveId) async {
+    final uid = currentUserId;
+    if (uid == null) throw Exception('Please sign in again');
+
+    final row = await client
+        .from('leave_requests')
+        .select(_leaveListSelect)
+        .eq('id', leaveId)
+        .maybeSingle()
+        .timeout(const Duration(seconds: 15));
+    if (row == null) throw Exception('Leave request not found');
+    final req = LeaveRequest.fromMap(Map<String, dynamic>.from(row));
+    if (req.userId != uid) {
+      throw Exception('You can only delete your own leave request');
+    }
+    if (req.status != 'pending') {
+      throw Exception('Only pending leave can be deleted');
+    }
+
+    final path = req.attachmentPath?.trim();
+    if (path != null && path.isNotEmpty) {
+      try {
+        await client.storage
+            .from(_leaveAttachmentsBucket)
+            .remove([path])
+            .timeout(const Duration(seconds: 20));
+      } catch (_) {}
+    }
+
+    await client
+        .from('leave_requests')
+        .delete()
+        .eq('id', leaveId)
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .timeout(const Duration(seconds: 15));
+  }
+
   static Future<List<LeaveRequest>> getMyLeaveRequests(
     String userId, {
     int limit = 400,
@@ -1456,6 +1643,43 @@ class SupabaseService {
     return ExpenseClaim.fromMap(m);
   }
 
+  /// Employee deletes their own pending claim (wrong file or details).
+  /// Approved / rejected claims cannot be deleted.
+  static Future<void> deleteMyPendingClaim(String claimId) async {
+    final uid = currentUserId;
+    if (uid == null) throw Exception('Please sign in again');
+
+    final claim = await getExpenseClaimById(claimId);
+    if (claim == null) throw Exception('Claim not found');
+    if (claim.userId != uid) {
+      throw Exception('You can only delete your own claim');
+    }
+    if (claim.status != 'pending') {
+      throw Exception('Only pending claims can be deleted');
+    }
+
+    final paths = claim.attachments
+        .map((a) => a.storagePath.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (paths.isNotEmpty) {
+      try {
+        await client.storage
+            .from(_claimAttachmentsBucket)
+            .remove(paths)
+            .timeout(const Duration(seconds: 20));
+      } catch (_) {}
+    }
+
+    await client
+        .from('expense_claims')
+        .delete()
+        .eq('id', claimId)
+        .eq('user_id', uid)
+        .eq('status', 'pending')
+        .timeout(const Duration(seconds: 15));
+  }
+
   /// Admin claims page.
   static Future<List<ExpenseClaim>> getExpenseClaimsPage({
     int offset = 0,
@@ -1593,73 +1817,99 @@ class SupabaseService {
       getAllEmployees(),
       _getAttendanceRowsByMonth(month),
       _getApprovedLeaveRowsByMonth(month),
+      _getMonthlyAttendanceNotesMap(month),
     ]);
 
     final employees = results[0] as List<AppUser>;
     final records = results[1] as List<Attendance>;
     final approvedLeaves = results[2] as List<LeaveRequest>;
+    final notesByUser = results[3] as Map<String, String>;
 
     final byUserAttendance = <String, List<Attendance>>{};
     for (final record in records) {
       byUserAttendance.putIfAbsent(record.userId, () => []).add(record);
     }
 
-    final approvedLeaveDays = <String, int>{};
+    final byUserLeave = <String, List<LeaveRequest>>{};
     for (final leave in approvedLeaves) {
-      approvedLeaveDays.update(
-        leave.userId,
-        (value) =>
-            value + _overlapDaysInMonth(leave.startDate, leave.endDate, month),
-        ifAbsent: () =>
-            _overlapDaysInMonth(leave.startDate, leave.endDate, month),
-      );
+      byUserLeave.putIfAbsent(leave.userId, () => []).add(leave);
     }
 
-    final summaries = employees.map((employee) {
-      final employeeRecords = List<Attendance>.from(
-        byUserAttendance[employee.id] ?? <Attendance>[],
-      );
-      employeeRecords.sort((a, b) => b.date.compareTo(a.date));
-      var completedAttendanceDays = 0;
-      var openAttendanceDays = 0;
-      DateTime? lastDate;
-
-      for (final record in employeeRecords) {
-        if (record.status == 'completed') {
-          completedAttendanceDays += 1;
-        } else if (record.status == 'in_progress') {
-          openAttendanceDays += 1;
-        }
-
-        if (lastDate == null || record.date.isAfter(lastDate)) {
-          lastDate = record.date;
-        }
-      }
-
-      return MonthlyAttendanceSummary(
-        employeeId: employee.id,
-        employeeName: employee.name,
-        username: employee.username,
-        email: employee.email,
-        totalAttendanceRecords: employeeRecords.length,
-        completedAttendanceDays: completedAttendanceDays,
-        openAttendanceDays: openAttendanceDays,
-        approvedLeaveDays: approvedLeaveDays[employee.id] ?? 0,
-        lastAttendanceDate: lastDate,
-      );
-    }).toList();
+    final today = AppTime.malaysiaDateOnly();
+    final summaries = employees
+        .map(
+          (employee) => MonthlyAttendanceRollup.summarizeEmployee(
+            employee: employee,
+            month: DateTime(month.year, month.month),
+            records: byUserAttendance[employee.id] ?? const <Attendance>[],
+            approvedLeaves: byUserLeave[employee.id] ?? const <LeaveRequest>[],
+            today: today,
+            notes: notesByUser[employee.id] ?? '',
+          ),
+        )
+        .toList();
 
     summaries.sort((a, b) {
-      if (a.hasNoAttendance != b.hasNoAttendance) {
-        return a.hasNoAttendance ? 1 : -1;
+      int rank(MonthlyAttendanceSummary s) {
+        switch (s.reviewState) {
+          case MonthlyAttendanceReviewState.hasMia:
+            return 0;
+          case MonthlyAttendanceReviewState.noAttendance:
+            return 1;
+          case MonthlyAttendanceReviewState.clean:
+            return 2;
+        }
       }
-      final attendanceCompare = b.completedAttendanceDays.compareTo(
-        a.completedAttendanceDays,
-      );
-      if (attendanceCompare != 0) return attendanceCompare;
+      final byRank = rank(a).compareTo(rank(b));
+      if (byRank != 0) return byRank;
+      final byMia = b.miaDays.compareTo(a.miaDays);
+      if (byMia != 0) return byMia;
+      final byAttend = b.attendDays.compareTo(a.attendDays);
+      if (byAttend != 0) return byAttend;
       return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
     });
     return summaries;
+  }
+
+  /// Admin notes keyed by employee id. Empty map if table not migrated yet.
+  static Future<Map<String, String>> _getMonthlyAttendanceNotesMap(
+    DateTime month,
+  ) async {
+    try {
+      final data = await client
+          .from('monthly_attendance_notes')
+          .select('user_id, notes')
+          .eq('period_year', month.year)
+          .eq('period_month', month.month);
+      final map = <String, String>{};
+      for (final row in data as List) {
+        final id = row['user_id'] as String?;
+        if (id == null) continue;
+        map[id] = (row['notes'] as String?)?.trim() ?? '';
+      }
+      return map;
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  static Future<void> upsertMonthlyAttendanceNote({
+    required String employeeId,
+    required DateTime month,
+    required String notes,
+  }) async {
+    final uid = client.auth.currentUser?.id;
+    await client.from('monthly_attendance_notes').upsert(
+      {
+        'user_id': employeeId,
+        'period_year': month.year,
+        'period_month': month.month,
+        'notes': notes.trim(),
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+        if (uid != null) 'updated_by': uid,
+      },
+      onConflict: 'user_id,period_year,period_month',
+    );
   }
 
   static Future<EmployeeMonthlyCalendarData> getEmployeeMonthlyCalendar(
@@ -2462,18 +2712,6 @@ class SupabaseService {
   // ──────────────────────────────────────────────
 
   static String _todayString() => AppTime.malaysiaDateString();
-
-  static int _overlapDaysInMonth(DateTime start, DateTime end, DateTime month) {
-    final monthStart = DateTime(month.year, month.month);
-    final monthEnd = DateTime(
-      month.year,
-      month.month + 1,
-    ).subtract(const Duration(days: 1));
-    final effectiveStart = start.isAfter(monthStart) ? start : monthStart;
-    final effectiveEnd = end.isBefore(monthEnd) ? end : monthEnd;
-    if (effectiveEnd.isBefore(effectiveStart)) return 0;
-    return effectiveEnd.difference(effectiveStart).inDays + 1;
-  }
 
   static String _dateString(DateTime d) {
     return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';

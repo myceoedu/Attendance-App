@@ -122,6 +122,17 @@ CREATE POLICY "Admins update leave requests"
     EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'admin')
   );
 
+-- Employees may delete their own pending requests (wrong MC or details).
+DROP POLICY IF EXISTS "Employees delete own pending leave requests"
+  ON public.leave_requests;
+CREATE POLICY "Employees delete own pending leave requests"
+  ON public.leave_requests FOR DELETE
+  TO authenticated
+  USING (
+    auth.uid() = user_id
+    AND status = 'pending'
+  );
+
 
 -- ============================================================
 -- OPTIONAL: Auto-create user profile on signup

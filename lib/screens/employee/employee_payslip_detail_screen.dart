@@ -23,8 +23,9 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
     final money = NumberFormat.currency(symbol: 'RM ', decimalDigits: 2);
     final period =
         '${run.periodYear}-${run.periodMonth.toString().padLeft(2, '0')}';
-    final periodReadable = DateFormat('MMMM yyyy')
-        .format(DateTime(run.periodYear, run.periodMonth));
+    final periodReadable = DateFormat(
+      'MMMM yyyy',
+    ).format(DateTime(run.periodYear, run.periodMonth));
     final intern = item.isIntern;
     final calDays = PayrollEngine.calendarDaysInMonth(
       DateTime(run.periodYear, run.periodMonth),
@@ -46,27 +47,22 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
     }
 
     Widget line(String k, double v) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                k,
-                style: const TextStyle(color: AppColors.textSecondary),
-              ),
-              Text(
-                money.format(v),
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(k, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(
+            money.format(v),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-        );
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Text(period),
-      ),
+      appBar: AppBar(title: Text(period)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -112,11 +108,11 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
           Text(
             intern
                 ? 'Calendar days in month: $calDays · '
-                    'Days with clock-in: ${item.presentDays} · '
-                    'Leave days counted: ${item.unpaidLeaveDays}'
+                      'Days with clock-in: ${item.presentDays} · '
+                      'Leave days counted: ${item.unpaidLeaveDays}'
                 : 'Working weekdays in month: ${item.workingWeekdays} · '
-                    'Days with clock-in: ${item.presentDays} · '
-                    'Unpaid leave days counted: ${item.unpaidLeaveDays}d',
+                      'Days with clock-in: ${item.presentDays} · '
+                      'Unpaid leave days counted: ${item.unpaidLeaveDays}d',
             style: const TextStyle(
               fontSize: 12,
               height: 1.35,
@@ -127,9 +123,9 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               intern
-                  ? 'Intern allowance (and commission if any) is divided by calendar days. Approved leave in this period reduces pay. No EPF, SOCSO, or EIS.'
+                  ? 'Intern allowance (and commission if any) is divided by calendar days. Approved non-annual leave in this period reduces pay. No EPF, SOCSO, or EIS.'
                   : 'Only approved unpaid leave on weekdays reduces pay. '
-                      'Sick and other paid leave do not.',
+                        'Sick and other paid leave do not.',
               style: TextStyle(
                 fontSize: 11,
                 height: 1.35,
@@ -139,7 +135,8 @@ class EmployeePayslipDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 18),
           sec('Earnings', [
-            if (!intern || item.basicAmount > 0) line('Basic', item.basicAmount),
+            if (!intern || item.basicAmount > 0)
+              line('Basic', item.basicAmount),
             ...item.variablePayEarningsLines.map((e) => line(e.key, e.value)),
             line('Subtotal', item.earningsSubtotal),
             line(

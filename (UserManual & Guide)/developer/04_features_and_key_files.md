@@ -42,9 +42,10 @@ Use this as a map when you need to change a feature quickly.
 |---------|-----------|
 | Shell / tabs | `lib/screens/admin/admin_shell.dart` |
 | Home | `lib/screens/admin/admin_home_tab.dart` |
-| Employees list/edit | `employee_list_screen.dart`, `admin_employee_edit_screen.dart` |
+| Employees list/edit | `employee_list_screen.dart`, `admin_employee_edit_screen.dart`, `admin_add_employee_screen.dart` |
+| Admin create employee | Edge Function `supabase/functions/admin-create-user` |
 | Attendance overview | `attendance_overview_screen.dart`, calendar screens |
-| Leave hub | `admin_leave_hub_screen.dart`, `leave_management_screen.dart` |
+| Leave inbox | `leave_management_screen.dart` (home shortcut opens this directly) |
 | Claims | `claim_management_screen.dart` |
 | Announcements | `admin_announcements_screen.dart` |
 | Workplace geofence | `admin_work_site_screen.dart`, `work_site_map_picker_screen.dart` |

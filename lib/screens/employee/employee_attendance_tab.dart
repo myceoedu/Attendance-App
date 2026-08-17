@@ -17,9 +17,22 @@ import '../../utils/app_time.dart';
 import '../../utils/async_load_guard.dart';
 import '../../utils/error_messages.dart';
 import '../../utils/geofence.dart';
+import '../../widgets/app_confirm_dialog.dart';
 import 'attendance_history_screen.dart';
 import 'employee_attendance_log_screen.dart';
 import 'employee_shell.dart';
+
+const Color _kNavy = Color(0xFF14213D);
+const Color _kMuted = Color(0xFF9AA1AD);
+const Color _kCardBorder = Color(0xFFE4E6EB);
+const Color _kClockSecondary = Color(0xFFC7CCD6);
+const Color _kEyebrow = Color(0xFF8B93A3);
+const Color _kCoral = Color(0xFFF0997B);
+const Color _kStatusGreen = Color(0xFF5DCAA5);
+const Color _kDoneBannerBg = Color(0xFFE1F5EE);
+const Color _kDoneBannerBorder = Color(0xFFC3ECDD);
+const Color _kDoneHeadline = Color(0xFF0F6E56);
+const Color _kDoneSubtitle = Color(0xFF3E8B71);
 
 /// Clock in / clock out flow for employees.
 ///
@@ -110,19 +123,14 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     }
   }
 
-  /// Live clock only while working (1s). Otherwise refresh once a minute.
-  /// Paused entirely when the Clock tab is not visible.
+  /// Live clock while the Clock tab is visible (1s) so seconds stay accurate.
   void _syncTicker() {
     _ticker?.cancel();
     _ticker = null;
     if (!_tabActive || !mounted) return;
-    final working = _state == _AttendanceState.working;
-    _ticker = Timer.periodic(
-      working ? const Duration(seconds: 1) : const Duration(minutes: 1),
-      (_) {
-        if (mounted && _tabActive) _now.value = AppTime.malaysiaNow();
-      },
-    );
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _tabActive) _now.value = AppTime.malaysiaNow();
+    });
   }
 
   // ──────────────────────────────────────────────
@@ -199,12 +207,8 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
       _now.value = AppTime.malaysiaNow();
       _syncTicker();
       // One light GPS sample for range hint — never blocks clock UI.
-      if (_state == _AttendanceState.idle &&
-          _workSite != null &&
-          _workSite!.isActive) {
+      if (_workSite != null && _workSite!.isActive) {
         unawaited(_refreshRangeHint());
-      } else if (_rangeHint != null && mounted) {
-        setState(() => _rangeHint = null);
       }
     } catch (e) {
       if (!mounted || !_loadGuard.isCurrent(gen)) return;
@@ -283,12 +287,13 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
 
   Future<void> _clockIn() async {
     if (_state != _AttendanceState.idle || _clockBusy) return;
-    final ok = await _confirm(
-      title: 'Clock In',
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Clock in?',
       message: 'Start your workday now?',
-      confirmLabel: 'Clock In',
-      confirmColor: AppColors.primary,
-      icon: Icons.login,
+      cancelLabel: 'Not now',
+      confirmLabel: 'Clock in',
+      emphasis: AppConfirmEmphasis.confirm,
     );
     if (ok != true) return;
     if (!mounted) return;
@@ -381,13 +386,15 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     if (Attendance.isPendingLocalSyncId(_today!.id)) return;
 
     final elapsed = _elapsed();
-    final ok = await _confirm(
-      title: 'Clock Out',
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Clock out?',
       message:
           'End your workday now?\n\nWorked: ${_fmtDuration(elapsed)}\nThis cannot be undone.',
-      confirmLabel: 'Clock Out',
+      cancelLabel: 'Stay clocked in',
+      confirmLabel: 'Clock out',
+      emphasis: AppConfirmEmphasis.confirm,
       confirmColor: AppColors.teal,
-      icon: Icons.logout,
     );
     if (ok != true) return;
     if (!mounted) return;
@@ -445,41 +452,6 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   String _fmtTime(DateTime t) =>
       DateFormat('h:mm a').format(AppTime.toMalaysia(t));
 
-  Future<bool?> _confirm({
-    required String title,
-    required String message,
-    required String confirmLabel,
-    required Color confirmColor,
-    required IconData icon,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Row(
-          children: [
-            Icon(icon, color: confirmColor),
-            const SizedBox(width: 10),
-            Text(title),
-          ],
-        ),
-        content: Text(message, style: const TextStyle(height: 1.4)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: confirmColor),
-            child: Text(confirmLabel),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSuccess(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.success),
@@ -496,13 +468,37 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
   // UI
   // ──────────────────────────────────────────────
 
+  String _firstName(String? fullName) {
+    final t = (fullName ?? '').trim();
+    if (t.isEmpty) return 'there';
+    return t.split(RegExp(r'\s+')).first;
+  }
+
+  String _timeOfDayGreeting(DateTime local) {
+    final h = local.hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  String get _officeName =>
+      (_workSite?.name.trim().isNotEmpty == true) ? _workSite!.name.trim() : 'Office';
+
+  String get _shiftLabel {
+    // Company workday (MYT): 9:00–18:00.
+    return '9:00 AM–6:00 PM';
+  }
+
+  bool get _locationVerified =>
+      _rangeHint != null && _rangeHint!.startsWith('In range');
+
   @override
   Widget build(BuildContext context) {
     final dateFmt = DateFormat('EEEE, d MMMM yyyy');
-    final timeFmt = DateFormat('hh:mm:ss a');
+    final userName = context.select<AuthProvider, String?>(
+      (a) => a.user?.name,
+    );
 
-    // No nested [Scaffold] — [AppBar] + [Expanded] under surface (avoid
-    // [MaterialType.canvas] on web; it can composite as a flat primary tint).
     return SizedBox.expand(
       child: ColoredBox(
         color: AppColors.surface,
@@ -538,31 +534,71 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                   ? const Center(child: CircularProgressIndicator())
                   : ListView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
                       children: [
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: () => _load(showSpinner: true),
-                            icon: const Icon(Icons.refresh_rounded, size: 20),
-                            label: const Text('Refresh'),
-                          ),
-                        ),
                         ValueListenableBuilder<DateTime>(
                           valueListenable: _now,
                           builder: (context, now, _) {
-                            return Text(
-                              dateFmt.format(now),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textSecondary,
-                              ),
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        dateFmt.format(now),
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: _kNavy,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${_timeOfDayGreeting(now)}, ${_firstName(userName)}',
+                                        style: const TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w400,
+                                          color: _kMuted,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => _load(showSpinner: true),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: _kMuted,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                      vertical: 0,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    textStyle: const TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  icon: const Icon(
+                                    Icons.refresh_rounded,
+                                    size: 16,
+                                  ),
+                                  label: const Text('Refresh'),
+                                ),
+                              ],
                             );
                           },
                         ),
                         const SizedBox(height: 14),
-                        // Gradient chrome stays stable; only text ticks.
-                        RepaintBoundary(child: _clockCard(timeFmt)),
+                        RepaintBoundary(child: _clockCard()),
+                        if (_workSite != null) ...[
+                          const SizedBox(height: 12),
+                          _locationShiftCard(),
+                        ],
                         const SizedBox(height: 18),
                         _stepIndicator(),
                         const SizedBox(height: 22),
@@ -578,93 +614,133 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
   }
 
-  Widget _clockCard(DateFormat timeFmt) {
-    final state = _state;
-
-    final (String label, Color labelFg, Color labelBg) = switch (state) {
-      _AttendanceState.blocked => (
-        _todayApprovedLeave?.leaveTypeDisplay ?? 'Approved Leave',
-        AppColors.leave,
-        AppColors.leaveLight.withValues(alpha: 0.92),
-      ),
-      _AttendanceState.idle => (
-        'Not Clocked In',
-        AppColors.onBrand,
-        Colors.white.withValues(alpha: 0.16),
-      ),
-      _AttendanceState.working => (
-        'Working',
-        AppColors.primaryDark,
-        AppColors.primaryLight.withValues(alpha: 0.92),
-      ),
-      _AttendanceState.done => (
-        'Done',
-        AppColors.success,
-        AppColors.successLight.withValues(alpha: 0.92),
-      ),
-    };
-
+  Widget _locationShiftCard() {
+    final verified = _locationVerified;
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        gradient: AppGradients.brandPanel,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.brandHeaderBorder),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brandHeaderShadow.withValues(alpha: 0.35),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kCardBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.location_on_outlined,
+            size: 18,
+            color: verified ? _kNavy : _kMuted,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '$_officeName · expected shift $_shiftLabel',
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: _kMuted,
+                height: 1.3,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(
+            Icons.check_circle_rounded,
+            size: 18,
+            color: verified ? _kStatusGreen : _kCardBorder,
           ),
         ],
       ),
+    );
+  }
+
+  Widget _clockCard() {
+    final state = _state;
+    final hasIn = _today?.clockInTime != null;
+    final hasOut = _today?.clockOutTime != null;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+      decoration: BoxDecoration(
+        color: _kNavy,
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Column(
         children: [
+          const Text(
+            'CURRENT TIME',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.08 * 12,
+              color: _kEyebrow,
+            ),
+          ),
+          const SizedBox(height: 8),
           ValueListenableBuilder<DateTime>(
             valueListenable: _now,
             builder: (context, now, _) {
-              return Text(
-                timeFmt.format(now),
-                style: const TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.onBrand,
-                  letterSpacing: 1.2,
-                ),
+              // [_now] is already [AppTime.malaysiaNow] — do not call toMalaysia again.
+              final hm = DateFormat('h:mm').format(now);
+              final sec = DateFormat('ss').format(now);
+              final ap = DateFormat('a').format(now);
+              const tabular = [FontFeature.tabularFigures()];
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Text(
+                    hm,
+                    style: const TextStyle(
+                      fontSize: 38,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                      fontFeatures: tabular,
+                      height: 1,
+                    ),
+                  ),
+                  Text(
+                    ':$sec',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w400,
+                      color: _kClockSecondary,
+                      fontFeatures: tabular,
+                      height: 1,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    ap,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w400,
+                      color: _kClockSecondary,
+                      fontFeatures: tabular,
+                      height: 1,
+                    ),
+                  ),
+                ],
               );
             },
           ),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: labelBg,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: labelFg.withValues(
-                  alpha: state == _AttendanceState.idle ? 0.35 : 0.22,
-                ),
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: labelFg,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
+          const SizedBox(height: 14),
+          _statusPill(state),
+          const SizedBox(height: 16),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: Colors.white.withValues(alpha: 0.12),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
                 child: _timeBlock(
-                  'Clock In',
-                  _today?.clockInTime != null
-                      ? _fmtTime(_today!.clockInTime!)
-                      : '--:--',
+                  'Clock in',
+                  hasIn ? _fmtTime(_today!.clockInTime!) : '--:--',
                   Icons.login,
+                  filled: hasIn,
                 ),
               ),
               Container(
@@ -674,11 +750,10 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               ),
               Expanded(
                 child: _timeBlock(
-                  'Clock Out',
-                  _today?.clockOutTime != null
-                      ? _fmtTime(_today!.clockOutTime!)
-                      : '--:--',
+                  'Clock out',
+                  hasOut ? _fmtTime(_today!.clockOutTime!) : '--:--',
                   Icons.logout,
+                  filled: hasOut,
                 ),
               ),
             ],
@@ -715,35 +790,36 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                 ],
               ),
             ),
-          ] else if (state != _AttendanceState.idle) ...[
+          ] else if (state == _AttendanceState.working) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+                color: const Color(0x265DCAA5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _kStatusGreen.withValues(alpha: 0.45),
+                ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.timer_outlined,
                     size: 16,
-                    color: AppColors.onBrandSecondary,
+                    color: _kStatusGreen,
                   ),
                   const SizedBox(width: 6),
                   ValueListenableBuilder<DateTime>(
                     valueListenable: _now,
                     builder: (context, now, _) {
                       return Text(
-                        state == _AttendanceState.done
-                            ? 'Worked: ${_fmtDuration(_elapsed(now.toUtc()))}'
-                            : 'Elapsed: ${_fmtDuration(_elapsed(now.toUtc()))}',
+                        'Elapsed ${_fmtDuration(_elapsed(now.toUtc()))}',
                         style: const TextStyle(
-                          color: AppColors.onBrand,
+                          color: _kStatusGreen,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
+                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       );
                     },
@@ -757,17 +833,71 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     );
   }
 
-  Widget _timeBlock(String label, String time, IconData icon) {
+  Widget _statusPill(_AttendanceState state) {
+    final (String label, Color accent) = switch (state) {
+      _AttendanceState.blocked => (
+        _todayApprovedLeave?.leaveTypeDisplay ?? 'Approved leave',
+        AppColors.leave,
+      ),
+      _AttendanceState.idle => ('Not clocked in', _kCoral),
+      _AttendanceState.working => ('Clocked in', _kStatusGreen),
+      _AttendanceState.done => ('Clocked out', _kStatusGreen),
+    };
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: accent,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _timeBlock(
+    String label,
+    String time,
+    IconData icon, {
+    required bool filled,
+  }) {
+    final valueColor =
+        filled ? Colors.white : Colors.white.withValues(alpha: 0.45);
     return Column(
       children: [
-        Icon(icon, color: AppColors.onBrandFaint, size: 18),
+        Icon(
+          icon,
+          color: filled
+              ? Colors.white.withValues(alpha: 0.72)
+              : Colors.white.withValues(alpha: 0.40),
+          size: 18,
+        ),
         const SizedBox(height: 6),
         Text(
           time,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: AppColors.onBrand,
+            color: valueColor,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
         ),
         const SizedBox(height: 2),
@@ -775,7 +905,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: AppColors.onBrandMuted,
+            color: Colors.white.withValues(alpha: 0.55),
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -811,27 +941,35 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
         ),
       );
     }
-    final steps = const ['Clock In', 'Working', 'Clock Out'];
-    final activeIndex = switch (state) {
+
+    final steps = const ['Clock in', 'Working', 'Clock out'];
+    // How many steps are fully complete (checkmark). Done = all 3.
+    final completedCount = switch (state) {
       _AttendanceState.blocked => 0,
       _AttendanceState.idle => 0,
       _AttendanceState.working => 1,
-      _AttendanceState.done => 2,
+      _AttendanceState.done => 3,
     };
+    final currentIdx = state == _AttendanceState.done ? -1 : completedCount;
 
     return Row(
       children: List.generate(steps.length * 2 - 1, (i) {
         if (i.isOdd) {
-          final lineActive = (i ~/ 2) < activeIndex;
+          final lineIdx = i ~/ 2;
+          final lineActive = lineIdx < completedCount ||
+              (state == _AttendanceState.done);
           return Expanded(
             child: Container(
               height: 2,
-              color: lineActive ? AppColors.primary : AppColors.divider,
+              margin: const EdgeInsets.only(bottom: 16),
+              color: lineActive ? _kNavy : AppColors.divider,
             ),
           );
         }
         final idx = i ~/ 2;
-        final isActive = idx <= activeIndex;
+        final isComplete = idx < completedCount;
+        final isCurrent = idx == currentIdx;
+        final isFilled = isComplete || isCurrent;
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -839,29 +977,35 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: isActive ? AppColors.primary : Colors.white,
+                color: isFilled ? _kNavy : Colors.white,
                 border: Border.all(
-                  color: isActive ? AppColors.primary : AppColors.divider,
+                  color: isFilled ? _kNavy : AppColors.divider,
                   width: 2,
                 ),
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: Text(
-                '${idx + 1}',
-                style: TextStyle(
-                  color: isActive ? Colors.white : AppColors.textHint,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              child: isComplete
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
+                  : Text(
+                      '${idx + 1}',
+                      style: TextStyle(
+                        color: isFilled ? Colors.white : AppColors.textHint,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
             const SizedBox(height: 4),
             Text(
               steps[idx],
               style: TextStyle(
                 fontSize: 10,
-                color: isActive ? AppColors.textPrimary : AppColors.textHint,
+                color: isFilled ? _kNavy : AppColors.textHint,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -945,9 +1089,21 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
             _bigButton(
               label: _clockBusy ? 'Clocking in…' : 'Clock In',
               icon: Icons.login,
-              color: AppColors.primary,
+              color: _kNavy,
               onPressed: _clockBusy ? null : _clockIn,
             ),
+            if (_workSite != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Your location is verified against $_officeName.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: _kMuted,
+                ),
+              ),
+            ],
           ],
         );
       case _AttendanceState.working:
@@ -962,7 +1118,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
                 child: LinearProgressIndicator(
                   minHeight: 4,
                   backgroundColor: AppColors.divider,
-                  color: AppColors.teal,
+                  color: _kNavy,
                 ),
               ),
               const SizedBox(height: 8),
@@ -978,45 +1134,60 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
               const SizedBox(height: 14),
             ],
             _bigButton(
-              label: 'Clock Out',
+              label: _clockBusy ? 'Clocking out…' : 'Clock out',
               icon: Icons.logout,
-              color: AppColors.teal,
-              onPressed: pendingIn ? null : _clockOut,
+              color: _kNavy,
+              onPressed: pendingIn || _clockBusy ? null : _clockOut,
             ),
+            if (_workSite != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Your location is verified against $_officeName.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: _kMuted,
+                ),
+              ),
+            ],
           ],
         );
       case _AttendanceState.done:
         return Container(
-          padding: const EdgeInsets.all(18),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           decoration: BoxDecoration(
-            color: AppColors.success.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+            color: _kDoneBannerBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _kDoneBannerBorder),
           ),
           child: Column(
             children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, color: AppColors.success, size: 22),
-                  SizedBox(width: 8),
-                  Text(
-                    "You're all done for today!",
-                    style: TextStyle(
-                      color: AppColors.success,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                    ),
-                  ),
-                ],
+              const Icon(
+                Icons.check_circle_rounded,
+                color: _kDoneHeadline,
+                size: 28,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                "You're all done for today",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _kDoneHeadline,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Total worked: ${_fmtDuration(_elapsed())}',
+                textAlign: TextAlign.center,
                 style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
+                  color: _kDoneSubtitle,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -1029,8 +1200,7 @@ class _EmployeeAttendanceTabState extends State<EmployeeAttendanceTab> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () =>
-            pushAppPage(context, const EmployeeAttendanceLogScreen()),
+        onTap: () => pushAppPage(context, const EmployeeAttendanceLogScreen()),
         borderRadius: BorderRadius.circular(18),
         child: Ink(
           decoration: BoxDecoration(
@@ -1163,12 +1333,14 @@ class _GeofenceHint extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: (inRange ? AppColors.success : AppColors.sky)
-                .withValues(alpha: 0.08),
+            color: (inRange ? AppColors.success : AppColors.sky).withValues(
+              alpha: 0.08,
+            ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: (inRange ? AppColors.success : AppColors.sky)
-                  .withValues(alpha: 0.28),
+              color: (inRange ? AppColors.success : AppColors.sky).withValues(
+                alpha: 0.28,
+              ),
             ),
           ),
           child: Row(

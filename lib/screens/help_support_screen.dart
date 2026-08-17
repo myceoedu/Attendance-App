@@ -9,6 +9,17 @@ import '../constants/help_support_config.dart';
 import '../models/app_user.dart';
 import '../providers/auth_provider.dart';
 
+const Color _kNavy = Color(0xFF14213D);
+const Color _kPageBg = Color(0xFFF5F6F8);
+const Color _kBorder = Color(0xFFE4E6EB);
+const Color _kInputBorder = Color(0xFFD8DBE2);
+const Color _kMuted = Color(0xFF9AA1AD);
+const Color _kHairline = Color(0xFFEEF0F3);
+const Color _kHeroBody = Color(0xFFC7CCD6);
+const Color _kVersion = Color(0xFFB4B9C2);
+const Color _kBlue = Color(0xFF185FA5);
+const Color _kBlueBg = Color(0xFFE6F1FB);
+
 /// Help centre: FAQs, mail/call shortcuts, and copy-paste diagnostics for IT/HR.
 class HelpSupportScreen extends StatelessWidget {
   const HelpSupportScreen({super.key, this.adminView = false});
@@ -83,7 +94,9 @@ Platform: ${_platformLabel()}'''.trim();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Diagnostics copied. Share with HR/IT when you contact them.'),
+        content: Text(
+          'Diagnostics copied. Share with HR/IT when you contact them.',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -127,7 +140,7 @@ Platform: ${_platformLabel()}'''.trim();
       const _Faq(
         q: 'How do I change my password?',
         a:
-            'Signed in: Profile → Change password. Signed out: Login → Forgot password → open the email link → set and confirm a new password → sign in. Expired links need a new reset email. For account issues, call support.',
+            'Signed in: staff use Profile → Change password; admin use Home → Change password. Signed out: Login → Forgot password → open the email link → set and confirm a new password → sign in. Expired links need a new reset email. For account issues, call support.',
       ),
       const _Faq(
         q: 'The app feels slow or will not load',
@@ -140,6 +153,18 @@ Platform: ${_platformLabel()}'''.trim();
     return everyone;
   }
 
+  Widget _sectionLabel(String text) {
+    return Text(
+      text.toUpperCase(),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.06 * 11,
+        color: _kMuted,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final email = _emailUri;
@@ -148,105 +173,117 @@ Platform: ${_platformLabel()}'''.trim();
     final hasContact = email != null || phone != null;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: _kPageBg,
       appBar: AppBar(
+        backgroundColor: _kNavy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: AppChrome.onBrand,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+        ),
         title: const Text('Help & support'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _introCard(),
             if (hasContact) ...[
-              const SizedBox(height: 18),
-              Text(
-                'Contact',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary.withValues(alpha: 0.85),
-                  letterSpacing: -0.1,
-                ),
-              ),
+              const SizedBox(height: 20),
+              _sectionLabel('Contact'),
               const SizedBox(height: 10),
-              if (email != null)
-                _contactTile(
-                  context,
-                  icon: Icons.mail_outline_rounded,
-                  title: 'Email HR / IT',
-                  subtitle: HelpSupportConfig.supportEmail.trim(),
-                  onTap: () => _openUri(context, email),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kBorder),
                 ),
-              if (email != null && phone != null) const SizedBox(height: 8),
-              if (phone != null)
-                _contactTile(
-                  context,
-                  icon: Icons.phone_in_talk_rounded,
-                  title: 'Call support',
-                  subtitle: HelpSupportConfig.supportPhone.trim(),
-                  onTap: () => _openUri(context, phone),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    if (email != null)
+                      _contactTile(
+                        context,
+                        icon: Icons.mail_outline_rounded,
+                        title: 'Email HR / IT',
+                        subtitle: HelpSupportConfig.supportEmail.trim(),
+                        onTap: () => _openUri(context, email),
+                      ),
+                    if (email != null && phone != null)
+                      const Divider(height: 1, thickness: 1, color: _kHairline),
+                    if (phone != null)
+                      _contactTile(
+                        context,
+                        icon: Icons.phone_rounded,
+                        title: 'Call support',
+                        subtitle: HelpSupportConfig.supportPhone.trim(),
+                        onTap: () => _openUri(context, phone),
+                      ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                HelpSupportConfig.officeHours,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: FontWeight.w400,
+                  color: _kMuted,
+                ),
+              ),
             ],
-            const SizedBox(height: 12),
-            Text(
-              HelpSupportConfig.officeHours,
-              style: TextStyle(
-                fontSize: 12.5,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-              ),
-            ),
-            const SizedBox(height: 22),
-            Text(
-              'Common questions',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary.withValues(alpha: 0.85),
-                letterSpacing: -0.1,
-              ),
-            ),
+            const SizedBox(height: 20),
+            _sectionLabel('Common questions'),
             const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.divider),
-                boxShadow: AppElevation.cardOnSurface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _kBorder),
               ),
               clipBehavior: Clip.antiAlias,
               child: Theme(
                 data: Theme.of(context).copyWith(
                   dividerColor: Colors.transparent,
-                  splashColor: AppColors.primary.withValues(alpha: 0.06),
+                  splashColor: _kNavy.withValues(alpha: 0.06),
                 ),
                 child: Column(
                   children: [
                     for (var i = 0; i < faqItems.length; i++) ...[
                       if (i > 0)
-                        Divider(
+                        const Divider(
                           height: 1,
                           thickness: 1,
-                          color: AppColors.divider.withValues(alpha: 0.85),
+                          color: _kHairline,
                         ),
                       ExpansionTile(
-                        tilePadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        childrenPadding: const EdgeInsets.fromLTRB(
-                          16,
-                          0,
-                          16,
-                          16,
+                        tilePadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 2,
                         ),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          14,
+                          0,
+                          14,
+                          14,
+                        ),
+                        iconColor: _kMuted,
+                        collapsedIconColor: _kMuted,
                         title: Text(
                           faqItems[i].q,
                           style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            height: 1.25,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: _kNavy,
+                            height: 1.3,
                           ),
                         ),
                         children: [
@@ -254,12 +291,11 @@ Platform: ${_platformLabel()}'''.trim();
                             alignment: Alignment.centerLeft,
                             child: Text(
                               faqItems[i].a,
-                              style: TextStyle(
-                                fontSize: 13,
+                              style: const TextStyle(
+                                fontSize: 12.5,
                                 height: 1.45,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textSecondary
-                                    .withValues(alpha: 0.95),
+                                fontWeight: FontWeight.w400,
+                                color: _kMuted,
                               ),
                             ),
                           ),
@@ -271,25 +307,37 @@ Platform: ${_platformLabel()}'''.trim();
               ),
             ),
             const SizedBox(height: 20),
-            OutlinedButton.icon(
-              onPressed: () => _copyDiagnostics(context),
-              icon: const Icon(Icons.copy_rounded, size: 20),
-              label: const Text('Copy diagnostics for support'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+            SizedBox(
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () => _copyDiagnostics(context),
+                icon: const Icon(Icons.copy_rounded, size: 18, color: _kNavy),
+                label: const Text(
+                  'Copy diagnostics for support',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: _kNavy,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _kNavy,
+                  side: const BorderSide(color: _kInputBorder),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Center(
               child: Text(
                 'myRekod · v${HelpSupportConfig.appVersionLabel}',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textHint.withValues(alpha: 0.95),
+                  fontWeight: FontWeight.w400,
+                  color: _kVersion,
                 ),
               ),
             ),
@@ -301,65 +349,55 @@ Platform: ${_platformLabel()}'''.trim();
 
   Widget _introCard() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        gradient: adminView ? AppGradients.violet : AppGradients.primary,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.brandHeaderBorder.withValues(alpha: 0.35),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: (adminView ? AppColors.violet : AppColors.primaryDark)
-                .withValues(alpha: 0.22),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: _kNavy,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.brandChipFill,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.brandChipBorder),
-                ),
-                child: Icon(
-                  Icons.support_agent_rounded,
-                  color: AppColors.onBrand.withValues(alpha: 0.95),
-                  size: 26,
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Text(
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.headset_mic_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
                   "We're here to help",
                   style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.onBrand,
-                    letterSpacing: -0.35,
-                    height: 1.15,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    height: 1.25,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            adminView
-                ? 'Answers for admins. Contact HR or IT if you need account or system help.'
-                : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.45,
-              fontWeight: FontWeight.w600,
-              color: AppColors.onBrandMuted.withValues(alpha: 0.98),
+                const SizedBox(height: 6),
+                Text(
+                  adminView
+                      ? 'Answers for admins. Contact HR or IT if you need account or system help.'
+                      : 'Find answers below, or call HR / IT from Contact. If something looks wrong, copy diagnostics and share them with support.',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    height: 1.4,
+                    fontWeight: FontWeight.w400,
+                    color: _kHeroBody,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -376,26 +414,22 @@ Platform: ${_platformLabel()}'''.trim();
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Ink(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primaryDark.withValues(alpha: 0.04),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 22),
+              Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _kBlueBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: _kBlue, size: 18),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -404,9 +438,9 @@ Platform: ${_platformLabel()}'''.trim();
                     Text(
                       title,
                       style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w500,
+                        color: _kNavy,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -414,20 +448,19 @@ Platform: ${_platformLabel()}'''.trim();
                       subtitle,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color:
-                            AppColors.textSecondary.withValues(alpha: 0.92),
+                        fontWeight: FontWeight.w400,
+                        color: _kMuted,
                       ),
                     ),
                   ],
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.open_in_new_rounded,
-                size: 20,
-                color: AppColors.textHint.withValues(alpha: 0.85),
+                size: 16,
+                color: _kMuted,
               ),
             ],
           ),

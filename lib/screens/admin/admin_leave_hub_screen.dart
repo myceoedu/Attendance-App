@@ -54,8 +54,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
             _HubPathCard(
               icon: Icons.people_outline_rounded,
               iconGradientColors: const [
-                Color(0xFF6366F1),
-                Color(0xFF818CF8),
+                AppColors.indigo,
+                AppColors.violet,
               ],
               title: 'By employee',
               subtitle:
@@ -68,8 +68,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
             _HubPathCard(
               icon: Icons.dashboard_customize_outlined,
               iconGradientColors: const [
-                Color(0xFF0D9488),
-                Color(0xFF2DD4BF),
+                AppColors.teal,
+                AppColors.tealBright,
               ],
               title: 'All leave requests',
               subtitle:

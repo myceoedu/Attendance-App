@@ -16,6 +16,7 @@ import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
 import '../../utils/async_load_guard.dart';
+import '../../widgets/dashboard_header_rings.dart';
 import '../../widgets/employee_quick_access_tile.dart';
 import '../../widgets/notification_bell_button.dart';
 import '../announcements_screen.dart';
@@ -26,6 +27,9 @@ import 'employee_attendance_log_screen.dart';
 import 'employee_payroll_history_screen.dart';
 import 'employee_shell.dart';
 import 'leave_tab.dart';
+
+const Color _kNavy = Color(0xFF14213D);
+const Color _kCardBorder = Color(0xFFE4E6EB);
 
 /// Employee **Dashboard**.
 ///
@@ -317,21 +321,44 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             cacheExtent: 520,
-            padding: EdgeInsets.only(bottom: bottomInset + 32),
+            padding: EdgeInsets.only(bottom: bottomInset + 48),
             children: [
-              // Hero header + attendance card rebuild every minute (clock).
               RepaintBoundary(
                 child: ValueListenableBuilder<DateTime>(
                   valueListenable: _clockNow,
-                  builder: (context, now, _) =>
-                      _heroHeader(displayName, _dateFmt.format(now), now),
+                  builder: (context, now, _) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _heroHeader(
+                          displayName,
+                          _dateFmt.format(now),
+                          now,
+                        ),
+                        Transform.translate(
+                          offset: const Offset(0, -36),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
+                            child: _attendanceStatusCard(now, _todayLeave),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
-              // Quick access rebuilds ONLY on data change (_load / realtime).
-              RepaintBoundary(
+              Transform.translate(
+                offset: const Offset(0, -24),
                 child: Padding(
-                  padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 8),
-                  child: _quickAccessSection(context),
+                  padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _statStrip(),
+                      const SizedBox(height: 16),
+                      _quickAccessSection(context),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -341,152 +368,134 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     );
   }
 
-  // ── Hero header + embedded attendance card ──────────────────────────────
+  // ── Hero header ─────────────────────────────────────────────────────────
 
   Widget _heroHeader(String name, String dateText, DateTime now) {
-    final leave = _todayLeave;
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppChrome.onBrand,
       child: Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0F2255), Color(0xFF1A3A8F), Color(0xFF1A56DB)],
-            stops: [0.0, 0.48, 1.0],
-          ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(30),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primaryDark.withValues(alpha: 0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+        color: _kNavy,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Positioned(
+              right: -36,
+              top: -52,
+              child: DashboardHeaderRings(size: 240),
+            ),
+            Padding(
+              // Safe-area inset + ≥20px so avatar/bell clear the status bar.
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.viewPaddingOf(context).top + 20,
+                12,
+                52,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: AppGradients.tealBadge,
+                          borderRadius: BorderRadius.circular(15),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.teal.withValues(alpha: 0.2),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          (name.isNotEmpty ? name[0] : '?').toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 21,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _greeting(now),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.72),
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.55,
+                                height: 1.15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: NotificationBellButton(
+                          iconColor: AppColors.onBrand,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 12,
+                        color: Colors.white.withValues(alpha: 0.62),
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          dateText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Greeting row
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Teal avatar badge
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF2DD4BF), Color(0xFF0D9488)],
-                        ),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x330D9488),
-                            blurRadius: 6,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (name.isNotEmpty ? name[0] : '?').toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _greeting(now),
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.72),
-                              letterSpacing: 0.1,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                              letterSpacing: -0.55,
-                              height: 1.15,
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.calendar_today_rounded,
-                                size: 12,
-                                color: Colors.white.withValues(alpha: 0.62),
-                              ),
-                              const SizedBox(width: 5),
-                              Expanded(
-                                child: Text(
-                                  dateText,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Material(
-                      type: MaterialType.transparency,
-                      child: NotificationBellButton(
-                        iconColor: AppColors.onBrand,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Attendance card embedded in the header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-                child: _attendanceEmbeddedCard(now, leave),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  // ── Attendance card (inside header) ────────────────────────────────────
+  // ── Attendance status card (overlaps header) ────────────────────────────
 
-  Widget _attendanceEmbeddedCard(DateTime now, LeaveRequest? leave) {
+  Widget _attendanceStatusCard(DateTime now, LeaveRequest? leave) {
     final t = _today;
     final onLeave = leave != null;
     final idle = !onLeave && t == null;
@@ -557,42 +566,19 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x1A000000),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kCardBorder),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Status-colored top accent strip
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: onLeave
-                    ? [AppColors.leave, AppColors.leave.withValues(alpha: 0.55)]
-                    : done
-                    ? [const Color(0xFF059669), const Color(0xFF34D399)]
-                    : working
-                    ? [AppColors.primaryDark, AppColors.primary]
-                    : [AppColors.border, AppColors.surface],
-              ),
-            ),
-          ),
-          // ── Status row ─────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Tappable status pill → Clock tab
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
@@ -613,8 +599,28 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(statusIcon, color: statusColor, size: 17),
-                          const SizedBox(width: 5),
+                          if (working)
+                            Container(
+                              width: 7,
+                              height: 7,
+                              margin: const EdgeInsets.only(right: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.success,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.success.withValues(
+                                      alpha: 0.45,
+                                    ),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
+                            )
+                          else ...[
+                            Icon(statusIcon, color: statusColor, size: 17),
+                            const SizedBox(width: 5),
+                          ],
                           Text(
                             statusLabel,
                             style: TextStyle(
@@ -655,46 +661,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          Divider(
-            height: 1,
-            thickness: 1,
-            color: AppColors.divider.withValues(alpha: 0.8),
-          ),
-          // ── Clock times row ────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 11, 14, 13),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: _timeColumn(
-                    icon: Icons.login_rounded,
-                    iconColor: const Color(0xFF059669),
-                    label: 'Clock in',
-                    value: inDisplay,
-                    isSecondary: secondary(inDisplay),
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  margin: const EdgeInsets.symmetric(horizontal: 12),
-                  color: AppColors.border.withValues(alpha: 0.7),
-                ),
-                Expanded(
-                  child: _timeColumn(
-                    icon: Icons.logout_rounded,
-                    iconColor: AppColors.primaryDark.withValues(alpha: 0.85),
-                    label: 'Clock out',
-                    value: outDisplay,
-                    isSecondary: secondary(outDisplay),
-                  ),
-                ),
-                // View log button
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 Material(
                   color: Colors.transparent,
                   child: Tooltip(
@@ -704,19 +671,15 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                         context,
                         const EmployeeAttendanceLogScreen(),
                       ),
-                      borderRadius: BorderRadius.circular(13),
+                      borderRadius: BorderRadius.circular(10),
                       child: Ink(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
-                          vertical: 9,
+                          vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF0F2255), Color(0xFF1A56DB)],
-                          ),
-                          borderRadius: BorderRadius.circular(13),
+                          color: _kNavy,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -724,9 +687,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                             Icon(
                               Icons.history_rounded,
                               color: Colors.white.withValues(alpha: 0.96),
-                              size: 20,
+                              size: 18,
                             ),
-                            const SizedBox(height: 3),
+                            const SizedBox(height: 2),
                             const Text(
                               'Log',
                               textAlign: TextAlign.center,
@@ -756,54 +719,76 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
               ],
             ),
           ),
+          const Divider(height: 1, thickness: 1, color: _kCardBorder),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _timeColumn(
+                    label: 'Clock in',
+                    value: inDisplay,
+                    isSecondary: secondary(inDisplay),
+                    emphasize: !secondary(inDisplay),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 44,
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  color: _kCardBorder,
+                ),
+                Expanded(
+                  child: _timeColumn(
+                    label: 'Clock out',
+                    value: outDisplay,
+                    isSecondary: secondary(outDisplay),
+                    emphasize: false,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
   Widget _timeColumn({
-    required IconData icon,
-    required Color iconColor,
     required String label,
     required String value,
     required bool isSecondary,
+    required bool emphasize,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 14, color: iconColor),
-            const SizedBox(width: 5),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textSecondary.withValues(alpha: 0.88),
-                ),
-              ),
-            ),
-          ],
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary.withValues(alpha: 0.88),
+          ),
         ),
-        const SizedBox(height: 3),
+        const SizedBox(height: 4),
         Text(
           value,
           style: isSecondary
-              ? TextStyle(
+              ? const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: AppColors.textHint,
                 )
-              : const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
+              : TextStyle(
+                  fontSize: emphasize ? 20 : 16,
+                  fontWeight: emphasize ? FontWeight.w700 : FontWeight.w700,
                   color: AppColors.textPrimary,
-                  letterSpacing: -0.8,
+                  letterSpacing: -0.5,
                   height: 1.1,
                 ),
         ),
@@ -943,7 +928,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         border: Border.all(color: AppColors.border.withValues(alpha: 0.65)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0A000000),
+            color: AppColors.cardShadowFaint,
             blurRadius: 4,
             offset: Offset(0, 1),
           ),
@@ -996,14 +981,16 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
 
   Widget _quickAccessSection(BuildContext context) {
     const gap = 10.0;
-    final tiles = <Widget>[
+
+    final gridTiles = <Widget>[
       EmployeeQuickAccessTile(
         label: 'Leave',
         subLabel: 'Balance & history',
         semanticAction:
             'Open leave for annual balance, sick leave, and emergency leave.',
         icon: Icons.event_available_rounded,
-        accentColor: AppColors.teal,
+        iconBackground: AppColors.qaLeaveBg,
+        iconColor: AppColors.qaLeaveIcon,
         onTap: () => pushAppPage(context, const LeaveTab()),
       ),
       EmployeeQuickAccessTile(
@@ -1011,7 +998,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         subLabel: 'Expenses',
         semanticAction: 'Opens expense claims and receipt uploads.',
         icon: Icons.receipt_long_rounded,
-        accentColor: AppColors.orange,
+        iconBackground: AppColors.qaClaimBg,
+        iconColor: AppColors.qaClaimIcon,
         onTap: () => pushAppPage(context, const ClaimsScreen()),
       ),
       EmployeeQuickAccessTile(
@@ -1019,7 +1007,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         subLabel: 'Payslips',
         semanticAction: 'Opens your payslip history and PDF downloads.',
         icon: Icons.payments_rounded,
-        accentColor: AppColors.violet,
+        iconBackground: AppColors.qaPayrollBg,
+        iconColor: AppColors.qaPayrollIcon,
         onTap: () => pushAppPage(context, const EmployeePayrollHistoryScreen()),
       ),
       EmployeeQuickAccessTile(
@@ -1027,7 +1016,8 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         subLabel: 'Announcements',
         semanticAction: 'Company-wide notices posted by administrators.',
         icon: Icons.campaign_rounded,
-        accentColor: AppColors.accent,
+        iconBackground: AppColors.qaNoticesBg,
+        iconColor: AppColors.qaNoticesIcon,
         badgeCount: _announcementUnread > 0 ? _announcementUnread : null,
         onTap: () async {
           await pushAppPage(context, const AnnouncementsScreen());
@@ -1035,44 +1025,38 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         },
       ),
       EmployeeQuickAccessTile(
-        label: 'Calendar',
-        subLabel: 'Attendance',
-        semanticAction: 'Opens your attendance calendar.',
-        icon: Icons.calendar_month_rounded,
-        accentColor: AppColors.indigo,
-        onTap: () => pushAppPage(context, const AttendanceHistoryScreen()),
-      ),
-      EmployeeQuickAccessTile(
         label: 'Help',
         subLabel: 'HR & IT support',
         semanticAction:
             'Opens help topics, contact HR or IT, and copy diagnostics.',
         icon: Icons.support_agent_rounded,
-        accentColor: AppColors.sky,
+        iconBackground: AppColors.qaHelpBg,
+        iconColor: AppColors.qaHelpIcon,
         onTap: () => pushAppPage(context, const HelpSupportScreen()),
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, c) {
-        final cols = c.maxWidth >= 720 ? 4 : 3;
-        final tileH = (c.maxWidth - gap * (cols - 1)) / cols / 1.02;
+        const cols = 3;
+        final cellW = (c.maxWidth - gap * (cols - 1)) / cols;
+        // Portrait tile: slightly taller than wide so icon + 2 text lines fit.
+        final tileH = (cellW * 1.05).clamp(100.0, 124.0);
         final rows = <Widget>[];
-        for (var i = 0; i < tiles.length; i += cols) {
-          final slice = tiles.sublist(
-            i,
-            i + cols > tiles.length ? tiles.length : i + cols,
-          );
+        for (var i = 0; i < gridTiles.length; i += cols) {
+          final end =
+              (i + cols > gridTiles.length) ? gridTiles.length : i + cols;
+          final slice = gridTiles.sublist(i, end);
           rows.add(
             SizedBox(
               height: tileH,
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   for (var j = 0; j < slice.length; j++) ...[
                     if (j > 0) const SizedBox(width: gap),
                     Expanded(child: slice[j]),
                   ],
-                  // Pad incomplete last row so tile widths stay even.
                   for (var j = slice.length; j < cols; j++) ...[
                     const SizedBox(width: gap),
                     const Expanded(child: SizedBox.shrink()),
@@ -1081,7 +1065,7 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
               ),
             ),
           );
-          if (i + cols < tiles.length) {
+          if (end < gridTiles.length) {
             rows.add(const SizedBox(height: gap));
           }
         }
@@ -1089,9 +1073,9 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _statStrip(),
-            const SizedBox(height: 16),
             const Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
                   'Quick access',
@@ -1103,22 +1087,96 @@ class _EmployeeHomeTabState extends State<EmployeeHomeTab> {
                     height: 1.1,
                   ),
                 ),
-                Spacer(),
+                SizedBox(width: 8),
                 Text(
                   '6 tools',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textHint,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+            _calendarHeroRow(context),
+            const SizedBox(height: gap),
             ...rows,
+            const SizedBox(height: 12),
           ],
         );
       },
+    );
+  }
+
+  Widget _calendarHeroRow(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => pushAppPage(context, const AttendanceHistoryScreen()),
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+          decoration: BoxDecoration(
+            color: _kNavy,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Calendar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Your attendance this month.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w400,
+                        color: Color(0xB3FFFFFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

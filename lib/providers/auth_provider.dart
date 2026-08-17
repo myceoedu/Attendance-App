@@ -546,14 +546,58 @@ class AuthProvider extends ChangeNotifier {
   // Keep old name as alias so nothing else breaks.
   Future<String?> updateProfileName(String name) => updateProfile(name: name);
 
-  Future<String?> changePassword(String newPassword) async {
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
     if (newPassword.length < 6) return 'Password must be at least 6 characters';
+    if (newPassword.length > 72) return 'Password is too long';
     if (_passwordRecoveryPending) {
       return completePasswordRecovery(newPassword);
     }
+    if (currentPassword.isEmpty) {
+      return 'Enter your current password';
+    }
+    if (currentPassword == newPassword) {
+      return 'New password must be different from the current password';
+    }
+    final email = (_user != null && _user!.email.trim().isNotEmpty)
+        ? _user!.email.trim()
+        : (SupabaseService.currentAuthUser?.email ?? '').trim();
+    if (email.isEmpty) {
+      return 'Could not verify your account. Sign out and sign in again.';
+    }
     try {
-      await SupabaseService.updatePassword(newPassword);
+      await SupabaseService.signIn(
+        email,
+        currentPassword,
+      ).timeout(const Duration(seconds: 15));
+    } on TimeoutException {
+      return 'Request timed out. Check your connection and try again.';
+    } on AuthException {
+      return 'Current password is incorrect';
+    } catch (e) {
+      final s = e.toString().toLowerCase();
+      if (s.contains('invalid') ||
+          s.contains('credentials') ||
+          s.contains('invalid login')) {
+        return 'Current password is incorrect';
+      }
+      if (s.contains('socket') ||
+          s.contains('network') ||
+          s.contains('failed to fetch') ||
+          s.contains('failed host lookup')) {
+        return 'No internet connection. Check Wi‑Fi or data and try again.';
+      }
+      return 'Could not verify current password';
+    }
+    try {
+      await SupabaseService.updatePassword(
+        newPassword,
+      ).timeout(const Duration(seconds: 15));
       return null;
+    } on TimeoutException {
+      return 'Request timed out. Check your connection and try again.';
     } catch (_) {
       return 'Could not change password';
     }

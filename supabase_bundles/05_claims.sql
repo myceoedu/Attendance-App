@@ -105,6 +105,18 @@ CREATE POLICY "claim_attachments_insert_own_pending"
     )
   );
 
+DROP POLICY IF EXISTS "claim_attachments_delete_own_pending" ON public.claim_attachments;
+CREATE POLICY "claim_attachments_delete_own_pending"
+  ON public.claim_attachments FOR DELETE TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.expense_claims c
+      WHERE c.id = claim_id
+        AND c.user_id = auth.uid()
+        AND c.status = 'pending'
+    )
+  );
+
 -- Storage: private bucket; paths are {user_id}/{claim_id}/{filename}
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('claim-attachments', 'claim-attachments', false)

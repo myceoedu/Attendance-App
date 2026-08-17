@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../constants/app_theme.dart';
 import '../models/leave_request.dart';
 
 /// Canonical leave type IDs stored in [LeaveRequest.leaveType] / `leave_requests.leave_type`.
@@ -153,58 +154,58 @@ abstract final class LeaveCatalog {
   static LeaveTypeStyle uiStyle(String leaveType) {
     switch (leaveType) {
       case annual:
-        return LeaveTypeStyle(
-          color: const Color(0xFF0EA5E9),
+        return const LeaveTypeStyle(
+          color: AppColors.sky,
           icon: Icons.beach_access_rounded,
         );
       case annualHalfAm:
-        return LeaveTypeStyle(
-          color: const Color(0xFF0284C7),
+        return const LeaveTypeStyle(
+          color: AppColors.sky,
           icon: Icons.wb_sunny_outlined,
         );
       case annualHalfPm:
-        return LeaveTypeStyle(
-          color: const Color(0xFF0369A1),
+        return const LeaveTypeStyle(
+          color: AppColors.primaryDark,
           icon: Icons.nights_stay_outlined,
         );
       case sick:
-        return LeaveTypeStyle(
-          color: const Color(0xFFEC4899),
+        return const LeaveTypeStyle(
+          color: AppColors.danger,
           icon: Icons.local_hospital_rounded,
         );
       case emergency:
-        return LeaveTypeStyle(
-          color: const Color(0xFFF97316),
+        return const LeaveTypeStyle(
+          color: AppColors.warning,
           icon: Icons.warning_amber_rounded,
         );
       case unpaid:
-        return LeaveTypeStyle(
-          color: const Color(0xFF64748B),
+        return const LeaveTypeStyle(
+          color: AppColors.textSecondary,
           icon: Icons.payments_outlined,
         );
       case maternity:
-        return LeaveTypeStyle(
-          color: const Color(0xFFC026D3),
+        return const LeaveTypeStyle(
+          color: AppColors.indigo,
           icon: Icons.pregnant_woman_rounded,
         );
       case paternity:
-        return LeaveTypeStyle(
-          color: const Color(0xFF7C3AED),
+        return const LeaveTypeStyle(
+          color: AppColors.indigo,
           icon: Icons.child_care_rounded,
         );
       case marriage:
-        return LeaveTypeStyle(
-          color: const Color(0xFFDB2777),
+        return const LeaveTypeStyle(
+          color: AppColors.indigo,
           icon: Icons.favorite_rounded,
         );
       case publicHoliday:
-        return LeaveTypeStyle(
-          color: const Color(0xFF059669),
+        return const LeaveTypeStyle(
+          color: AppColors.success,
           icon: Icons.flag_rounded,
         );
       default:
-        return LeaveTypeStyle(
-          color: const Color(0xFF6366F1),
+        return const LeaveTypeStyle(
+          color: AppColors.indigo,
           icon: Icons.event_note_rounded,
         );
     }

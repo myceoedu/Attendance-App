@@ -24,7 +24,7 @@ From Home you can open:
 
 | Shortcut | What you do there |
 |----------|-------------------|
-| Leave hub | Review leave requests |
+| Leave | Review and approve leave requests |
 | Payroll | Salaries, runs, payslips |
 | Attendance | Who clocked in/out (also a bottom tab) |
 | Team | Employee list |
@@ -39,9 +39,20 @@ Pull down to refresh.
 
 ## 2. Employees (team)
 
-1. Open the **Employees** bottom tab (or Team from Home)
-2. Find and tap an employee
-3. Edit details such as:
+### Add an employee
+
+1. Open the **Employees** bottom tab
+2. Tap **+** (top right)
+3. Enter full name, email, username, and password
+4. Tap **Create account**
+5. Optionally tap **Add profile details** for job / leave / payroll fields, or **Not now** and edit later from the list
+
+They can sign in immediately with that email or username. Passwords cannot be viewed later.
+
+### Edit an employee
+
+1. Find and tap an employee
+2. Edit details such as:
    - Full name, phone, address
    - Role (Employee / Admin)
    - Job title, department, employee ID
@@ -132,11 +143,10 @@ Admins mainly monitor and investigate.
 
 ## 4. Leave management
 
-1. Home → **Leave hub**
-2. Choose how you want to review leave (pending list and/or by employee)
-3. Open a request
-4. **Approve** or **Reject**
-5. Add a clear reason when rejecting
+1. Home → **Leave**
+2. Tap **Pending** (or another count) to filter
+3. **Approve** or **Reject** on the request
+4. Add a clear reason when rejecting
 
 Employees see the new status in their Leave section.
 

@@ -19,7 +19,8 @@ class PayrollItemDetailScreen extends StatefulWidget {
   final PayrollRun run;
 
   @override
-  State<PayrollItemDetailScreen> createState() => _PayrollItemDetailScreenState();
+  State<PayrollItemDetailScreen> createState() =>
+      _PayrollItemDetailScreenState();
 }
 
 class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
@@ -30,7 +31,9 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -52,9 +55,9 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
     final item = _item;
     if (item == null || _busy) return;
     if (widget.run.status == 'paid') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot edit a paid run')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cannot edit a paid run')));
       return;
     }
     setState(() => _busy = true);
@@ -79,10 +82,14 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
             }()
           : configs.first;
       final month = DateTime(widget.run.periodYear, widget.run.periodMonth);
-      final attFuture =
-          SupabaseService.getEmployeeAttendanceByMonth(item.userId, month);
-      final leavesFuture =
-          SupabaseService.getEmployeeApprovedLeavesByMonth(item.userId, month);
+      final attFuture = SupabaseService.getEmployeeAttendanceByMonth(
+        item.userId,
+        month,
+      );
+      final leavesFuture = SupabaseService.getEmployeeApprovedLeavesByMonth(
+        item.userId,
+        month,
+      );
       final employeeFuture = SupabaseService.getUserById(item.userId);
       final att = await attFuture;
       final leaves = await leavesFuture;
@@ -147,12 +154,16 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
       await SupabaseService.updatePayrollItem(updated);
       await SupabaseService.payrollRecalculateRunTotals(widget.run.id);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Recalculated')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Recalculated')));
       }
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -188,7 +199,10 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(t, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+          Text(
+            t,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+          ),
           const SizedBox(height: 6),
           ...rows,
           const SizedBox(height: 14),
@@ -197,15 +211,18 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
     }
 
     Widget line(String k, double v) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(k, style: const TextStyle(color: AppColors.textSecondary)),
-              Text(money.format(v), style: const TextStyle(fontWeight: FontWeight.w600)),
-            ],
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(k, style: const TextStyle(color: AppColors.textSecondary)),
+          Text(
+            money.format(v),
+            style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-        );
+        ],
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -220,11 +237,11 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
           Text(
             intern
                 ? 'Calendar days in month: $calDays · '
-                    'Days with clock-in: ${item.presentDays} · '
-                    'Leave days counted (incl. half-days): ${item.unpaidLeaveDays}'
+                      'Days with clock-in: ${item.presentDays} · '
+                      'Leave days counted (incl. half-days): ${item.unpaidLeaveDays}'
                 : 'Working weekdays in month: ${item.workingWeekdays} · '
-                    'Days with clock-in: ${item.presentDays} · '
-                    'Unpaid leave (weekdays): ${item.unpaidLeaveDays}d',
+                      'Days with clock-in: ${item.presentDays} · '
+                      'Unpaid leave (weekdays): ${item.unpaidLeaveDays}d',
             style: const TextStyle(
               fontSize: 12,
               height: 1.35,
@@ -235,7 +252,7 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               intern
-                  ? 'Allowance and commission are divided by calendar days. Approved leave reduces pay. Half-day annual counts as 0.5. No EPF, SOCSO, or EIS for interns.'
+                  ? 'Allowance and commission are divided by calendar days. Approved non-annual leave reduces pay. No EPF, SOCSO, or EIS for interns. Annual leave does not apply.'
                   : 'Only approved unpaid leave reduces pay. Sick, emergency, and annual leave are paid. Missing clock-in does not cut pay in this run.',
               style: TextStyle(
                 fontSize: 11,
@@ -246,7 +263,8 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
           ),
           const SizedBox(height: 16),
           sec('Earnings', [
-            if (!intern || item.basicAmount > 0) line('Basic', item.basicAmount),
+            if (!intern || item.basicAmount > 0)
+              line('Basic', item.basicAmount),
             ...item.variablePayEarningsLines.map((e) => line(e.key, e.value)),
             line('Subtotal', item.earningsSubtotal),
             line(
@@ -293,22 +311,33 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
             decoration: BoxDecoration(
               color: AppColors.primaryLight.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              border: Border.all(
+                color: AppColors.primary.withValues(alpha: 0.2),
+              ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Net salary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                const Text(
+                  'Net salary',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                ),
                 Text(
                   money.format(item.netSalary),
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
                 ),
               ],
             ),
           ),
           if (item.calcNote.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(item.calcNote, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+            Text(
+              item.calcNote,
+              style: const TextStyle(fontSize: 11, color: AppColors.textHint),
+            ),
           ],
           const SizedBox(height: 20),
           OutlinedButton.icon(

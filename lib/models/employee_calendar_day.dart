@@ -74,6 +74,15 @@ class EmployeeCalendarDay {
 
   /// Leave overrides attendance in the grid and summary counts.
   bool get isCountedAsPresentDay => hasCompletedAttendance && !hasApprovedLeave;
+
+  /// Completed full day (not leave, not short session).
+  bool get isCountedAsFullDayPresent =>
+      isCountedAsPresentDay && !(primaryAttendance?.isHalfDayWorked ?? false);
+
+  /// Completed short session under 4h 30m (not leave).
+  bool get isCountedAsHalfDayWorked =>
+      isCountedAsPresentDay && (primaryAttendance?.isHalfDayWorked ?? false);
+
   bool get isCountedAsOpenDay => hasOpenAttendance && !hasApprovedLeave;
 
   EmployeeCalendarDayState get state {
@@ -86,6 +95,9 @@ class EmployeeCalendarDay {
   String get stateLabel {
     switch (state) {
       case EmployeeCalendarDayState.completed:
+        if (primaryAttendance?.isHalfDayWorked == true) {
+          return primaryAttendance!.sessionShortLabel ?? 'Half day';
+        }
         return 'Attended';
       case EmployeeCalendarDayState.inProgress:
         return 'In Progress';
@@ -114,6 +126,14 @@ class EmployeeMonthlyCalendarData {
 
   late final int presentDayCount = days
       .where((day) => day.isCountedAsPresentDay)
+      .length;
+
+  late final int fullDayPresentCount = days
+      .where((day) => day.isCountedAsFullDayPresent)
+      .length;
+
+  late final int halfDayWorkedCount = days
+      .where((day) => day.isCountedAsHalfDayWorked)
       .length;
 
   late final int leaveDayCount = days

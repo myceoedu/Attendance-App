@@ -19,6 +19,8 @@ abstract class AppColors {
   static const violetLight = Color(0xFFEDE9FE);
   static const teal = Color(0xFF0D9488);
   static const tealLight = Color(0xFFCCFBF1);
+  /// Clock FAB / login wordmark (matches [AppGradients.teal] end).
+  static const tealBright = Color(0xFF2DD4BF);
   static const pink = Color(0xFFDB2777);
   static const pinkLight = Color(0xFFFCE7F3);
   static const orange = Color(0xFFEA580C);
@@ -41,6 +43,13 @@ abstract class AppColors {
   static const quickAccessIconWell = Color(0xFFE8ECF0);
   static const quickAccessIconWellRing = Color(0xFFFFFFFF);
   static const quickAccessCardShadow = Color(0x1A0F172A); // ~10% textPrimary
+  /// Soft card lift (~4% [textPrimary]).
+  static const cardShadowFaint = Color(0x0A0F172A);
+
+  /// Login / employee navy chrome (matches [AppGradients.authBackground]).
+  static const authDeep = Color(0xFF0B1D4A);
+  static const authNavy = Color(0xFF0F2255);
+  static const authBlue = Color(0xFF1A3A8F);
   static const success = Color(0xFF059669);
   static const successLight = Color(0xFFD1FAE5);
   /// Open attendance / clocked-in state.
@@ -95,7 +104,7 @@ abstract class AppColors {
   static const adminNavBackground = Color(0xFF312E81);
   static Color get adminNavIndicator => Colors.white.withValues(alpha: 0.22);
   static Color get adminHeaderShadow =>
-      const Color(0xFF312E81).withValues(alpha: 0.38);
+      adminNavBackground.withValues(alpha: 0.38);
 
   /// Soft fill behind shortcut icons (accent is semantic: leave, pay, etc.).
   static Color quickAccessWellFill(Color accent) => Color.alphaBlend(
@@ -113,6 +122,18 @@ abstract class AppColors {
     }
     return Color.lerp(accent, primaryDark, 0.1)!;
   }
+
+  // ── Employee quick-access icon wells (pastel tint tokens) ────────────
+  static const qaLeaveBg = Color(0xFFE1F5EE);
+  static const qaLeaveIcon = Color(0xFF0F6E56);
+  static const qaClaimBg = Color(0xFFFAEEDA);
+  static const qaClaimIcon = Color(0xFF854F0B);
+  static const qaPayrollBg = Color(0xFFE6F1FB);
+  static const qaPayrollIcon = Color(0xFF185FA5);
+  static const qaNoticesBg = Color(0xFFFBEAF0);
+  static const qaNoticesIcon = Color(0xFF993556);
+  static const qaHelpBg = Color(0xFFE9EBF2);
+  static const qaHelpIcon = Color(0xFF14213D);
 }
 
 /// Reusable gradients so screens share the same visual language.
@@ -137,9 +158,16 @@ abstract class AppGradients {
   );
 
   static const teal = LinearGradient(
-    colors: [Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF2DD4BF)],
+    colors: [Color(0xFF0F766E), AppColors.teal, AppColors.tealBright],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
+  );
+
+  /// Clock FAB / avatar badge.
+  static const LinearGradient tealBadge = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AppColors.tealBright, AppColors.teal],
   );
 
   static const sunset = LinearGradient(
@@ -191,11 +219,19 @@ abstract class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF0B1D4A),
-      Color(0xFF0F2255),
-      Color(0xFF1A3A8F),
+      AppColors.authDeep,
+      AppColors.authNavy,
+      AppColors.authBlue,
     ],
     stops: [0.0, 0.45, 1.0],
+  );
+
+  /// Employee home hero — navy into brand blue.
+  static const LinearGradient employeeHeroHeader = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [AppColors.authNavy, AppColors.authBlue, AppColors.primary],
+    stops: [0.0, 0.48, 1.0],
   );
 
   /// Admin dashboard header — indigo / violet (not employee [brandHeader] blue).
@@ -203,7 +239,7 @@ abstract class AppGradients {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF312E81),
+      AppColors.adminNavBackground,
       Color(0xFF4338CA),
       Color(0xFF6366F1),
     ],
@@ -218,12 +254,21 @@ abstract class AppChrome {
     statusBarBrightness: Brightness.dark,
   );
 
+  /// Login / auth screens — navy system nav bar (#14213D).
+  static const SystemUiOverlayStyle onAuth = SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    statusBarBrightness: Brightness.dark,
+    systemNavigationBarColor: Color(0xFF14213D),
+    systemNavigationBarIconBrightness: Brightness.light,
+  );
+
   /// White / light headers & lists — dark status icons.
   static const SystemUiOverlayStyle onLightSurface = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFFF8FAFC),
+    systemNavigationBarColor: AppColors.surface,
     systemNavigationBarIconBrightness: Brightness.dark,
   );
 }

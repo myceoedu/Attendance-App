@@ -8,7 +8,12 @@ import '../utils/app_route.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
-const _kWordmarkTeal = Color(0xFF2DD4BF);
+const Color _kNavy = Color(0xFF14213D);
+const Color _kWordmarkAccent = Color(0xFF8FB4E8);
+const Color _kFieldBorder = Color(0xFFD8DBE2);
+const Color _kLabel = Color(0xFF3A3F4B);
+const Color _kMuted = Color(0xFF9AA1AD);
+const Color _kLink = Color(0xFF185FA5);
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -81,71 +86,61 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: AppChrome.onBrand.copyWith(
-        systemNavigationBarColor: const Color(0xFF0F2255),
-        systemNavigationBarIconBrightness: Brightness.light,
-      ),
+      value: AppChrome.onAuth,
       child: Scaffold(
-        backgroundColor: const Color(0xFF1A3A8F),
-        body: DecoratedBox(
-          decoration: const BoxDecoration(
-            gradient: AppGradients.authBackground,
-          ),
-          child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _BrandMark(),
-                Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 36),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 420),
-                        child: Column(
-                          children: [
-                            _FormCard(
-                              formKey: _formKey,
-                              usernameCtrl: _usernameCtrl,
-                              passwordCtrl: _passwordCtrl,
-                              obscure: _obscure,
-                              busy: _busy,
-                              error: _error,
-                              info: _info,
-                              infoIsError: _infoIsError,
-                              onToggleObscure: () =>
-                                  setState(() => _obscure = !_obscure),
-                              onSubmit: _submit,
-                              onForgotPassword: () =>
-                                  pushAppPage(
-                                    context,
-                                    const ForgotPasswordScreen(),
-                                  ),
-                              onCreateAccount: () =>
-                                  pushAppPage(
-                                    context,
-                                    const RegisterScreen(),
-                                  ),
+        backgroundColor: _kNavy,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const _BrandMark(),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 36),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                        children: [
+                          _FormCard(
+                            formKey: _formKey,
+                            usernameCtrl: _usernameCtrl,
+                            passwordCtrl: _passwordCtrl,
+                            obscure: _obscure,
+                            busy: _busy,
+                            error: _error,
+                            info: _info,
+                            infoIsError: _infoIsError,
+                            onToggleObscure: () =>
+                                setState(() => _obscure = !_obscure),
+                            onSubmit: _submit,
+                            onForgotPassword: () => pushAppPage(
+                              context,
+                              const ForgotPasswordScreen(),
                             ),
-                            const SizedBox(height: 28),
-                            Text(
-                              'myRekod · Enterprise HR · Secure access',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                color: Colors.white.withValues(alpha: 0.45),
-                                letterSpacing: 0.3,
-                              ),
+                            onCreateAccount: () => pushAppPage(
+                              context,
+                              const RegisterScreen(),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 28),
+                          Text(
+                            'myRekod · Enterprise HR · Secure access',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                              color: Colors.white.withValues(alpha: 0.38),
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -154,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Brand mark — sits above the card, minimal
+// Brand mark — sits above the card
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _BrandMark extends StatelessWidget {
@@ -163,36 +158,29 @@ class _BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 44, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 44, 24, 28),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Icon tile
           Container(
-            width: 52,
-            height: 52,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
-              color: AppColors.teal,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.teal.withValues(alpha: 0.40),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                  spreadRadius: -2,
-                ),
-              ],
+              color: Colors.white.withValues(alpha: 0.10),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.28),
+              ),
             ),
             child: const Center(
               child: Icon(
                 Icons.fingerprint_rounded,
-                size: 26,
+                size: 28,
                 color: Colors.white,
               ),
             ),
           ),
           const SizedBox(height: 14),
-          // Wordmark
           RichText(
             textAlign: TextAlign.center,
             text: const TextSpan(
@@ -209,14 +197,14 @@ class _BrandMark extends StatelessWidget {
                 ),
                 TextSpan(
                   text: 'Rekod',
-                  style: TextStyle(color: _kWordmarkTeal),
+                  style: TextStyle(color: _kWordmarkAccent),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
-            'Workforce Management',
+            'Workforce management',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w400,
@@ -231,7 +219,7 @@ class _BrandMark extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Form card — the floating white sheet
+// Form card
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _FormCard extends StatelessWidget {
@@ -264,30 +252,29 @@ class _FormCard extends StatelessWidget {
   final VoidCallback onCreateAccount;
 
   static InputDecorationTheme _inputTheme() {
-    const r = 10.0;
+    const r = 8.0;
     return InputDecorationTheme(
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-      prefixIconColor: AppColors.textSecondary,
+      fillColor: Colors.white,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      prefixIconColor: _kMuted,
       hintStyle: const TextStyle(
-        color: AppColors.textHint,
+        color: _kMuted,
         fontSize: 14,
         fontWeight: FontWeight.w400,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: const BorderSide(color: _kFieldBorder),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: const BorderSide(color: _kFieldBorder),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
-        borderSide:
-            const BorderSide(color: AppColors.teal, width: 1.5),
+        borderSide: const BorderSide(color: _kNavy, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
@@ -295,8 +282,7 @@ class _FormCard extends StatelessWidget {
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(r),
-        borderSide:
-            const BorderSide(color: AppColors.danger, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
       ),
     );
   }
@@ -306,44 +292,26 @@ class _FormCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          // Deep diffuse lift
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.36),
-            blurRadius: 60,
-            offset: const Offset(0, 24),
-            spreadRadius: -12,
-          ),
-          // Soft ambient ring
-          BoxShadow(
-            color: AppColors.teal.withValues(alpha: 0.07),
-            blurRadius: 32,
-            offset: const Offset(0, 8),
-            spreadRadius: -4,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Theme(
-        data: Theme.of(context)
-            .copyWith(inputDecorationTheme: _inputTheme()),
+        data: Theme.of(context).copyWith(inputDecorationTheme: _inputTheme()),
         child: Form(
           key: formKey,
           child: Padding(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // ── Header ───────────────────────────────────────────
                 const Text(
                   'Sign in to your account',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.5,
-                    height: 1.2,
+                    color: _kNavy,
+                    letterSpacing: -0.3,
+                    height: 1.25,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -352,13 +320,12 @@ class _FormCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
-                    color: AppColors.textSecondary,
-                    height: 1.45,
+                    color: _kMuted,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
 
-                // ── Username ─────────────────────────────────────────
                 const _Label('Username or email'),
                 const SizedBox(height: 6),
                 TextFormField(
@@ -366,12 +333,14 @@ class _FormCard extends StatelessWidget {
                   keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: _kNavy,
+                  ),
                   decoration: const InputDecoration(
                     hintText: 'you@gmail.com or username',
-                    prefixIcon: Icon(
-                      Icons.person_outline_rounded,
-                      size: 18,
-                    ),
+                    prefixIcon: Icon(Icons.person_outline_rounded, size: 18),
                   ),
                   validator: (v) {
                     if (v == null || v.trim().isEmpty) return 'Required';
@@ -385,44 +354,20 @@ class _FormCard extends StatelessWidget {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
-                // ── Password (label + forgot inline) ─────────────────
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Flexible(child: _Label('Password')),
-                    Flexible(
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: GestureDetector(
-                          onTap: busy ? null : onForgotPassword,
-                          behavior: HitTestBehavior.opaque,
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
-                            child: Text(
-                              'Forgot password?',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: busy
-                                    ? AppColors.textHint
-                                    : AppColors.teal,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                const _Label('Password'),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: passwordCtrl,
                   obscureText: obscure,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => onSubmit(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: _kNavy,
+                  ),
                   decoration: InputDecoration(
                     hintText: '••••••••',
                     prefixIcon: const Icon(
@@ -435,47 +380,77 @@ class _FormCard extends StatelessWidget {
                             ? Icons.visibility_off_outlined
                             : Icons.visibility_outlined,
                         size: 18,
-                        color: AppColors.textHint,
+                        color: _kMuted,
                       ),
                       onPressed: onToggleObscure,
                     ),
                   ),
                   validator: (v) =>
-                      (v == null || v.length < 6)
-                          ? 'Min 6 characters'
-                          : null,
+                      (v == null || v.length < 6) ? 'Min 6 characters' : null,
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: GestureDetector(
+                    onTap: busy ? null : onForgotPassword,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: busy ? _kMuted : _kLink,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
 
-                // ── Error banner ────────────────────────────────────
                 if (info != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _InfoBanner(info!, isError: infoIsError),
                 ],
                 if (error != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   _ErrorBanner(error!),
                 ],
-                const SizedBox(height: 22),
+                const SizedBox(height: 16),
 
-                // ── Sign in button ───────────────────────────────────
                 _SignInButton(
                   busy: busy,
                   onPressed: busy ? null : onSubmit,
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 14),
 
-                // ── Create account ───────────────────────────────────
-                TextButton(
-                  onPressed: busy ? null : onCreateAccount,
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.textSecondary,
-                    minimumSize: const Size.fromHeight(44),
-                    textStyle: const TextStyle(
+                Text.rich(
+                  TextSpan(
+                    style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w400,
+                      color: _kMuted,
                     ),
+                    children: [
+                      const TextSpan(text: "Don't have an account? "),
+                      WidgetSpan(
+                        alignment: PlaceholderAlignment.baseline,
+                        baseline: TextBaseline.alphabetic,
+                        child: GestureDetector(
+                          onTap: busy ? null : onCreateAccount,
+                          child: Text(
+                            'Create one',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: busy ? _kMuted : _kLink,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  child: const Text('Create an account'),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -485,10 +460,6 @@ class _FormCard extends StatelessWidget {
     );
   }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Atoms
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _Label extends StatelessWidget {
   const _Label(this.text);
@@ -502,7 +473,7 @@ class _Label extends StatelessWidget {
       style: const TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
+        color: _kLabel,
         height: 1.0,
       ),
     );
@@ -601,76 +572,44 @@ class _SignInButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onPressed != null;
-    final radius = BorderRadius.circular(10);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: enabled ? AppGradients.teal : null,
-        color: enabled ? null : AppColors.border,
-        borderRadius: radius,
-        boxShadow: enabled
-            ? [
-                BoxShadow(
-                  color: AppColors.teal.withValues(alpha: 0.30),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
-                  spreadRadius: -2,
-                ),
-              ]
-            : null,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: radius,
-          splashColor: Colors.white.withValues(alpha: 0.08),
-          highlightColor: Colors.white.withValues(alpha: 0.05),
-          child: Ink(
-            height: 50,
-            decoration: BoxDecoration(borderRadius: radius),
-            child: Center(
-              child: busy
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Sign in',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
+    return SizedBox(
+      height: 48,
+      child: FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(
+          backgroundColor: _kNavy,
+          disabledBackgroundColor: _kFieldBorder,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
         ),
+        child: busy
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white,
+                ),
+              )
+            : const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Sign in',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
+              ),
       ),
     );
   }

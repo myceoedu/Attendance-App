@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_route.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +12,24 @@ import '../../utils/app_time.dart';
 import '../../utils/profile_validators.dart';
 import '../change_password_screen.dart';
 import '../help_support_screen.dart';
+import '../../widgets/app_confirm_dialog.dart';
+
+// Profile design system (match Add employee / Employee details).
+const Color _kNavy = Color(0xFF14213D);
+const Color _kPageBg = Color(0xFFF5F6F8);
+const Color _kBorder = Color(0xFFE4E6EB);
+const Color _kInputBorder = Color(0xFFD8DBE2);
+const Color _kMuted = Color(0xFF9AA1AD);
+const Color _kHairline = Color(0xFFEEF0F3);
+const Color _kAvatarTile = Color(0xFFE9EBF2);
+const Color _kProgressGreen = Color(0xFF5DCAA5);
+const Color _kAmber = Color(0xFFC9A961);
+const Color _kAmberBorder = Color(0xFFE0C088);
+const Color _kAmberBg = Color(0xFFFDF9F1);
+const Color _kLockedBorder = Color(0xFFEEF0F3);
+const Color _kLockedBg = Color(0xFFFAFAFA);
+const Color _kLockedText = Color(0xFFB4B9C2);
+const Color _kLinkBlue = Color(0xFF185FA5);
 
 enum _ProfileSectionKey {
   personal,
@@ -368,28 +387,19 @@ class _ProfileTabState extends State<ProfileTab> {
     });
   }
 
-  void _confirmLogout(BuildContext context, AuthProvider auth) {
-    showDialog<void>(
+  Future<void> _confirmLogout(BuildContext context, AuthProvider auth) async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out'),
-        content: const Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              auth.signOut();
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
+      title: 'Sign out?',
+      message: 'You will need to sign in again to use the app.',
+      cancelLabel: 'Stay',
+      confirmLabel: 'Sign out',
+      emphasis: AppConfirmEmphasis.safe,
+      confirmColor: AppColors.danger,
     );
+    if (ok && context.mounted) {
+      auth.signOut();
+    }
   }
 
   @override
@@ -428,31 +438,71 @@ class _ProfileTabState extends State<ProfileTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
-                    children: [
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            _expandedSections = Set<_ProfileSectionKey>.from(
-                              _ProfileSectionKey.values,
-                            );
-                          });
-                        },
-                        child: const Text('Expand all'),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: _kBorder),
+                        ),
                       ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() => _expandedSections = {});
-                        },
-                        child: const Text('Collapse all'),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: _kLinkBlue,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                textStyle: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _expandedSections =
+                                      Set<_ProfileSectionKey>.from(
+                                    _ProfileSectionKey.values,
+                                  );
+                                });
+                              },
+                              child: const Text('Expand all'),
+                            ),
+                            const SizedBox(width: 12),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: _kMuted,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                textStyle: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() => _expandedSections = {});
+                              },
+                              child: const Text('Collapse all'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 2),
                   _ProfileExpandableSection(
                     title: 'Personal information',
                     icon: Icons.person_outline_rounded,
-                    accent: AppColors.indigo,
                     subtitle: subtitles[_ProfileSectionKey.personal]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.personal,
@@ -509,42 +559,38 @@ class _ProfileTabState extends State<ProfileTab> {
                                   ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'Full name',
+                            icon: Icons.badge_outlined,
                             controller: _nameCtrl,
-                            decoration: _dec(Icons.badge_outlined, 'Full name'),
+                            emptyHint: 'Add your full name',
                             validator: ProfileValidators.requiredName,
                             textCapitalization: TextCapitalization.words,
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Mobile number',
+                            icon: Icons.phone_iphone_rounded,
                             controller: _phoneCtrl,
+                            emptyHint: 'Add your mobile number',
                             keyboardType: TextInputType.phone,
-                            decoration: _dec(
-                              Icons.phone_iphone_rounded,
-                              'Mobile number',
-                            ),
                             validator: ProfileValidators.phoneMalaysia,
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Current address',
+                            icon: Icons.home_outlined,
                             controller: _addressCtrl,
+                            emptyHint: 'Add your address',
                             maxLines: 2,
-                            decoration: _dec(
-                              Icons.home_outlined,
-                              'Current address',
-                            ),
                             textCapitalization: TextCapitalization.sentences,
                           ),
-                          const SizedBox(height: 12),
-                          DropdownButtonFormField<String>(
-                            key: ValueKey<String>('marital_$_maritalValue'),
-                            initialValue: _maritalValue.isEmpty
-                                ? ''
-                                : _maritalValue,
-                            decoration: _dec(
-                              Icons.favorite_outline_rounded,
-                              'Marital status',
-                            ),
+                          const SizedBox(height: 10),
+                          _editDropdownField(
+                            label: 'Marital status',
+                            icon: Icons.favorite_outline_rounded,
+                            value: _maritalValue.isEmpty ? '' : _maritalValue,
+                            emptyHint: 'Not set',
                             items: const [
                               DropdownMenuItem(
                                 value: '',
@@ -574,52 +620,48 @@ class _ProfileTabState extends State<ProfileTab> {
                             onChanged: (v) =>
                                 setState(() => _maritalValue = v ?? ''),
                           ),
-                          const SizedBox(height: 12),
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(
-                              Icons.cake_outlined,
-                              color: AppColors.primary.withValues(alpha: 0.85),
-                            ),
-                            title: const Text('Date of birth'),
-                            subtitle: Text(
-                              _dob == null
-                                  ? 'Tap to select'
-                                  : dateFmtLong.format(_dob!),
-                              style: TextStyle(
-                                color: _dob == null
-                                    ? AppColors.textHint
-                                    : AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            trailing: const Icon(Icons.edit_calendar_outlined),
+                          const SizedBox(height: 10),
+                          _editDateField(
+                            label: 'Date of birth',
+                            icon: Icons.cake_outlined,
+                            value: _dob == null
+                                ? null
+                                : dateFmtLong.format(_dob!),
+                            emptyHint: 'Tap to select',
                             onTap: _pickDob,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: AppColors.border),
-                            ),
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'IC number',
+                            icon: Icons.credit_card_outlined,
                             controller: _icCtrl,
-                            decoration: _dec(
-                              Icons.credit_card_outlined,
-                              'IC number (######-##-####)',
-                            ),
+                            emptyHint: '######-##-####',
                             validator: ProfileValidators.icNumber,
                           ),
                         ],
-                        const SizedBox(height: 8),
-                        _readonlyBlock(),
                       ],
                     ),
                   ),
                   const SizedBox(height: 10),
+                  _lockedField(
+                    label: 'Username',
+                    icon: Icons.alternate_email,
+                    value: _usernameCtrl.text.isNotEmpty
+                        ? _usernameCtrl.text
+                        : '—',
+                  ),
+                  const SizedBox(height: 10),
+                  _lockedField(
+                    label: 'Email',
+                    icon: Icons.email_outlined,
+                    value: _emailCtrl.text.isNotEmpty ? _emailCtrl.text : '—',
+                  ),
+                  const SizedBox(height: 10),
+                  _scrollMoreHint(),
+                  const SizedBox(height: 10),
                   _ProfileExpandableSection(
                     title: 'Employment information',
                     icon: Icons.work_outline_rounded,
-                    accent: AppColors.teal,
                     subtitle: subtitles[_ProfileSectionKey.employment]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.employment,
@@ -629,11 +671,18 @@ class _ProfileTabState extends State<ProfileTab> {
                     body: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _viewRow(
-                          Icons.shield_outlined,
-                          'Role',
-                          user.isAdmin ? 'Administrator' : 'Employee',
-                        ),
+                        if (!_editing)
+                          _viewRow(
+                            Icons.shield_outlined,
+                            'Role',
+                            user.isAdmin ? 'Administrator' : 'Employee',
+                          )
+                        else
+                          _lockedField(
+                            label: 'Role',
+                            icon: Icons.shield_outlined,
+                            value: user.isAdmin ? 'Administrator' : 'Employee',
+                          ),
                         if (!_editing)
                           _viewRow(
                             Icons.event_outlined,
@@ -641,41 +690,25 @@ class _ProfileTabState extends State<ProfileTab> {
                             _joinDateLabel(user),
                           )
                         else ...[
-                          ListTile(
-                            contentPadding: EdgeInsets.zero,
-                            leading: Icon(
-                              Icons.event_outlined,
-                              color: AppColors.primary.withValues(alpha: 0.85),
-                            ),
-                            title: const Text('Join date'),
-                            subtitle: Text(
-                              dateFmtLong.format(_joinDate),
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            trailing: const Icon(Icons.edit_calendar_outlined),
+                          _editDateField(
+                            label: 'Join date',
+                            icon: Icons.event_outlined,
+                            value: dateFmtLong.format(_joinDate),
+                            emptyHint: 'Tap to select',
                             onTap: _pickJoinDate,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: const BorderSide(color: AppColors.border),
-                            ),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 6),
                           Text(
                             'If your start date was recorded wrong, update it here. '
                             'Annual leave calculations may use this date.',
-                            style: TextStyle(
+                            style: GoogleFonts.inter(
                               fontSize: 11.5,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.9,
-                              ),
+                              color: _kMuted,
                               height: 1.35,
                             ),
                           ),
-                          const SizedBox(height: 10),
                         ],
+                        const SizedBox(height: 10),
                         if (!_editing) ...[
                           _viewRow(
                             Icons.workspace_premium_outlined,
@@ -702,28 +735,25 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'Position',
+                            icon: Icons.workspace_premium_outlined,
                             controller: _jobCtrl,
-                            decoration: _dec(
-                              Icons.workspace_premium_outlined,
-                              'Position / role title',
-                            ),
+                            emptyHint: 'Add your position',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Department',
+                            icon: Icons.apartment_outlined,
                             controller: _deptCtrl,
-                            decoration: _dec(
-                              Icons.apartment_outlined,
-                              'Department',
-                            ),
+                            emptyHint: 'Add your department',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Employee ID',
+                            icon: Icons.badge_rounded,
                             controller: _empIdCtrl,
-                            decoration: _dec(
-                              Icons.badge_rounded,
-                              'Employee ID',
-                            ),
+                            emptyHint: 'Add employee ID',
                           ),
                         ],
                       ],
@@ -733,7 +763,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   _ProfileExpandableSection(
                     title: 'Statutory (Malaysia)',
                     icon: Icons.account_balance_outlined,
-                    accent: AppColors.sky,
                     subtitle: subtitles[_ProfileSectionKey.statutory]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.statutory,
@@ -761,20 +790,18 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'EPF number',
+                            icon: Icons.account_balance_wallet_outlined,
                             controller: _epfCtrl,
-                            decoration: _dec(
-                              Icons.account_balance_wallet_outlined,
-                              'EPF number',
-                            ),
+                            emptyHint: 'Add EPF number',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'SOCSO number',
+                            icon: Icons.health_and_safety_outlined,
                             controller: _socsoCtrl,
-                            decoration: _dec(
-                              Icons.health_and_safety_outlined,
-                              'SOCSO number',
-                            ),
+                            emptyHint: 'Add SOCSO number',
                           ),
                         ],
                       ],
@@ -784,7 +811,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   _ProfileExpandableSection(
                     title: 'Bank information',
                     icon: Icons.account_balance_wallet_outlined,
-                    accent: AppColors.violet,
                     subtitle: subtitles[_ProfileSectionKey.bank]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.bank,
@@ -813,22 +839,20 @@ class _ProfileTabState extends State<ProfileTab> {
                                   ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'Bank name',
+                            icon: Icons.account_balance_outlined,
                             controller: _bankNameCtrl,
-                            decoration: _dec(
-                              Icons.account_balance_outlined,
-                              'Bank name',
-                            ),
+                            emptyHint: 'Add bank name',
                             textCapitalization: TextCapitalization.words,
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Bank account number',
+                            icon: Icons.numbers_rounded,
                             controller: _bankAcctCtrl,
+                            emptyHint: 'Add account number',
                             keyboardType: TextInputType.number,
-                            decoration: _dec(
-                              Icons.numbers_rounded,
-                              'Bank account number',
-                            ),
                             validator: ProfileValidators.bankAccount,
                           ),
                         ],
@@ -839,7 +863,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   _ProfileExpandableSection(
                     title: 'Education',
                     icon: Icons.school_outlined,
-                    accent: AppColors.orange,
                     subtitle: subtitles[_ProfileSectionKey.education]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.education,
@@ -867,20 +890,18 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'Highest level of studies',
+                            icon: Icons.stacked_bar_chart_outlined,
                             controller: _eduLevelCtrl,
-                            decoration: _dec(
-                              Icons.stacked_bar_chart_outlined,
-                              'Highest level (e.g. Bachelor)',
-                            ),
+                            emptyHint: 'e.g. Bachelor',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'College / university',
+                            icon: Icons.domain_outlined,
                             controller: _eduInstCtrl,
-                            decoration: _dec(
-                              Icons.domain_outlined,
-                              'Institution name',
-                            ),
+                            emptyHint: 'Add institution name',
                             textCapitalization: TextCapitalization.words,
                           ),
                         ],
@@ -891,7 +912,6 @@ class _ProfileTabState extends State<ProfileTab> {
                   _ProfileExpandableSection(
                     title: 'Emergency contact',
                     icon: Icons.contact_phone_outlined,
-                    accent: AppColors.danger,
                     subtitle: subtitles[_ProfileSectionKey.emergency]!,
                     expanded: _expandedSections.contains(
                       _ProfileSectionKey.emergency,
@@ -927,30 +947,27 @@ class _ProfileTabState extends State<ProfileTab> {
                             ),
                           ),
                         ] else ...[
-                          TextFormField(
+                          _editTextField(
+                            label: 'Contact name',
+                            icon: Icons.person_outline_rounded,
                             controller: _emeNameCtrl,
-                            decoration: _dec(
-                              Icons.person_outline_rounded,
-                              'Contact name',
-                            ),
+                            emptyHint: 'Add contact name',
                             textCapitalization: TextCapitalization.words,
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Relationship',
+                            icon: Icons.group_outlined,
                             controller: _emeRelCtrl,
-                            decoration: _dec(
-                              Icons.group_outlined,
-                              'Relationship',
-                            ),
+                            emptyHint: 'Add relationship',
                           ),
-                          const SizedBox(height: 12),
-                          TextFormField(
+                          const SizedBox(height: 10),
+                          _editTextField(
+                            label: 'Phone number',
+                            icon: Icons.phone_callback_outlined,
                             controller: _emePhoneCtrl,
+                            emptyHint: 'Add phone number',
                             keyboardType: TextInputType.phone,
-                            decoration: _dec(
-                              Icons.phone_callback_outlined,
-                              'Phone number',
-                            ),
                             validator: ProfileValidators.phoneMalaysia,
                           ),
                         ],
@@ -990,80 +1007,410 @@ class _ProfileTabState extends State<ProfileTab> {
       ],
     );
 
-    return SizedBox.expand(
-      child: ColoredBox(
-        color: AppColors.surface,
-        child: RefreshIndicator(onRefresh: _onRefresh, child: body),
+    return Theme(
+      data: Theme.of(context).copyWith(
+        textTheme: GoogleFonts.interTextTheme(Theme.of(context).textTheme),
+      ),
+      child: SizedBox.expand(
+        child: ColoredBox(
+          color: _kPageBg,
+          child: RefreshIndicator(
+            color: _kNavy,
+            onRefresh: _onRefresh,
+            child: body,
+          ),
+        ),
       ),
     );
   }
 
-  InputDecoration _dec(IconData icon, String label) {
-    return InputDecoration(
-      labelText: label,
-      prefixIcon: Icon(icon, size: 22),
-      alignLabelWithHint: true,
+  Widget _fieldLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w500,
+          color: _kMuted,
+        ),
+      ),
     );
   }
 
-  Widget _readonlyBlock() {
+  InputDecoration _editInputDec({
+    required IconData icon,
+    required bool empty,
+    String? hint,
+    int maxLines = 1,
+  }) {
+    final iconColor = empty ? _kAmber : _kMuted;
+    final transparent = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide.none,
+    );
+    final solid = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: _kInputBorder),
+    );
+    final focused = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(
+        color: empty ? _kAmber : _kNavy,
+        width: empty ? 1.5 : 1.5,
+      ),
+    );
+
+    return InputDecoration(
+      hintText: empty ? hint : null,
+      hintStyle: GoogleFonts.inter(
+        fontSize: 13.5,
+        fontWeight: FontWeight.w400,
+        fontStyle: FontStyle.italic,
+        color: _kAmber,
+      ),
+      prefixIcon: Icon(icon, size: 18, color: iconColor),
+      isDense: true,
+      filled: true,
+      fillColor: empty ? _kAmberBg : Colors.white,
+      contentPadding: EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: maxLines > 1 ? 12 : 10,
+      ),
+      border: empty ? transparent : solid,
+      enabledBorder: empty ? transparent : solid,
+      focusedBorder: empty ? transparent : focused,
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.danger),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _wrapEditBox({
+    required bool empty,
+    required Widget child,
+    int maxLines = 1,
+  }) {
+    final box = ConstrainedBox(
+      constraints: BoxConstraints(minHeight: maxLines > 1 ? 64 : 40),
+      child: child,
+    );
+    if (!empty) return box;
+    return CustomPaint(
+      painter: _DashedRRectPainter(
+        color: _kAmberBorder,
+        radius: 8,
+        strokeWidth: 1.5,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: ColoredBox(
+          color: _kAmberBg,
+          child: box,
+        ),
+      ),
+    );
+  }
+
+  Widget _editTextField({
+    required String label,
+    required IconData icon,
+    required TextEditingController controller,
+    required String emptyHint,
+    String? Function(String?)? validator,
+    TextInputType? keyboardType,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+    int maxLines = 1,
+  }) {
+    final empty = controller.text.trim().isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const SizedBox(height: 6),
-        TextFormField(
-          controller: _usernameCtrl,
-          readOnly: true,
-          decoration: _dec(Icons.alternate_email, 'Username'),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _emailCtrl,
-          readOnly: true,
-          decoration: _dec(Icons.email_outlined, 'Email'),
+        _fieldLabel(label),
+        _wrapEditBox(
+          empty: empty,
+          maxLines: maxLines,
+          child: TextFormField(
+            controller: controller,
+            validator: validator,
+            keyboardType: keyboardType,
+            textCapitalization: textCapitalization,
+            maxLines: maxLines,
+            minLines: maxLines > 1 ? maxLines : 1,
+            onChanged: (_) => setState(() {}),
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+              color: empty ? _kAmber : _kNavy,
+            ),
+            decoration: _editInputDec(
+              icon: icon,
+              empty: empty,
+              hint: emptyHint,
+              maxLines: maxLines,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _viewRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: AppColors.primary.withValues(alpha: 0.8)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary.withValues(alpha: 0.95),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: value == 'Not updated yet'
-                        ? AppColors.textHint
-                        : AppColors.textPrimary,
-                  ),
-                ),
-              ],
+  Widget _editDropdownField({
+    required String label,
+    required IconData icon,
+    required String value,
+    required String emptyHint,
+    required List<DropdownMenuItem<String>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final empty = value.trim().isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _fieldLabel(label),
+        _wrapEditBox(
+          empty: empty,
+          child: DropdownButtonFormField<String>(
+            key: ValueKey<String>('dd_${label}_$value'),
+            initialValue: value,
+            items: items,
+            onChanged: onChanged,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: empty ? _kAmber : _kMuted,
+              size: 20,
             ),
+            style: GoogleFonts.inter(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+              fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+              color: empty ? _kAmber : _kNavy,
+            ),
+            dropdownColor: Colors.white,
+            decoration: _editInputDec(
+              icon: icon,
+              empty: empty,
+              hint: emptyHint,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _editDateField({
+    required String label,
+    required IconData icon,
+    required String? value,
+    required String emptyHint,
+    required VoidCallback onTap,
+  }) {
+    final empty = value == null || value.trim().isEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _fieldLabel(label),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: _wrapEditBox(
+              empty: empty,
+              child: InputDecorator(
+                decoration: _editInputDec(
+                  icon: icon,
+                  empty: empty,
+                  hint: emptyHint,
+                ).copyWith(
+                  suffixIcon: Icon(
+                    Icons.calendar_today_outlined,
+                    size: 16,
+                    color: empty ? _kAmber : _kMuted,
+                  ),
+                ),
+                child: Text(
+                  empty ? emptyHint : value,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+                    color: empty ? _kAmber : _kNavy,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _lockedField({
+    required String label,
+    required IconData icon,
+    required String value,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _fieldLabel(label),
+        Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: _kLockedBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: _kLockedBorder),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: _kLockedText),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    color: _kLockedText,
+                  ),
+                ),
+              ),
+              const Icon(Icons.lock_outline_rounded, size: 15, color: _kLockedText),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _scrollMoreHint() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            'Scroll for more',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: _kMuted,
+            ),
+          ),
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            size: 18,
+            color: _kMuted,
           ),
         ],
       ),
     );
   }
+
+  Widget _viewRow(IconData icon, String label, String value) {
+    final empty = value == 'Not updated yet';
+    final accent = empty ? _kAmber : _kMuted;
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: _kHairline)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 18, color: accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: _kMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: empty ? FontWeight.w400 : FontWeight.w500,
+                      fontStyle: empty ? FontStyle.italic : FontStyle.normal,
+                      color: empty ? _kAmber : _kNavy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  _DashedRRectPainter({
+    required this.color,
+    required this.radius,
+    this.strokeWidth = 1.5,
+  });
+
+  final Color color;
+  final double radius;
+  final double strokeWidth;
+  static const double _dash = 4;
+  static const double _gap = 3;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(
+        strokeWidth / 2,
+        strokeWidth / 2,
+        size.width - strokeWidth,
+        size.height - strokeWidth,
+      ),
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        final next = distance + _dash;
+        canvas.drawPath(
+          metric.extractPath(distance, next.clamp(0, metric.length)),
+          paint,
+        );
+        distance = next + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter oldDelegate) =>
+      oldDelegate.color != color ||
+      oldDelegate.radius != radius ||
+      oldDelegate.strokeWidth != strokeWidth;
 }
 
 class _ProfileHeader extends StatelessWidget {
@@ -1085,20 +1432,7 @@ class _ProfileHeader extends StatelessWidget {
       value: AppChrome.onBrand,
       child: Container(
         width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: AppGradients.brandHeader,
-          border: Border(
-            bottom: BorderSide(color: AppColors.brandHeaderBorder),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.brandHeaderShadow,
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-              spreadRadius: -4,
-            ),
-          ],
-        ),
+        color: _kNavy,
         child: SafeArea(
           bottom: false,
           child: Padding(
@@ -1107,12 +1441,12 @@ class _ProfileHeader extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Text(
+                    Text(
                       'My profile',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.onBrand,
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white,
                       ),
                     ),
                     const Spacer(),
@@ -1123,15 +1457,15 @@ class _ProfileHeader extends StatelessWidget {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.onBrand.withValues(alpha: 0.12),
+                          color: Colors.white.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Editing',
-                          style: TextStyle(
+                          style: GoogleFonts.inter(
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.onBrand,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -1142,52 +1476,44 @@ class _ProfileHeader extends StatelessWidget {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 96,
-                      height: 96,
+                      width: 76,
+                      height: 76,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: AppGradients.primary,
+                        color: Colors.white.withValues(alpha: 0.12),
                         border: Border.all(
-                          color: AppColors.brandAvatarRing,
-                          width: 2,
+                          color: Colors.white.withValues(alpha: 0.28),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.22),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          fontSize: 40,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.onBrand,
+                        style: GoogleFonts.inter(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                     Positioned(
-                      right: -4,
+                      right: -2,
                       bottom: -2,
                       child: Material(
                         color: Colors.white,
-                        shape: const CircleBorder(),
-                        elevation: 2,
-                        child: IconButton(
-                          tooltip: 'Change photo',
-                          constraints: const BoxConstraints.tightFor(
-                            width: 36,
-                            height: 36,
-                          ),
-                          padding: EdgeInsets.zero,
-                          iconSize: 18,
-                          onPressed: onTogglePhoto,
-                          icon: Icon(
-                            Icons.photo_camera_outlined,
-                            color: AppColors.primaryDark,
+                        shape: const CircleBorder(
+                          side: BorderSide(color: _kNavy, width: 2),
+                        ),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: onTogglePhoto,
+                          child: const SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: Icon(
+                              Icons.photo_camera_outlined,
+                              size: 14,
+                              color: _kNavy,
+                            ),
                           ),
                         ),
                       ),
@@ -1198,46 +1524,39 @@ class _ProfileHeader extends StatelessWidget {
                 Text(
                   user.name.isNotEmpty ? user.name : 'Employee',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.onBrand,
-                    letterSpacing: -0.35,
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _chip(
-                      user.isAdmin ? 'ADMIN' : 'EMPLOYEE',
-                      AppColors.brandChipFill,
-                    ),
+                    _chip(user.isAdmin ? 'Admin' : 'Employee'),
                     const SizedBox(width: 8),
-                    _chip(
-                      user.isAdmin ? 'Administrator' : 'Team member',
-                      AppColors.onBrand.withValues(alpha: 0.1),
-                    ),
+                    _chip(user.isAdmin ? 'Administrator' : 'Team member'),
                   ],
                 ),
                 const SizedBox(height: 16),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(999),
                   child: LinearProgressIndicator(
                     value: pct / 100,
-                    minHeight: 8,
-                    backgroundColor: Colors.white.withValues(alpha: 0.25),
-                    color: AppColors.success,
+                    minHeight: 5,
+                    backgroundColor: Colors.white.withValues(alpha: 0.18),
+                    color: _kProgressGreen,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$pct% complete. Fill the empty fields to finish your profile.',
+                  '$pct% complete · fill in the empty fields to finish your profile',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onBrandSecondary,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white.withValues(alpha: 0.72),
                     height: 1.3,
                   ),
                 ),
@@ -1249,21 +1568,19 @@ class _ProfileHeader extends StatelessWidget {
     );
   }
 
-  Widget _chip(String t, Color bg) {
+  Widget _chip(String t) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.brandChipBorder),
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         t,
-        style: const TextStyle(
-          fontSize: 10,
-          fontWeight: FontWeight.w800,
-          color: AppColors.onBrand,
-          letterSpacing: 0.6,
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+          color: Colors.white.withValues(alpha: 0.85),
         ),
       ),
     );
@@ -1274,7 +1591,6 @@ class _ProfileExpandableSection extends StatelessWidget {
   const _ProfileExpandableSection({
     required this.title,
     required this.icon,
-    required this.accent,
     required this.subtitle,
     required this.expanded,
     required this.onToggle,
@@ -1283,7 +1599,6 @@ class _ProfileExpandableSection extends StatelessWidget {
 
   final String title;
   final IconData icon;
-  final Color accent;
   final String subtitle;
   final bool expanded;
   final VoidCallback onToggle;
@@ -1295,16 +1610,8 @@ class _ProfileExpandableSection extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-            spreadRadius: -4,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1315,17 +1622,19 @@ class _ProfileExpandableSection extends StatelessWidget {
             child: InkWell(
               onTap: onToggle,
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 14, 8, expanded ? 10 : 14),
+                padding: EdgeInsets.fromLTRB(14, 12, 10, expanded ? 10 : 12),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      width: 34,
+                      height: 34,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
+                        color: _kAvatarTile,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(icon, color: accent, size: 20),
+                      child: Icon(icon, color: _kNavy, size: 18),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -1334,43 +1643,32 @@ class _ProfileExpandableSection extends StatelessWidget {
                         children: [
                           Text(
                             title,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: AppColors.textPrimary,
-                              letterSpacing: -0.2,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w500,
+                              color: _kNavy,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.92,
-                              ),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                              color: _kMuted,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(left: 2, top: 2),
-                      child: AnimatedRotation(
-                        turns: expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 220),
-                        curve: Curves.easeInOut,
-                        child: Icon(
-                          Icons.expand_more_rounded,
-                          size: 26,
-                          color: AppColors.textSecondary.withValues(
-                            alpha: 0.75,
-                          ),
-                        ),
-                      ),
+                    Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 22,
+                      color: _kMuted,
                     ),
                   ],
                 ),
@@ -1383,7 +1681,6 @@ class _ProfileExpandableSection extends StatelessWidget {
             alignment: Alignment.topCenter,
             child: Visibility(
               visible: expanded,
-              // Skip collapsed section content.
               maintainState: false,
               maintainAnimation: false,
               child: Column(
@@ -1391,11 +1688,11 @@ class _ProfileExpandableSection extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Divider(height: 22),
+                    padding: EdgeInsets.symmetric(horizontal: 14),
+                    child: Divider(height: 1, thickness: 1, color: _kHairline),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
                     child: body,
                   ),
                 ],
@@ -1436,11 +1733,10 @@ class _QuickActions extends StatelessWidget {
       children: [
         Text(
           'Quick actions',
-          style: TextStyle(
+          style: GoogleFonts.inter(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary.withValues(alpha: 0.85),
-            letterSpacing: -0.1,
+            fontWeight: FontWeight.w500,
+            color: _kNavy,
           ),
         ),
         const SizedBox(height: 10),
@@ -1450,9 +1746,11 @@ class _QuickActions extends StatelessWidget {
             icon: const Icon(Icons.edit_outlined, size: 18),
             label: const Text('Edit profile'),
             style: FilledButton.styleFrom(
+              backgroundColor: _kNavy,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           )
@@ -1471,9 +1769,12 @@ class _QuickActions extends StatelessWidget {
                 : const Icon(Icons.save_outlined, size: 18),
             label: Text(saving ? 'Saving…' : 'Save changes'),
             style: FilledButton.styleFrom(
+              backgroundColor: _kNavy,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: _kNavy.withValues(alpha: 0.45),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
@@ -1483,9 +1784,11 @@ class _QuickActions extends StatelessWidget {
             icon: const Icon(Icons.close_rounded, size: 18),
             label: const Text('Cancel'),
             style: OutlinedButton.styleFrom(
+              foregroundColor: _kMuted,
+              side: const BorderSide(color: _kBorder),
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
           ),
@@ -1516,7 +1819,7 @@ class _QuickActions extends StatelessWidget {
             backgroundColor: AppColors.dangerLight.withValues(alpha: 0.35),
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
         ),
@@ -1533,40 +1836,33 @@ class _QuickActions extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(10),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           child: Ink(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.divider),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primaryDark.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 3),
-                ),
-              ],
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kBorder),
             ),
             child: Row(
               children: [
-                Icon(icon, color: AppColors.primary, size: 22),
+                Icon(icon, color: _kNavy, size: 20),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                      color: _kNavy,
                     ),
                   ),
                 ),
-                Icon(
+                const Icon(
                   Icons.chevron_right_rounded,
-                  color: AppColors.textHint.withValues(alpha: 0.8),
+                  color: _kMuted,
                 ),
               ],
             ),

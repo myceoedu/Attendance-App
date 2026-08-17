@@ -16,7 +16,10 @@ abstract final class EmploymentStatus {
 
   static String normalize(dynamic raw) {
     if (raw == null) return permanent;
-    var v = raw.toString().trim().toLowerCase().replaceAll(RegExp(r'[\s-]+'), '_');
+    var v = raw.toString().trim().toLowerCase().replaceAll(
+      RegExp(r'[\s-]+'),
+      '_',
+    );
     if (v == 'parttime') v = partTime;
     if (codes.contains(v)) return v;
     return permanent;
@@ -35,5 +38,11 @@ abstract final class EmploymentStatus {
       default:
         return 'Permanent';
     }
+  }
+
+  /// Annual leave is for permanent and contract staff only.
+  static bool hasAnnualLeave(String? code) {
+    final v = normalize(code);
+    return v == permanent || v == contract;
   }
 }

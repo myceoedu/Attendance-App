@@ -1,0 +1,7 @@
+# Minimal config for Edge Functions.
+# Deploy: supabase functions deploy admin-create-user --no-verify-jwt
+project_id = "attendance_app"
+
+[functions.admin-create-user]
+enabled = true
+verify_jwt = false

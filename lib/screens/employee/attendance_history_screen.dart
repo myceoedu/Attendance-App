@@ -15,6 +15,24 @@ import '../../utils/app_time.dart';
 import '../../utils/leave_catalog.dart';
 import '../../widgets/status_chip.dart';
 
+// Dashboard-aligned semantic tints for calendar + stats.
+const Color _kNavy = Color(0xFF14213D);
+const Color _kPageBg = Color(0xFFF5F6F8);
+const Color _kBorder = Color(0xFFE4E6EB);
+const Color _kMuted = Color(0xFF9AA1AD);
+const Color _kWeekendBg = Color(0xFFF5F6F8);
+const Color _kOutside = Color(0xFFD2D5DB);
+const Color _kPillBg = Color(0xFFE9EBF2);
+
+const Color _kFull = Color(0xFF0F6E56);
+const Color _kFullBg = Color(0xFFE3F5EE);
+const Color _kHalf = Color(0xFF854F0B);
+const Color _kHalfBg = Color(0xFFFAEEDA);
+const Color _kLeave = Color(0xFF993C1D);
+const Color _kLeaveBg = Color(0xFFFCEBE3);
+const Color _kOpen = Color(0xFF185FA5);
+const Color _kOpenBg = Color(0xFFE8F1FB);
+
 class AttendanceHistoryScreen extends StatefulWidget {
   const AttendanceHistoryScreen({super.key});
 
@@ -143,7 +161,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   }
 
   // ── monthly totals (computed once per loaded month, not per rebuild) ──────
-  int get _presentDays => _calendarData?.presentDayCount ?? 0;
+  int get _presentDays => _calendarData?.fullDayPresentCount ?? 0;
+  int get _halfDays => _calendarData?.halfDayWorkedCount ?? 0;
   int get _leaveDays => _calendarData?.leaveDayCount ?? 0;
   int get _openRecords => _calendarData?.openDayCount ?? 0;
 
@@ -153,22 +172,37 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(title: const Text('My Attendance')),
+      backgroundColor: _kPageBg,
+      appBar: AppBar(
+        backgroundColor: _kNavy,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: AppChrome.onBrand,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
+        ),
+        title: const Text('My attendance'),
+      ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(color: _kNavy, strokeWidth: 2.4),
+            )
           : _error != null
           ? _buildError()
           : RefreshIndicator(
+              color: _kNavy,
               onRefresh: () async => _loadCalendar(showSpinner: false),
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 children: [
                   _buildCalendarCard(),
                   const SizedBox(height: 12),
                   _buildMonthStatsRow(),
-                  const SizedBox(height: 12),
-                  _buildLegend(),
                   ValueListenableBuilder<DateTime?>(
                     valueListenable: _selectedDayN,
                     builder: (context, sel, _) {
@@ -229,8 +263,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.divider),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _kBorder),
             ),
             child: Column(
               children: [
@@ -240,17 +274,17 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     children: [
                       IconButton(
                         onPressed: () => _changeMonth(-1),
-                        icon: const Icon(Icons.chevron_left),
-                        color: AppColors.textPrimary,
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        color: _kMuted,
                       ),
                       Expanded(
                         child: Text(
                           monthLabel,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                            color: _kNavy,
                           ),
                         ),
                       ),
@@ -259,10 +293,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                             ? () => _changeMonth(1)
                             : null,
                         icon: Icon(
-                          Icons.chevron_right,
-                          color: _canMoveForward
-                              ? AppColors.textPrimary
-                              : AppColors.textHint,
+                          Icons.chevron_right_rounded,
+                          color: _canMoveForward ? _kMuted : _kOutside,
                         ),
                       ),
                     ],
@@ -281,7 +313,7 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                       CalendarFormat.month: 'Month',
                     },
                     startingDayOfWeek: StartingDayOfWeek.monday,
-                    rowHeight: 52,
+                    rowHeight: 48,
                     daysOfWeekHeight: 28,
                     sixWeekMonthsEnforced: true,
                     selectedDayPredicate: (day) =>
@@ -317,8 +349,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                           _dowFmt.format(day),
                           style: const TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                            color: _kMuted,
                           ),
                         ),
                       ),
@@ -333,81 +365,72 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     );
   }
 
+  bool _isWeekend(DateTime day) =>
+      day.weekday == DateTime.saturday || day.weekday == DateTime.sunday;
+
   Widget _buildDayCell(
     DateTime day, {
     required bool isSelected,
     bool isToday = false,
   }) {
     final data = _calendarData?.dayFor(day);
-    final isPast = DateTime(day.year, day.month, day.day).isBefore(_today);
+    final weekend = _isWeekend(day);
 
-    Color cellBg;
-    Color cellBorder;
-    Color numColor;
+    Color? cellBg;
+    Color numColor = _kNavy;
+    var weight = FontWeight.w500;
 
-    if (data?.hasApprovedLeave == true) {
-      cellBg = AppColors.leaveLight.withValues(alpha: 0.8);
-      cellBorder = AppColors.leave.withValues(alpha: 0.45);
-      numColor = AppColors.leave;
+    if (isToday) {
+      // Today: navy border only — no status fill (blue reserved for Open).
+      cellBg = null;
+      numColor = _kNavy;
+      weight = FontWeight.w700;
+    } else if (weekend) {
+      cellBg = _kWeekendBg;
+      numColor = _kMuted;
+    } else if (data?.hasApprovedLeave == true) {
+      cellBg = _kLeaveBg;
+      numColor = _kLeave;
+      weight = FontWeight.w500;
     } else if (data?.hasOpenAttendance == true) {
-      cellBg = AppColors.openLight.withValues(alpha: 0.75);
-      cellBorder = AppColors.open.withValues(alpha: 0.45);
-      numColor = AppColors.open;
-    } else if (data?.hasCompletedAttendance == true) {
-      cellBg = AppColors.success.withValues(alpha: 0.22);
-      cellBorder = AppColors.success.withValues(alpha: 0.55);
-      numColor = AppColors.success;
-    } else if (isPast) {
-      cellBg = AppColors.surface;
-      cellBorder = AppColors.divider;
-      numColor = AppColors.textHint;
-    } else {
-      cellBg = Colors.white;
-      cellBorder = AppColors.divider;
-      numColor = AppColors.textPrimary;
+      cellBg = _kOpenBg;
+      numColor = _kOpen;
+      weight = FontWeight.w500;
+    } else if (data?.isCountedAsHalfDayWorked == true) {
+      cellBg = _kHalfBg;
+      numColor = _kHalf;
+      weight = FontWeight.w500;
+    } else if (data?.isCountedAsFullDayPresent == true ||
+        data?.hasCompletedAttendance == true) {
+      cellBg = _kFullBg;
+      numColor = _kFull;
+      weight = FontWeight.w500;
     }
 
-    if (isSelected) {
-      cellBorder = AppColors.primary;
-      numColor = AppColors.primaryDark;
+    if (isSelected && !isToday) {
+      numColor = _kNavy;
+      weight = FontWeight.w700;
     }
 
     return Padding(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(2),
       child: Container(
-        padding: EdgeInsets.all(isToday && !isSelected ? 1.5 : 0),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(13.5),
-          border: isToday && !isSelected
-              ? Border.all(color: AppColors.today, width: 1.6)
-              : null,
-          boxShadow: isToday && !isSelected
-              ? [
-                  BoxShadow(
-                    color: AppColors.today.withValues(alpha: 0.16),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : null,
+          color: cellBg,
+          borderRadius: BorderRadius.circular(6),
+          border: isToday
+              ? Border.all(color: _kNavy, width: 1.5)
+              : (isSelected
+                    ? Border.all(color: _kNavy, width: 1.5)
+                    : null),
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cellBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: cellBorder,
-              width: isSelected ? 2.0 : 1.0,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            '${day.day}',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: numColor,
-            ),
+        alignment: Alignment.center,
+        child: Text(
+          '${day.day}',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: weight,
+            color: numColor,
           ),
         ),
       ),
@@ -416,109 +439,78 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
 
   Widget _buildOutsideCell(DateTime day) {
     return Padding(
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(2),
       child: Center(
         child: Text(
           '${day.day}',
           style: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textHint,
+            fontWeight: FontWeight.w400,
+            color: _kOutside,
           ),
         ),
       ),
     );
   }
 
-  // ── monthly stats row ─────────────────────────────────────────────────────
+  // ── monthly stats (compact) ───────────────────────────────────────────────
   Widget _buildMonthStatsRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildStatChip(
-            Icons.check_circle_outline,
-            '$_presentDays',
-            'Present',
-            AppColors.success,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildStatChip(
-            Icons.event_available_outlined,
-            '$_leaveDays',
-            'Leave',
-            AppColors.leave,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _buildStatChip(
-            Icons.warning_amber_rounded,
-            '$_openRecords',
-            'Open',
-            AppColors.open,
-          ),
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Row(
+        children: [
+          _buildStatChip('$_presentDays', 'Full', _kFull),
+          _statDivider(),
+          _buildStatChip('$_halfDays', 'Half', _kHalf),
+          _statDivider(),
+          _buildStatChip('$_leaveDays', 'Leave', _kLeave),
+          _statDivider(),
+          _buildStatChip('$_openRecords', 'Open', _kOpen),
+        ],
+      ),
     );
   }
 
-  Widget _buildStatChip(
-    IconData icon,
-    String value,
-    String label,
-    Color color,
-  ) {
+  Widget _statDivider() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
+      width: 1,
+      height: 28,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      color: _kBorder,
+    );
+  }
+
+  Widget _buildStatChip(String value, String label, Color color) {
+    return Expanded(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: color),
-          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              height: 1.1,
+              letterSpacing: -0.2,
               color: color,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textSecondary,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w500,
+              color: _kMuted,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  // ── legend ────────────────────────────────────────────────────────────────
-  Widget _buildLegend() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _LegendSwatch(color: AppColors.success, label: 'Present'),
-          _LegendSwatch(color: AppColors.leave, label: 'Leave'),
-          _LegendSwatch(color: AppColors.open, label: 'Open'),
-          _LegendSwatch(color: AppColors.textHint, label: 'No record'),
         ],
       ),
     );
@@ -539,6 +531,9 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     } else if (dayData?.hasOpenAttendance == true) {
       accent = AppColors.open;
       accentIcon = Icons.access_time_outlined;
+    } else if (dayData?.isCountedAsHalfDayWorked == true) {
+      accent = AppColors.orange;
+      accentIcon = Icons.timelapse_rounded;
     } else if (dayData?.hasCompletedAttendance == true) {
       accent = AppColors.success;
       accentIcon = Icons.check_circle_outline;
@@ -601,7 +596,18 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (attendance != null) ...[
-                  StatusChip.fromStatus(attendance.status),
+                  Row(
+                    children: [
+                      StatusChip.fromStatus(attendance.status),
+                      if (attendance.isHalfDayWorked) ...[
+                        const SizedBox(width: 8),
+                        StatusChip(
+                          label: attendance.sessionShortLabel ?? 'Half day',
+                          color: AppColors.orange,
+                        ),
+                      ],
+                    ],
+                  ),
                   const SizedBox(height: 14),
                   _infoRow(
                     Icons.login_rounded,
@@ -625,6 +631,15 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                         ? AppColors.open
                         : AppColors.success,
                   ),
+                  if (attendance.workedLabel != null)
+                    _infoRow(
+                      Icons.schedule_rounded,
+                      'Worked',
+                      attendance.workedLabel!,
+                      attendance.isHalfDayWorked
+                          ? AppColors.orange
+                          : AppColors.textSecondary,
+                    ),
                 ] else ...[
                   const Text(
                     'No attendance record for this date.',
@@ -676,26 +691,20 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.divider),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: BoxDecoration(
-              color: AppColors.leaveLight.withValues(alpha: 0.7),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(18),
-              ),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Row(
               children: [
                 const Icon(
-                  Icons.event_busy_outlined,
+                  Icons.event_available_outlined,
                   size: 18,
-                  color: AppColors.leave,
+                  color: _kMuted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -703,8 +712,8 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     'Approved leave · $monthLabel',
                     style: const TextStyle(
                       fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.leave,
+                      fontWeight: FontWeight.w500,
+                      color: _kNavy,
                     ),
                   ),
                 ),
@@ -714,27 +723,35 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.leave.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
+                    color: _kPillBg,
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     '${leaves.length}',
                     style: const TextStyle(
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.leave,
+                      fontWeight: FontWeight.w600,
+                      color: _kNavy,
                     ),
                   ),
                 ),
               ],
             ),
           ),
+          const Divider(height: 1, thickness: 1, color: _kBorder),
           if (leaves.isEmpty)
             const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'No approved leave for this month.',
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              padding: EdgeInsets.fromLTRB(16, 18, 16, 18),
+              child: Center(
+                child: Text(
+                  'No approved leave for this month.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: _kMuted,
+                  ),
+                ),
               ),
             )
           else
@@ -868,37 +885,3 @@ class _AttendanceHistoryScreenState extends State<AttendanceHistoryScreen> {
   }
 }
 
-// ── legend swatch ─────────────────────────────────────────────────────────
-class _LegendSwatch extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _LegendSwatch({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 28,
-          height: 20,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.22),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: color.withValues(alpha: 0.55)),
-          ),
-        ),
-        const SizedBox(height: 5),
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    );
-  }
-}

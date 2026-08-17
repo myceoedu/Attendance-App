@@ -13,6 +13,7 @@ import '../../utils/debouncer.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/status_chip.dart';
+import '../../widgets/app_confirm_dialog.dart';
 import '../employee/claim_detail_screen.dart';
 
 /// Admin: review employee expense claims and attachments.
@@ -460,28 +461,33 @@ class _ClaimRejectDialogState extends State<_ClaimRejectDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Reject claim'),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        maxLines: 3,
-        decoration: const InputDecoration(
-          hintText: 'Reason (shown to employee)',
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: SingleChildScrollView(
+          child: AppConfirmPanel(
+            title: 'Reject this claim?',
+            message: 'The employee will see your reason.',
+            body: TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: 'Reason (shown to employee)',
+                alignLabelWithHint: true,
+              ),
+            ),
+            cancelLabel: 'Keep',
+            confirmLabel: 'Reject',
+            emphasis: AppConfirmEmphasis.confirm,
+            confirmColor: AppColors.danger,
+            onCancel: () => Navigator.pop<String?>(context),
+            onConfirm: () => Navigator.pop(context, _controller.text),
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop<String?>(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          child: const Text('Reject'),
-        ),
-      ],
     );
   }
 }

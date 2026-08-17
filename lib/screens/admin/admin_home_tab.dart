@@ -13,11 +13,14 @@ import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
 import '../../utils/async_load_guard.dart';
+import '../../widgets/dashboard_header_rings.dart';
 import '../../widgets/notification_bell_button.dart';
+import '../../widgets/app_confirm_dialog.dart';
 import 'admin_shell.dart';
 import 'admin_announcements_screen.dart';
-import 'admin_leave_hub_screen.dart';
+import 'leave_management_screen.dart';
 import '../help_support_screen.dart';
+import '../change_password_screen.dart';
 import 'admin_work_site_screen.dart';
 import 'claim_management_screen.dart';
 import 'payroll/payroll_hub_screen.dart';
@@ -184,28 +187,19 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
     return 'Good evening';
   }
 
-  void _confirmSignOut() {
-    showDialog<void>(
+  Future<void> _confirmSignOut() async {
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Sign out'),
-        content: const Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<AuthProvider>().signOut();
-            },
-            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Sign out'),
-          ),
-        ],
-      ),
+      title: 'Sign out?',
+      message: 'You will need to sign in again to use the admin app.',
+      cancelLabel: 'Stay',
+      confirmLabel: 'Sign out',
+      emphasis: AppConfirmEmphasis.safe,
+      confirmColor: AppColors.danger,
     );
+    if (ok && mounted) {
+      context.read<AuthProvider>().signOut();
+    }
   }
 
   @override
@@ -328,6 +322,11 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            const Positioned(
+              right: -36,
+              top: -48,
+              child: DashboardHeaderRings(size: 240),
+            ),
             SafeArea(
               bottom: false,
               child: Padding(
@@ -484,7 +483,7 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
         border: Border.all(color: AppColors.divider),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0A0F172A),
+            color: AppColors.cardShadowFaint,
             blurRadius: 6,
             offset: Offset(0, 2),
           ),
@@ -682,17 +681,17 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
             Expanded(
               child: _bentoActionCard(
                 context,
-                label: pendingLeaves > 0
-                    ? 'Leave ($pendingLeaves)'
-                    : 'Leave hub',
-                hint: 'Choose how to view leave',
+                label: pendingLeaves > 0 ? 'Leave ($pendingLeaves)' : 'Leave',
+                hint: pendingLeaves > 0
+                    ? 'Requests waiting for you'
+                    : 'Review and approve',
                 icon: Icons.beach_access_rounded,
                 iconGradient: AppGradients.teal,
                 iconGlowColor: AppColors.teal,
                 showDot: pendingLeaves > 0,
                 onTap: () => pushAppPage(
                   context,
-                  const AdminLeaveHubScreen(),
+                  const LeaveManagementScreen(),
                   haptic: false,
                 ),
               ),
@@ -817,6 +816,8 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
           ],
         ),
         const SizedBox(height: 20),
+        _accountChangePasswordTile(context),
+        const SizedBox(height: 8),
         Center(
           child: TextButton.icon(
             onPressed: _confirmSignOut,
@@ -835,6 +836,48 @@ class _AdminHomeTabState extends State<AdminHomeTab> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _accountChangePasswordTile(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          pushAppPage(context, const ChangePasswordScreen(), haptic: false);
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: const Row(
+            children: [
+              Icon(
+                Icons.lock_reset_rounded,
+                color: AppColors.primary,
+                size: 22,
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Change password',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -55,12 +55,22 @@ class PayrollEngine {
     if (effectiveEnd.isAfter(monthEnd)) effectiveEnd = monthEnd;
     if (effectiveEnd.isBefore(effectiveStart)) return 0;
 
-    var startDay =
-        DateTime(effectiveStart.year, effectiveStart.month, effectiveStart.day);
-    final endDay =
-        DateTime(effectiveEnd.year, effectiveEnd.month, effectiveEnd.day);
+    var startDay = DateTime(
+      effectiveStart.year,
+      effectiveStart.month,
+      effectiveStart.day,
+    );
+    final endDay = DateTime(
+      effectiveEnd.year,
+      effectiveEnd.month,
+      effectiveEnd.day,
+    );
     var n = 0.0;
-    for (var d = startDay; !d.isAfter(endDay); d = d.add(const Duration(days: 1))) {
+    for (
+      var d = startDay;
+      !d.isAfter(endDay);
+      d = d.add(const Duration(days: 1))
+    ) {
       final w = d.weekday;
       if (w != DateTime.saturday && w != DateTime.sunday) n += 1;
     }
@@ -82,13 +92,16 @@ class PayrollEngine {
       if (leave.status.toLowerCase() != 'approved') continue;
       if (!LeaveCatalog.isPayrollUnpaidDeduction(leave.leaveType)) continue;
       total += _overlapWorkingWeekdaysInMonth(
-          leave.startDate, leave.endDate, month);
+        leave.startDate,
+        leave.endDate,
+        month,
+      );
     }
     return total;
   }
 
-  /// **Intern:** all approved leave overlapping [month]; calendar-day units
-  /// (0.5 per half-day annual type per day, else 1.0 per calendar day).
+  /// **Intern:** all approved **non-annual** leave overlapping [month]; calendar-day units
+  /// (interns do not use annual leave).
   static double internLeaveCalendarUnitsFromRequests({
     required String userId,
     required DateTime month,
@@ -98,6 +111,7 @@ class PayrollEngine {
     for (final leave in leaves) {
       if (leave.userId != userId) continue;
       if (leave.status.toLowerCase() != 'approved') continue;
+      if (LeaveCatalog.consumesAnnual(leave.leaveType)) continue;
       total += _overlapCalendarLeaveUnitsInMonth(
         leave.startDate,
         leave.endDate,
@@ -126,7 +140,11 @@ class PayrollEngine {
 
     final unit = LeaveCatalog.isHalfDayAnnual(leaveType) ? 0.5 : 1.0;
     var n = 0.0;
-    for (var d = effectiveStart; !d.isAfter(effectiveEnd); d = d.add(const Duration(days: 1))) {
+    for (
+      var d = effectiveStart;
+      !d.isAfter(effectiveEnd);
+      d = d.add(const Duration(days: 1))
+    ) {
       n += unit;
     }
     return n;
@@ -165,10 +183,7 @@ class PayrollEngine {
       if (end.isBefore(monthStart) || cur.isAfter(monthEnd)) continue;
       if (cur.isBefore(monthStart)) cur = monthStart;
       final last = end.isAfter(monthEnd) ? monthEnd : end;
-      for (
-          var d = cur;
-          !d.isAfter(last);
-          d = d.add(const Duration(days: 1))) {
+      for (var d = cur; !d.isAfter(last); d = d.add(const Duration(days: 1))) {
         leaveDates.add(dateKey(d));
       }
     }
@@ -296,8 +311,7 @@ class PayrollEngine {
     var statutoryBase = basicAmount + addOnTotal - unpaidDeduction;
     if (statutoryBase < 0) statutoryBase = 0;
 
-    final grossPay =
-        round2(basicAmount + addOnTotal - unpaidDeduction);
+    final grossPay = round2(basicAmount + addOnTotal - unpaidDeduction);
 
     final statutoryAmounts = PayrollCalculator.computeMalaysiaStatutory(
       wageBase: statutoryBase,

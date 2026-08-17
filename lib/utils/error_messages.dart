@@ -16,12 +16,15 @@ String friendlyLeaveError(Object e) {
         msg.contains('covering these dates') ||
         msg.contains('already have a pending')) {
       return 'These dates overlap an existing leave request (pending or approved).\n'
-          'Change the dates or cancel the overlapping request first.';
+          'Change the dates or delete the overlapping pending request first.';
     }
     if (msg.contains('annual leave would exceed balance') ||
         msg.contains('exceed_balance')) {
       return 'This annual leave goes over your entitlement for one or more '
           'calendar years. Shorten the dates or wait until leave is freed up.';
+    }
+    if (msg.contains('only for permanent and contract')) {
+      return 'Annual leave is for permanent and contract staff only.';
     }
     if (msg.contains('approved leave already covers')) {
       return 'An approved leave already covers the selected dates.';
@@ -44,6 +47,11 @@ String friendlyLeaveError(Object e) {
     if (msg.contains('not authenticated') || msg.contains('jwt')) {
       return 'Your session has expired. Please sign in again.';
     }
+    if (msg.contains('row-level security') ||
+        msg.contains('violates row-level')) {
+      return 'Only pending leave can be deleted. If this request is still '
+          'pending, ask HR/IT to run the leave delete SQL, then try again.';
+    }
   }
 
   // Exception thrown by client-side checks.
@@ -58,9 +66,23 @@ String friendlyLeaveError(Object e) {
   }
   if (raw.contains('pending or approved leave')) {
     return 'These dates overlap an existing leave request.\n'
-        'Change the dates or cancel the overlapping request first.';
+        'Change the dates or delete the overlapping pending request first.';
   }
-  if (raw.contains('network') || raw.contains('socket') || raw.contains('timeout')) {
+  if (raw.contains('only pending leave can be deleted')) {
+    return 'Only pending leave can be deleted. Approved or rejected requests stay on file.';
+  }
+  if (raw.contains('you can only delete your own leave')) {
+    return 'You can only delete your own leave request.';
+  }
+  if (raw.contains('leave request not found')) {
+    return 'This leave request is no longer available.';
+  }
+  if (raw.contains('please sign in again')) {
+    return 'Please sign in again.';
+  }
+  if (raw.contains('network') ||
+      raw.contains('socket') ||
+      raw.contains('timeout')) {
     return 'Network error. Check your connection and try again.';
   }
 
@@ -77,6 +99,9 @@ String friendlyAdminLeaveError(Object e) {
       return 'Cannot approve. This employee\'s annual leave would exceed their '
           'balance for one or more calendar years. Adjust entitlement (HR), '
           'reject overlaps, or ask them to shorten the request.';
+    }
+    if (msg.contains('only for permanent and contract')) {
+      return 'Cannot approve. Annual leave is for permanent and contract staff only.';
     }
   }
 
@@ -109,7 +134,9 @@ String friendlyClaimError(Object e) {
       return 'You do not have permission to perform this action.';
     }
   }
-  if (msg.contains('network') || msg.contains('socket') || msg.contains('timeout')) {
+  if (msg.contains('network') ||
+      msg.contains('socket') ||
+      msg.contains('timeout')) {
     return 'Network error. Check your connection and try again.';
   }
   // Surface our own Exception messages from validation / submit helpers.

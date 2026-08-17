@@ -66,12 +66,9 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
     return PopScope(
       canPop: false,
       child: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: AppChrome.onBrand.copyWith(
-          systemNavigationBarColor: const Color(0xFF0F2255),
-          systemNavigationBarIconBrightness: Brightness.light,
-        ),
+        value: AppChrome.onAuth,
         child: Scaffold(
-          backgroundColor: const Color(0xFF1A3A8F),
+          backgroundColor: AppColors.authBlue,
           body: DecoratedBox(
             decoration: const BoxDecoration(
               gradient: AppGradients.authBackground,

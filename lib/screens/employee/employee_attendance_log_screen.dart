@@ -454,6 +454,34 @@ class _EmployeeAttendanceLogScreenState
                                                     ),
                                                   ],
                                                 ),
+                                                if (r.isHalfDayWorked) ...[
+                                                  const SizedBox(height: 8),
+                                                  Align(
+                                                    alignment:
+                                                        Alignment.centerLeft,
+                                                    child: StatusChip(
+                                                      label:
+                                                          r.sessionShortLabel ??
+                                                          'Half day',
+                                                      color: AppColors.orange,
+                                                    ),
+                                                  ),
+                                                ],
+                                                if (r.workedLabel != null) ...[
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    'Worked: ${r.workedLabel}',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: r.isHalfDayWorked
+                                                          ? AppColors.orange
+                                                          : AppColors
+                                                                .textSecondary,
+                                                    ),
+                                                  ),
+                                                ],
                                                 const SizedBox(height: 12),
                                                 Row(
                                                   children: [

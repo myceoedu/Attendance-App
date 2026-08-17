@@ -9,6 +9,7 @@ import '../../utils/leave_catalog.dart';
 import '../../models/app_user.dart';
 import '../../models/annual_leave_summary.dart';
 import '../../models/leave_request.dart';
+import '../../models/payroll_salary_setting.dart';
 import '../../services/app_realtime.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/app_time.dart';
@@ -17,6 +18,7 @@ import '../../widgets/status_chip.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/leave_audit_history_sheet.dart';
 import '../../widgets/leave_attachment_link.dart';
+import '../../widgets/app_confirm_dialog.dart';
 
 class LeaveManagementScreen extends StatefulWidget {
   const LeaveManagementScreen({super.key, this.initialEmployeeId});
@@ -48,6 +50,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
 
   List<LeaveRequest> _requests = [];
   Map<String, AnnualLeaveSummary> _annualByUserId = {};
+  Map<String, PayrollSalarySetting> _payrollByUserId = {};
 
   /// Cached filter + status counts (updated by [_recomputeDerived]).
   List<LeaveRequest> _visibleRequests = const [];
@@ -118,9 +121,11 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
       final results = await Future.wait([
         SupabaseService.getLeaveRequestsPage(limit: _pageSize),
         SupabaseService.getAllEmployees(),
+        SupabaseService.getPayrollSalarySettings(),
       ]);
       final data = results[0] as List<LeaveRequest>;
       final employees = results[1] as List<AppUser>;
+      final payroll = results[2] as List<PayrollSalarySetting>;
       if (!mounted) return;
 
       final year = AppTime.malaysiaNow().year;
@@ -135,6 +140,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
       setState(() {
         _requests = data;
         _setEmployees(employees);
+        _payrollByUserId = {for (final s in payroll) s.userId: s};
         _annualByUserId = batch;
         _annualSummaryYear = year;
         _loading = false;
@@ -216,6 +222,12 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   }
 
   String _employeeNameById(String id) => _employeeNames[id] ?? 'Employee';
+
+  bool _userHasAnnualLeave(String userId) {
+    final s = _payrollByUserId[userId];
+    if (s == null) return true;
+    return s.hasAnnualLeave;
+  }
 
   void _toggleDetails(String requestId) {
     final next = Set<String>.of(_expandedRequestIds.value);
@@ -304,6 +316,19 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   }
 
   Future<void> _onApproveTapped(LeaveRequest r) async {
+    if (LeaveCatalog.consumesAnnual(r.leaveType) &&
+        !_userHasAnnualLeave(r.userId)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Annual leave is for permanent and contract staff only.',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      return;
+    }
     if (LeaveCatalog.consumesAnnual(r.leaveType)) {
       final ok = await showModalBottomSheet<bool>(
         context: context,
@@ -375,7 +400,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     final dateFmt = _dateFmt;
     final submittedFmt = _submittedFmt;
     final filtered = _visibleRequests;
-    final pendingCount = _pendingCount;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: AppChrome.onBrand,
@@ -395,9 +419,9 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
               const Text(
                 'Leave inbox',
                 style: TextStyle(
-                  fontSize: 19,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.35,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
                 ),
               ),
               Text(
@@ -427,33 +451,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
               ],
             ),
           ),
-          actions: [
-            if (pendingCount > 0)
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.onBrand.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.brandChipBorder),
-                    ),
-                    child: Text(
-                      '$pendingCount pending',
-                      style: const TextStyle(
-                        color: AppColors.onBrand,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-          ],
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -495,12 +492,12 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                         : RefreshIndicator(
                             onRefresh: () async => _load(showSpinner: true),
                             child: ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                              padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
                               addAutomaticKeepAlives: false,
                               cacheExtent: 400,
                               itemCount: filtered.length + (_hasMore ? 1 : 0),
                               separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 14),
                               itemBuilder: (_, i) {
                                 if (i == filtered.length) {
                                   return OutlinedButton(
@@ -538,141 +535,72 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   }
 
   Widget _buildCompactFilters() {
-    const statusItems = <(String, String)>[
-      ('all', 'All'),
-      ('pending', 'Pending'),
-      ('approved', 'Approved'),
-      ('rejected', 'Rejected'),
-    ];
+    final extraFilters = _selectedEmployeeId != null || _typeFilter != 'all';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Row(
         children: [
-          TextField(
-            controller: _searchCtrl,
-            onChanged: (_) => _searchDebounce(() {
-              if (mounted) setState(_recomputeDerived);
-            }),
-            textInputAction: TextInputAction.search,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-            decoration: InputDecoration(
-              hintText: 'Search people, reasons, or leave types',
-              hintStyle: TextStyle(
-                color: AppColors.textHint.withValues(alpha: 0.85),
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-              ),
-              isDense: true,
-              filled: true,
-              fillColor: Colors.white,
-              prefixIcon: Icon(
-                Icons.search_rounded,
-                size: 20,
-                color: AppColors.textSecondary.withValues(alpha: 0.9),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide(
-                  color: AppColors.textPrimary.withValues(alpha: 0.06),
+          Expanded(
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (_) => _searchDebounce(() {
+                if (mounted) setState(_recomputeDerived);
+              }),
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                hintText: 'Search people or reasons',
+                hintStyle: TextStyle(
+                  color: AppColors.textHint.withValues(alpha: 0.9),
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                 ),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(
-                  color: AppColors.indigo,
-                  width: 1.5,
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  size: 22,
+                  color: AppColors.textSecondary.withValues(alpha: 0.85),
                 ),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 4,
-                vertical: 10,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 36,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: statusItems.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (_, i) {
-                final v = statusItems[i];
-                final sel = _filter == v.$1;
-                return Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () => setState(() {
-                      _filter = v.$1;
-                      _recomputeDerived();
-                    }),
-                    borderRadius: BorderRadius.circular(999),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeOut,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 11,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: sel ? AppColors.indigo : Colors.white,
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: sel ? AppColors.indigo : AppColors.divider,
-                        ),
-                        boxShadow: sel
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.indigo.withValues(
-                                    alpha: 0.18,
-                                  ),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          v.$2,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.2,
-                            color: sel ? Colors.white : AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(
+                    color: AppColors.primaryDark,
+                    width: 1.4,
                   ),
-                );
-              },
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _compactEmployeeDropdown()),
-              const SizedBox(width: 8),
-              Expanded(child: _compactLeaveTypeDropdown()),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2),
-            child: Text(
-              _filterContextHint(),
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary.withValues(alpha: 0.85),
+          const SizedBox(width: 8),
+          Badge(
+            isLabelVisible: extraFilters,
+            smallSize: 8,
+            backgroundColor: AppColors.primaryDark,
+            child: IconButton.filledTonal(
+              tooltip: 'Filters',
+              onPressed: _openMoreFilters,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: AppColors.textPrimary,
+                side: const BorderSide(color: AppColors.divider),
+                minimumSize: const Size(48, 48),
               ),
+              icon: const Icon(Icons.tune_rounded),
             ),
           ),
         ],
@@ -680,19 +608,61 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     );
   }
 
-  String _filterContextHint() {
-    final order = _filter == 'pending'
-        ? 'Queue: oldest pending first'
-        : 'Sorted: newest first';
-    final type = switch (_typeFilter) {
-      'all' => null,
-      _ => LeaveCatalog.displayName(_typeFilter),
-    };
-    if (type != null) return '$order · $type';
-    return order;
+  Future<void> _openMoreFilters() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                4,
+                20,
+                20 + MediaQuery.paddingOf(ctx).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Filters',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _compactEmployeeDropdown(onChanged: () => setSheet(() {})),
+                  const SizedBox(height: 12),
+                  _compactLeaveTypeDropdown(onChanged: () => setSheet(() {})),
+                  if (_selectedEmployeeId != null || _typeFilter != 'all') ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedEmployeeId = null;
+                          _typeFilter = 'all';
+                          _recomputeDerived();
+                        });
+                        setSheet(() {});
+                      },
+                      child: const Text('Clear filters'),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
-  Widget _compactEmployeeDropdown() {
+  Widget _compactEmployeeDropdown({VoidCallback? onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       decoration: BoxDecoration(
@@ -726,6 +696,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                     _selectedEmployeeId = id;
                     _recomputeDerived();
                   });
+                  onChanged?.call();
                   if (id != null) await _ensureAnnualSummaryForUser(id);
                 },
                 style: const TextStyle(
@@ -743,7 +714,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     );
   }
 
-  Widget _compactLeaveTypeDropdown() {
+  Widget _compactLeaveTypeDropdown({VoidCallback? onChanged}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
       decoration: BoxDecoration(
@@ -776,6 +747,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                     _typeFilter = value;
                     _recomputeDerived();
                   });
+                  onChanged?.call();
                 },
                 style: const TextStyle(
                   fontSize: 12,
@@ -793,35 +765,37 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   }
 
   Widget _leaveStatsPills() {
-    final pending = _pendingCount;
-    final approved = _approvedCount;
-    final rejected = _rejectedCount;
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
       child: Row(
         children: [
           Expanded(
             child: _statPill(
               label: 'Pending',
-              value: pending,
+              value: _pendingCount,
               color: AppColors.warning,
+              selected: _filter == 'pending',
+              onTap: () => _selectStatusFilter('pending'),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
           Expanded(
             child: _statPill(
               label: 'Approved',
-              value: approved,
+              value: _approvedCount,
               color: AppColors.success,
+              selected: _filter == 'approved',
+              onTap: () => _selectStatusFilter('approved'),
             ),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: 10),
           Expanded(
             child: _statPill(
               label: 'Rejected',
-              value: rejected,
+              value: _rejectedCount,
               color: AppColors.danger,
+              selected: _filter == 'rejected',
+              onTap: () => _selectStatusFilter('rejected'),
             ),
           ),
         ],
@@ -829,42 +803,64 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     );
   }
 
+  void _selectStatusFilter(String status) {
+    setState(() {
+      _filter = _filter == status ? 'all' : status;
+      _recomputeDerived();
+    });
+  }
+
   Widget _statPill({
     required String label,
     required int value,
     required Color color,
+    required bool selected,
+    required VoidCallback onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-      decoration: BoxDecoration(
-        color: Color.alphaBlend(color.withValues(alpha: 0.1), Colors.white),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.35,
-              color: color.withValues(alpha: 0.85),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? Color.alphaBlend(color.withValues(alpha: 0.14), Colors.white)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected
+                  ? color.withValues(alpha: 0.5)
+                  : AppColors.divider,
+              width: selected ? 1.4 : 1,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            '$value',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-              height: 1,
-              letterSpacing: -0.4,
-              color: color,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? color : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '$value',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                  letterSpacing: -0.5,
+                  color: selected ? color : AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -872,12 +868,13 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   Widget _selectedEmployeeHero() {
     final id = _selectedEmployeeId;
     if (id == null) return const SizedBox.shrink();
+    if (!_userHasAnnualLeave(id)) return const SizedBox.shrink();
     final name = _employeeNameById(id);
     final s = _annualByUserId[id];
     final y = _annualSummaryYear;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -1025,12 +1022,6 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     );
   }
 
-  static Color _adminLeaveTypeAccent(String type) =>
-      LeaveCatalog.uiStyle(type).color;
-
-  static IconData _adminLeaveTypeIcon(String type) =>
-      LeaveCatalog.uiStyle(type).icon;
-
   Widget _adminLeaveRequestCard(
     LeaveRequest r,
     DateFormat dateFmt,
@@ -1043,401 +1034,225 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
     final initial = showEmployeeHeader && name.isNotEmpty
         ? name[0].toUpperCase()
         : '?';
-    final typeAccent = _adminLeaveTypeAccent(r.leaveType);
-    final typeIcon = _adminLeaveTypeIcon(r.leaveType);
-    final hasMc =
-        LeaveCatalog.requiresMcAttachment(r.leaveType) &&
-        r.attachmentPath != null &&
-        r.attachmentPath!.isNotEmpty;
+    final hasAttachment =
+        r.attachmentPath != null && r.attachmentPath!.isNotEmpty;
+    final sameDay =
+        r.startDate.year == r.endDate.year &&
+        r.startDate.month == r.endDate.month &&
+        r.startDate.day == r.endDate.day;
+    final dateLine = sameDay
+        ? dateFmt.format(r.startDate)
+        : '${dateFmt.format(r.startDate)} – ${dateFmt.format(r.endDate)}';
 
-    Widget attachmentRow = LeaveAttachmentRow(attachmentPath: r.attachmentPath);
-    if (hasMc) {
-      attachmentRow = Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.pink.withValues(alpha: 0.45)),
-          color: AppColors.pinkLight.withValues(alpha: 0.35),
-        ),
-        child: attachmentRow,
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: AppColors.textPrimary.withValues(alpha: 0.05),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.045),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-            spreadRadius: -6,
-          ),
-        ],
+    return Material(
+      color: Colors.white,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.divider),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 6,
-                  constraints: const BoxConstraints(minHeight: 88),
-                  decoration: BoxDecoration(
-                    color: typeAccent,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(20),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(9),
-                              decoration: BoxDecoration(
-                                color: typeAccent.withValues(alpha: 0.16),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                typeIcon,
-                                size: 22,
-                                color: typeAccent,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    r.leaveTypeDisplay,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.3,
-                                      height: 1.15,
-                                      color: Color.lerp(
-                                        typeAccent,
-                                        AppColors.textPrimary,
-                                        0.38,
-                                      ),
-                                    ),
-                                  ),
-                                  if (showEmployeeHeader) ...[
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 15,
-                                          backgroundColor:
-                                              AppColors.primaryLight,
-                                          child: Text(
-                                            initial,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.primary,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 14,
-                                              color: AppColors.textPrimary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            StatusChip.fromStatus(r.status),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.calendar_today_outlined,
-                              size: 15,
-                              color: AppColors.textSecondary.withValues(
-                                alpha: 0.85,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => _toggleDetails(r.id),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 16, 14),
+              child: ValueListenableBuilder<Set<String>>(
+                valueListenable: _expandedRequestIds,
+                builder: (context, expandedIds, _) {
+                  final expanded = expandedIds.contains(r.id);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (showEmployeeHeader) ...[
+                            CircleAvatar(
+                              radius: 18,
+                              backgroundColor: AppColors.primaryLight,
                               child: Text(
-                                '${dateFmt.format(r.startDate)} to '
-                                '${dateFmt.format(r.endDate)} · '
-                                '${r.durationDisplayLabel}',
-                                style: TextStyle(
-                                  fontSize: 12.5,
+                                initial,
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  height: 1.35,
-                                  color: AppColors.textSecondary.withValues(
-                                    alpha: 0.95,
-                                  ),
+                                  color: AppColors.primaryDark,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 12),
                           ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textHint.withValues(alpha: 0.92),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        ValueListenableBuilder<Set<String>>(
-                          valueListenable: _expandedRequestIds,
-                          builder: (context, expandedIds, _) {
-                            final detailsExpanded = expandedIds.contains(r.id);
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
+                          Expanded(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    10,
-                                    10,
-                                    10,
-                                    10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: typeAccent.withValues(alpha: 0.06),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: typeAccent.withValues(alpha: 0.12),
-                                    ),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.notes_rounded,
-                                            size: 14,
-                                            color: typeAccent.withValues(
-                                              alpha: 0.9,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            'Reason',
-                                            style: TextStyle(
-                                              fontSize: 10.5,
-                                              fontWeight: FontWeight.w800,
-                                              color: AppColors.textSecondary
-                                                  .withValues(alpha: 0.88),
-                                              letterSpacing: 0.4,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        r.reason,
-                                        maxLines: detailsExpanded ? null : 2,
-                                        overflow: detailsExpanded
-                                            ? TextOverflow.visible
-                                            : TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 13.5,
-                                          height: 1.4,
-                                          fontWeight: FontWeight.w500,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ],
+                                Text(
+                                  showEmployeeHeader
+                                      ? name
+                                      : r.leaveTypeDisplay,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -0.25,
+                                    height: 1.2,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                                if (!detailsExpanded && hasMc) ...[
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.attach_file_rounded,
-                                        size: 16,
-                                        color: AppColors.pink,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          'MC / attachment on file. Tap Details to open.',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            height: 1.3,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.pink.withValues(
-                                              alpha: 0.92,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton.icon(
-                                    onPressed: () => _toggleDetails(r.id),
-                                    icon: Icon(
-                                      detailsExpanded
-                                          ? Icons.expand_less_rounded
-                                          : Icons.expand_more_rounded,
-                                      size: 20,
-                                    ),
-                                    label: Text(
-                                      detailsExpanded
-                                          ? 'Hide details'
-                                          : 'Details',
-                                    ),
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: AppColors.indigo,
-                                      minimumSize: const Size(0, 44),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 2,
-                                      ),
-                                    ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  showEmployeeHeader
+                                      ? '${r.leaveTypeDisplay} · ${r.durationDisplayLabel}'
+                                      : r.durationDisplayLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textSecondary,
                                   ),
                                 ),
-                                if (detailsExpanded) ...[
-                                  _employeeAnnualBalancePanel(
-                                    r.userId,
-                                    r.leaveType,
-                                  ),
-                                  attachmentRow,
-                                  const SizedBox(height: 4),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: OutlinedButton.icon(
-                                      onPressed: () =>
-                                          showLeaveAuditHistorySheet(
-                                            context,
-                                            leaveRequestId: r.id,
-                                          ),
-                                      icon: const Icon(Icons.history, size: 16),
-                                      label: const Text('Audit history'),
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(0, 40),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  if (r.adminComment != null &&
-                                      r.adminComment!.isNotEmpty) ...[
-                                    const Divider(height: 20),
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Icon(
-                                          Icons.comment_outlined,
-                                          size: 15,
-                                          color: AppColors.textSecondary,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            r.adminComment!,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                              fontStyle: FontStyle.italic,
-                                              color: AppColors.textSecondary,
-                                              height: 1.35,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ],
                               ],
-                            );
-                          },
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          StatusChip.fromStatus(r.status),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        dateLine,
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        r.reason,
+                        maxLines: expanded ? null : 2,
+                        overflow: expanded
+                            ? TextOverflow.visible
+                            : TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.45,
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (hasAttachment)
+                            TextButton.icon(
+                              onPressed: () => openLeaveAttachment(
+                                context,
+                                r.attachmentPath,
+                              ),
+                              icon: const Icon(
+                                Icons.attach_file_rounded,
+                                size: 18,
+                              ),
+                              label: const Text('Attachment'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.primaryDark,
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
+                              ),
+                            ),
+                          const Spacer(),
+                          Icon(
+                            expanded
+                                ? Icons.expand_less_rounded
+                                : Icons.expand_more_rounded,
+                            color: AppColors.textHint,
+                          ),
+                        ],
+                      ),
+                      if (expanded) ...[
+                        Text(
+                          'Submitted ${submittedFmt.format(r.createdAt.toLocal())}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textHint,
+                          ),
+                        ),
+                        _employeeAnnualBalancePanel(r.userId, r.leaveType),
+                        if (r.adminComment != null &&
+                            r.adminComment!.isNotEmpty) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            r.adminComment!,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              height: 1.4,
+                              fontStyle: FontStyle.italic,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => showLeaveAuditHistorySheet(
+                              context,
+                              leaveRequestId: r.id,
+                            ),
+                            icon: const Icon(Icons.history, size: 16),
+                            label: const Text('History'),
+                          ),
                         ),
                       ],
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          if (r.status == 'pending')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _updateStatus(r, 'rejected'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        side: const BorderSide(color: AppColors.danger),
+                        minimumSize: const Size(0, 46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Reject'),
                     ),
                   ),
-                ),
-              ],
-            ),
-            if (r.status == 'pending')
-              Material(
-                color: AppColors.surface,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _updateStatus(r, 'rejected'),
-                          icon: const Icon(Icons.close_rounded, size: 18),
-                          label: const Text('Reject'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.danger,
-                            side: const BorderSide(color: AppColors.danger),
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => _onApproveTapped(r),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        minimumSize: const Size(0, 46),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => _onApproveTapped(r),
-                          icon: const Icon(Icons.check_rounded, size: 18),
-                          label: const Text('Approve'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.success,
-                            minimumSize: const Size(0, 48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      child: const Text('Approve'),
+                    ),
                   ),
-                ),
+                ],
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -1445,218 +1260,52 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
   String _fmtLeaveDays(double n) =>
       n == n.roundToDouble() ? '${n.round()}' : n.toStringAsFixed(1);
 
-  /// Annual entitlement snapshot for the employee on this card (all leave types).
+  /// Compact annual snapshot shown when a card is expanded.
   Widget _employeeAnnualBalancePanel(String userId, String requestLeaveType) {
-    final s = _annualByUserId[userId];
-    final y = _annualSummaryYear;
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 10),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.sky.withValues(alpha: 0.22)),
-        ),
-        child: s == null
-            ? Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    size: 18,
-                    color: AppColors.textHint,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Annual balance could not be loaded for this employee. '
-                      'Check that annual leave is enabled in Supabase for their account.',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary.withValues(alpha: 0.95),
-                      ),
-                    ),
-                  ),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: AppColors.sky.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.savings_outlined,
-                          size: 18,
-                          color: AppColors.sky,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Annual leave balance',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.15,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            Text(
-                              'Leave year $y · Malaysia calendar',
-                              style: TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textHint.withValues(
-                                  alpha: 0.95,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (requestLeaveType != 'annual') ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.divider),
-                      ),
-                      child: Text(
-                        'This leave does not use annual balance.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          height: 1.3,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary.withValues(
-                            alpha: 0.95,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        _fmtLeaveDays(s.remaining),
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                          color: AppColors.primary,
-                          letterSpacing: -0.6,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: Text(
-                          s.remaining == 1 ? 'day left' : 'days left',
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _balanceMiniPill(
-                        Icons.done_all_rounded,
-                        '${_fmtLeaveDays(s.used)} used',
-                        AppColors.textSecondary,
-                      ),
-                      _balanceMiniPill(
-                        Icons.hourglass_top_rounded,
-                        '${_fmtLeaveDays(s.pending)} pending',
-                        AppColors.warning,
-                      ),
-                      _balanceMiniPill(
-                        Icons.flag_outlined,
-                        '${_fmtLeaveDays(s.entitlement)} entitled',
-                        AppColors.sky,
-                      ),
-                    ],
-                  ),
-                  if (s.entitlement > 1e-6) ...[
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: (s.used / s.entitlement).clamp(0.0, 1.0),
-                        minHeight: 7,
-                        backgroundColor: AppColors.surface,
-                        color: AppColors.sky,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_fmtLeaveDays(s.used)} of ${_fmtLeaveDays(s.entitlement)} entitlement used '
-                      '(remaining ${_fmtLeaveDays(s.remaining)})',
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textHint,
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-      ),
-    );
-  }
-
-  static Widget _balanceMiniPill(IconData icon, String text, Color iconColor) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: iconColor),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
-            ),
+    if (!_userHasAnnualLeave(userId)) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Text(
+          'Annual leave is for permanent and contract staff only.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.4,
+            color: AppColors.textHint,
           ),
-        ],
+        ),
+      );
+    }
+    final s = _annualByUserId[userId];
+    if (s == null) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8),
+        child: Text(
+          'Annual balance unavailable for this employee.',
+          style: TextStyle(
+            fontSize: 12.5,
+            height: 1.4,
+            color: AppColors.textHint,
+          ),
+        ),
+      );
+    }
+
+    final usesAnnual = LeaveCatalog.consumesAnnual(requestLeaveType);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        usesAnnual
+            ? '${_fmtLeaveDays(s.remaining)} days left · '
+                  '${_fmtLeaveDays(s.used)} used of ${_fmtLeaveDays(s.entitlement)}'
+                  '${s.pending > 0 ? ' · ${_fmtLeaveDays(s.pending)} pending' : ''}'
+            : 'Does not use annual balance · '
+                  '${_fmtLeaveDays(s.remaining)} days remaining this year',
+        style: const TextStyle(
+          fontSize: 12.5,
+          height: 1.4,
+          fontWeight: FontWeight.w500,
+          color: AppColors.textSecondary,
+        ),
       ),
     );
   }
@@ -1790,45 +1439,35 @@ class _RejectCommentDialogState extends State<_RejectCommentDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: const Text('Reject this request?'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'The employee may see your note on this leave request. A short '
-            'explanation helps them understand the decision.',
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.4,
-              color: AppColors.textSecondary,
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: SingleChildScrollView(
+          child: AppConfirmPanel(
+            title: 'Reject this request?',
+            message:
+                'The employee may see your note. A short explanation helps them understand the decision.',
+            body: TextField(
+              controller: _controller,
+              autofocus: true,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText:
+                    'Optional: reason shown to the employee (recommended)',
+                alignLabelWithHint: true,
+              ),
             ),
+            cancelLabel: 'Keep',
+            confirmLabel: 'Reject',
+            emphasis: AppConfirmEmphasis.confirm,
+            confirmColor: AppColors.danger,
+            onCancel: () => Navigator.pop<String?>(context),
+            onConfirm: () => Navigator.pop(context, _controller.text),
           ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            maxLines: 3,
-            decoration: const InputDecoration(
-              hintText: 'Optional: reason shown to the employee (recommended)',
-              alignLabelWithHint: true,
-            ),
-          ),
-        ],
+        ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop<String?>(context),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
-          style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          child: const Text('Reject leave'),
-        ),
-      ],
     );
   }
 }

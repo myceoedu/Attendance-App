@@ -73,7 +73,8 @@ void main() {
         month: month,
         leaves: const [],
       );
-      final statutory = calc.epfEmployee + calc.socsoEmployee + calc.eisEmployee;
+      final statutory =
+          calc.epfEmployee + calc.socsoEmployee + calc.eisEmployee;
       expect(calc.netSalary, closeTo(calc.grossPay - statutory, 0.02));
       expect(calc.otAmount, 0);
     });
@@ -108,7 +109,10 @@ void main() {
         ],
       );
       expect(oneDay.unpaidLeaveDeduction, greaterThan(0));
-      expect(oneDay.grossPay, closeTo(none.grossPay - oneDay.unpaidLeaveDeduction, 0.02));
+      expect(
+        oneDay.grossPay,
+        closeTo(none.grossPay - oneDay.unpaidLeaveDeduction, 0.02),
+      );
       expect(
         oneDay.totalDeduction,
         closeTo(
@@ -121,29 +125,32 @@ void main() {
       );
     });
 
-    test('full package divided by WD drives unpaid leave (basic + allowance)', () {
-      final month = DateTime(2025, 6);
-      final calc = PayrollEngine.compute(
-        salary: _salary(basic: 2200, allowance: 220),
-        statutory: _statutory(),
-        workingWeekdays: 22,
-        presentDays: 22,
-        month: month,
-        leaves: [
-          LeaveRequest(
-            id: '1',
-            userId: 'u1',
-            leaveType: 'unpaid',
-            startDate: DateTime(2025, 6, 3),
-            endDate: DateTime(2025, 6, 3),
-            reason: '',
-            status: 'approved',
-            createdAt: DateTime.utc(2025),
-          ),
-        ],
-      );
-      expect(calc.unpaidLeaveDeduction, closeTo(110.0, 0.01));
-    });
+    test(
+      'full package divided by WD drives unpaid leave (basic + allowance)',
+      () {
+        final month = DateTime(2025, 6);
+        final calc = PayrollEngine.compute(
+          salary: _salary(basic: 2200, allowance: 220),
+          statutory: _statutory(),
+          workingWeekdays: 22,
+          presentDays: 22,
+          month: month,
+          leaves: [
+            LeaveRequest(
+              id: '1',
+              userId: 'u1',
+              leaveType: 'unpaid',
+              startDate: DateTime(2025, 6, 3),
+              endDate: DateTime(2025, 6, 3),
+              reason: '',
+              status: 'approved',
+              createdAt: DateTime.utc(2025),
+            ),
+          ],
+        );
+        expect(calc.unpaidLeaveDeduction, closeTo(110.0, 0.01));
+      },
+    );
 
     test('EPF above60: 0% employee and senior employer rate', () {
       final month = DateTime(2025, 6);
@@ -165,15 +172,14 @@ void main() {
       );
       final epfBase = 3000.0 + 500.0;
       expect(above60.epfEmployee, 0);
-      expect(above60.epfEmployer,
-          closeTo(PayrollEngine.round2(epfBase * 0.065), 0.02));
+      expect(
+        above60.epfEmployer,
+        closeTo(PayrollEngine.round2(epfBase * 0.065), 0.02),
+      );
       expect(above60.socsoEmployee, 0);
       expect(above60.eisEmployee, 0);
       expect(standard.epfEmployee, greaterThan(0));
-      expect(
-        above60.netSalary,
-        closeTo(above60.grossPay, 0.02),
-      );
+      expect(above60.netSalary, closeTo(above60.grossPay, 0.02));
     });
 
     test('EPF employer rate changes above RM5,000 wage base', () {
@@ -307,11 +313,7 @@ void main() {
         ),
       ];
       final calc = PayrollEngine.compute(
-        salary: _salary(
-          basic: 999,
-          allowance: 500,
-          compensationType: 'intern',
-        ),
+        salary: _salary(basic: 999, allowance: 500, compensationType: 'intern'),
         statutory: _statutory(),
         workingWeekdays: 22,
         presentDays: 20,
@@ -322,7 +324,10 @@ void main() {
       expect(calc.basicAmount, 0);
       expect(calc.allowanceAmount, 500);
       expect(calc.commissionAmount, 0);
-      expect(calc.unpaidLeaveDeduction, closeTo(PayrollEngine.round2(daily * 1), 0.02));
+      expect(
+        calc.unpaidLeaveDeduction,
+        closeTo(PayrollEngine.round2(daily * 1), 0.02),
+      );
       expect(calc.epfEmployee, 0);
       expect(calc.epfEmployer, 0);
       expect(calc.socsoEmployee, 0);
@@ -399,11 +404,14 @@ void main() {
       );
       final daily = 500 / 31;
       expect(calc.commissionAmount, 100);
-      expect(calc.unpaidLeaveDeduction, closeTo(PayrollEngine.round2(daily * 1), 0.02));
+      expect(
+        calc.unpaidLeaveDeduction,
+        closeTo(PayrollEngine.round2(daily * 1), 0.02),
+      );
       expect(calc.grossPay, closeTo(500 - calc.unpaidLeaveDeduction, 0.02));
     });
 
-    test('intern: half-day annual counts 0.5', () {
+    test('intern: annual leave is not deducted', () {
       final month = DateTime(2025, 3);
       final leaves = [
         LeaveRequest(
@@ -425,8 +433,7 @@ void main() {
         month: month,
         leaves: leaves,
       );
-      final daily = 310 / 31;
-      expect(calc.unpaidLeaveDeduction, closeTo(PayrollEngine.round2(daily * 0.5), 0.02));
+      expect(calc.unpaidLeaveDeduction, 0);
     });
   });
 

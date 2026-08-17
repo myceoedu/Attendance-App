@@ -431,7 +431,7 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
                 _blockTitle(
                   'Intern pay',
                   subtitle:
-                      'Step 1. Enter the full monthly allowance. No basic salary or statutory rows.',
+                      'Step 1. Enter the full monthly allowance. No basic salary, statutory rows, or annual leave.',
                 ),
                 const SizedBox(height: 14),
                 TextField(

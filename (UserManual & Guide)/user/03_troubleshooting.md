@@ -77,7 +77,7 @@ Passwords **cannot** be viewed in the database or dashboard. Only a new password
 ### My leave/claim stays pending
 
 - Waiting for admin approval is normal
-- Ask your manager/HR to open Leave hub or Claims
+- Ask your manager/HR to open Leave or Claims
 
 ### I cannot upload a file
 

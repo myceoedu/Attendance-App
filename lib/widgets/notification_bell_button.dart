@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../screens/notifications_screen.dart';
+import '../constants/app_theme.dart';
 import '../services/app_realtime.dart';
 import '../services/supabase_service.dart';
 
@@ -82,7 +83,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                color: Colors.red,
+                color: AppColors.danger,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(

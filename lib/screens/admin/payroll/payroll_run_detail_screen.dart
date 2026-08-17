@@ -6,6 +6,7 @@ import '../../../constants/app_theme.dart';
 import '../../../models/payroll_item.dart';
 import '../../../models/payroll_run.dart';
 import '../../../services/supabase_service.dart';
+import '../../../widgets/app_confirm_dialog.dart';
 import 'payroll_item_detail_screen.dart';
 
 class PayrollRunDetailScreen extends StatefulWidget {
@@ -26,7 +27,9 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _load(); });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
@@ -43,9 +46,9 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load run: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to load run: $e')));
     }
   }
 
@@ -57,13 +60,17 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
       await SupabaseService.payrollSyncAndCalculate(run);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Attendance synced & payroll calculated')),
+          const SnackBar(
+            content: Text('Attendance synced & payroll calculated'),
+          ),
         );
       }
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -76,12 +83,16 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
     try {
       await SupabaseService.approvePayrollRun(widget.runId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approved')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Approved')));
       }
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -90,28 +101,29 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
 
   Future<void> _paid() async {
     if (_run == null || _busy) return;
-    final ok = await showDialog<bool>(
+    final ok = await showAppConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Mark as paid?'),
-        content: const Text('Confirm that salaries have been disbursed.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Confirm')),
-        ],
-      ),
+      title: 'Mark as paid?',
+      message: 'Confirm that salaries have been disbursed.',
+      cancelLabel: 'Not yet',
+      confirmLabel: 'Mark paid',
+      emphasis: AppConfirmEmphasis.confirm,
     );
     if (ok != true) return;
     setState(() => _busy = true);
     try {
       await SupabaseService.markPayrollRunPaid(widget.runId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Marked paid')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Marked paid')));
       }
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -129,7 +141,9 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
       );
     }
 
-    final period = DateFormat.yMMMM().format(DateTime(run.periodYear, run.periodMonth));
+    final period = DateFormat.yMMMM().format(
+      DateTime(run.periodYear, run.periodMonth),
+    );
     final canCalc = run.status != 'paid' && run.status != 'cancelled';
     final canApprove = run.status == 'calculated';
     final canPay = run.status == 'approved';
@@ -145,8 +159,8 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
     final nextStep = switch (run.status) {
       'draft' =>
         'Pull approved attendance and leave for this month, then run calculation. '
-        'Present days on each payslip are clock-in days that are not also on approved leave '
-        '(same rule as the employee calendar). Unpaid leave still reduces pay in the engine.',
+            'Present days on each payslip are clock-in days that are not also on approved leave '
+            '(same rule as the employee calendar). Unpaid leave still reduces pay in the engine.',
       'calculated' =>
         'Check each employee line. When figures are correct, approve this run.',
       'approved' =>
@@ -222,8 +236,9 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               height: 1.35,
-                              color: AppColors.textSecondary
-                                  .withValues(alpha: 0.95),
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.95,
+                              ),
                             ),
                           ),
                         ),
@@ -266,7 +281,10 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Icon(Icons.calculate_rounded),
                 label: const Text('Sync attendance & calculate payroll'),
@@ -300,7 +318,10 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
               ),
             ],
             const SizedBox(height: 20),
-            const Text('Employees', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            const Text(
+              'Employees',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+            ),
             const SizedBox(height: 8),
             ..._items.map(
               (e) => Card(

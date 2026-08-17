@@ -28,6 +28,7 @@ class PayrollSalarySetting {
   final String staffId;
   final String department;
   final String position;
+
   /// HR category: permanent, contract, probation, intern, part_time.
   final String employmentStatus;
   final double basicSalary;
@@ -36,6 +37,7 @@ class PayrollSalarySetting {
   final double monthlyIncentive;
   final double monthlyIncrement;
   final bool otEligible;
+
   /// `employee` (default) or `intern` (allowance / calendar leave; no statutory).
   final String compensationType;
   final String epfCategory;
@@ -49,8 +51,11 @@ class PayrollSalarySetting {
 
   bool get isActive => payrollStatus == 'active';
 
-  bool get isIntern =>
-      compensationType.trim().toLowerCase() == 'intern';
+  bool get isIntern => compensationType.trim().toLowerCase() == 'intern';
+
+  /// Intern pay, intern status, probation, and part-time have no annual leave.
+  bool get hasAnnualLeave =>
+      !isIntern && EmploymentStatus.hasAnnualLeave(employmentStatus);
 
   double get totalMonthlyAddOns =>
       fixedAllowance + monthlyCommission + monthlyIncentive + monthlyIncrement;
@@ -61,16 +66,14 @@ class PayrollSalarySetting {
       staffId: map['staff_id'] as String? ?? '',
       department: map['department'] as String? ?? '',
       position: map['position'] as String? ?? '',
-      employmentStatus:
-          EmploymentStatus.normalize(map['employment_status']),
+      employmentStatus: EmploymentStatus.normalize(map['employment_status']),
       basicSalary: _num(map['basic_salary']) ?? 0,
       fixedAllowance: _num(map['fixed_allowance']) ?? 0,
       monthlyCommission: _num(map['monthly_commission']) ?? 0,
       monthlyIncentive: _num(map['monthly_incentive']) ?? 0,
       monthlyIncrement: _num(map['monthly_increment']) ?? 0,
       otEligible: map['ot_eligible'] as bool? ?? true,
-      compensationType:
-          map['compensation_type'] as String? ?? 'employee',
+      compensationType: map['compensation_type'] as String? ?? 'employee',
       epfCategory: map['epf_category'] as String? ?? 'standard',
       socsoCategory: map['socso_category'] as String? ?? 'standard',
       eisEligible: map['eis_eligible'] as bool? ?? true,

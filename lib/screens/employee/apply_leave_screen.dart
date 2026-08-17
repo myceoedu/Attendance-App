@@ -61,6 +61,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
   PlatformFile? _attachment;
 
   final _dateFmt = DateFormat('d MMM yyyy');
+  bool _annualEligible = true;
 
   /// Must match [SupabaseService] upload rules. We use [FileType.any] instead of
   /// [FileType.custom] so Android does not call the buggy `custom` channel method
@@ -95,6 +96,34 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     } else if (_otherLeaveOnly) {
       _leaveType = LeaveCatalog.sick;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadAnnualEligibility();
+    });
+  }
+
+  Future<void> _loadAnnualEligibility() async {
+    final uid = context.read<AuthProvider>().user?.id;
+    if (uid == null) return;
+    final ok = await SupabaseService.userHasAnnualLeave(uid);
+    if (!mounted) return;
+    if (!ok && _annualOnly) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Annual leave is for permanent and contract staff only.',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      _annualEligible = ok;
+      if (!ok && LeaveCatalog.consumesAnnual(_leaveType)) {
+        _leaveType = LeaveCatalog.sick;
+      }
+    });
   }
 
   @override
@@ -146,15 +175,19 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       )
       .toList();
 
-  List<DropdownMenuItem<String>> get _allLeaveMenuItems => LeaveCatalog
-      .orderedAllTypes
-      .map(
-        (t) => DropdownMenuItem<String>(
-          value: t,
-          child: Text(LeaveCatalog.displayName(t)),
-        ),
-      )
-      .toList();
+  List<DropdownMenuItem<String>> get _allLeaveMenuItems {
+    final types = _annualEligible
+        ? LeaveCatalog.orderedAllTypes
+        : LeaveCatalog.orderedOtherTypes;
+    return types
+        .map(
+          (t) => DropdownMenuItem<String>(
+            value: t,
+            child: Text(LeaveCatalog.displayName(t)),
+          ),
+        )
+        .toList();
+  }
 
   Future<void> _pickDate({required bool isStart}) async {
     final now = AppTime.malaysiaNow();
@@ -353,6 +386,17 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Half-day annual leave must use a single date'),
+        ),
+      );
+      return;
+    }
+    if (!_annualEligible && LeaveCatalog.consumesAnnual(_leaveType)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Annual leave is for permanent and contract staff only.',
+          ),
+          backgroundColor: AppColors.danger,
         ),
       );
       return;
@@ -800,10 +844,7 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
                 Icons.event_available_outlined,
                 'Annual type (full / half AM / half PM)',
               ),
-              (
-                Icons.date_range_rounded,
-                'Dates (one date only for half-day)',
-              ),
+              (Icons.date_range_rounded, 'Dates (one date only for half-day)'),
               (Icons.notes_rounded, 'Reason'),
               (Icons.attach_file_rounded, 'Optional supporting file'),
             ],
@@ -931,16 +972,16 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.skyLight.withValues(alpha: 0.35),
+        color: AppColors.primaryLight.withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(AppLayout.cardRadiusLg),
-        border: Border.all(color: AppColors.sky.withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.28)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.balance, size: 18, color: AppColors.sky),
+              Icon(Icons.balance, size: 18, color: AppColors.primaryDark),
               SizedBox(width: 8),
               Text(
                 'Balance vs request (Malaysia calendar year)',
@@ -1002,23 +1043,25 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
     switch (_leaveType) {
       case LeaveCatalog.annual:
         msg = 'Full-day annual leave. Documents are optional.';
-        bg = AppColors.skyLight;
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.annualHalfAm:
-        msg = 'Half-day morning. Start and end use the same date. Clock-in is still allowed.';
-        bg = AppColors.skyLight;
+        msg =
+            'Half-day morning. Start and end use the same date. Clock-in is still allowed.';
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.annualHalfPm:
-        msg = 'Half-day afternoon. Start and end use the same date. Clock-in is still allowed.';
-        bg = AppColors.skyLight;
+        msg =
+            'Half-day afternoon. Start and end use the same date. Clock-in is still allowed.';
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.sick:
         msg = 'Describe your symptoms. An MC or doctor\'s note is required.';
-        bg = AppColors.pinkLight;
+        bg = AppColors.dangerLight;
         break;
       case LeaveCatalog.emergency:
         msg = 'Explain the urgent matter. Attach proof if you can.';
-        bg = AppColors.orangeLight;
+        bg = AppColors.warningLight;
         break;
       case LeaveCatalog.unpaid:
         msg = 'Approved unpaid working days are unpaid in payroll.';
@@ -1026,15 +1069,15 @@ class _ApplyLeaveScreenState extends State<ApplyLeaveScreen> {
         break;
       case LeaveCatalog.maternity:
         msg = 'Add expected dates and key details.';
-        bg = AppColors.pinkLight;
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.paternity:
         msg = 'Add expected dates and key details.';
-        bg = AppColors.pinkLight;
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.marriage:
         msg = 'Add wedding or ceremony details.';
-        bg = AppColors.pinkLight;
+        bg = AppColors.primaryLight;
         break;
       case LeaveCatalog.publicHoliday:
         msg = 'Note which public holiday this replaces.';

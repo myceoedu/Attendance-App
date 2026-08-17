@@ -1,3 +1,5 @@
+import '../utils/attendance_work_rules.dart';
+
 class Attendance {
   /// Optimistic clock-in rows use ids with this prefix until the server row is returned.
   static const String pendingLocalIdPrefix = 'local-';
@@ -24,6 +26,20 @@ class Attendance {
     this.location,
     this.userName,
   });
+
+  /// Time between clock in and clock out. Null if open or invalid.
+  Duration? get workedDuration => AttendanceWorkRules.workedDuration(this);
+
+  AttendanceSessionKind get sessionKind =>
+      AttendanceWorkRules.sessionKind(this);
+
+  /// Morning (9–1) or afternoon (2–6) half day.
+  bool get isHalfDayWorked => AttendanceWorkRules.isHalfDayWorked(this);
+
+  String? get sessionShortLabel =>
+      AttendanceWorkRules.sessionShortLabel(this);
+
+  String? get workedLabel => AttendanceWorkRules.workedLabel(this);
 
   factory Attendance.fromMap(Map<String, dynamic> map) {
     final usersData = map['users'];

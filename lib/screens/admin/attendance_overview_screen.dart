@@ -44,6 +44,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
   List<Attendance> _visibleRecords = const [];
   int _completedCount = 0;
   int _inProgressCount = 0;
+  int _halfDayCount = 0;
 
   @override
   void initState() {
@@ -122,18 +123,27 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
     final query = _searchCtrl.text.trim().toLowerCase();
     final hasQuery = query.isNotEmpty;
     final filterAll = _statusFilter == 'all';
+    final filterHalfDay = _statusFilter == 'half_day';
 
     var completed = 0;
     var inProgress = 0;
+    var halfDay = 0;
     final visible = <Attendance>[];
 
     for (final record in _records) {
       if (record.status == 'completed') {
         completed++;
+        if (record.isHalfDayWorked) halfDay++;
       } else if (record.status == 'in_progress') {
         inProgress++;
       }
-      if (!filterAll && record.status != _statusFilter) continue;
+
+      if (filterHalfDay) {
+        if (!record.isHalfDayWorked) continue;
+      } else if (!filterAll && record.status != _statusFilter) {
+        continue;
+      }
+
       if (hasQuery) {
         final name = record.userName?.toLowerCase() ?? '';
         if (!name.contains(query)) continue;
@@ -143,6 +153,7 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
 
     _completedCount = completed;
     _inProgressCount = inProgress;
+    _halfDayCount = halfDay;
     _visibleRecords = visible;
   }
 
@@ -201,23 +212,44 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: AppColors.divider),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          child: Column(
                             children: [
-                              _summaryItem(
-                                'Total',
-                                '${_records.length}',
-                                AppColors.primary,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _summaryItem(
+                                      'Total',
+                                      '${_records.length}',
+                                      AppColors.primary,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _summaryItem(
+                                      'In Progress',
+                                      '$_inProgressCount',
+                                      AppColors.inProgress,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              _summaryItem(
-                                'In Progress',
-                                '$_inProgressCount',
-                                AppColors.inProgress,
-                              ),
-                              _summaryItem(
-                                'Completed',
-                                '$_completedCount',
-                                AppColors.success,
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _summaryItem(
+                                      'Completed',
+                                      '$_completedCount',
+                                      AppColors.success,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _summaryItem(
+                                      'Half day',
+                                      '$_halfDayCount',
+                                      AppColors.orange,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -237,6 +269,10 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                             AppFilterOption(
                               value: 'completed',
                               label: 'Completed',
+                            ),
+                            AppFilterOption(
+                              value: 'half_day',
+                              label: 'Half day',
                             ),
                           ],
                           selectedChip: _statusFilter,
@@ -318,7 +354,8 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                                                       Text(
                                                         'In: ${r.clockInTime != null ? _timeFmt.format(AppTime.toMalaysia(r.clockInTime!)) : '-'}'
                                                         '  •  '
-                                                        'Out: ${r.clockOutTime != null ? _timeFmt.format(AppTime.toMalaysia(r.clockOutTime!)) : '-'}',
+                                                        'Out: ${r.clockOutTime != null ? _timeFmt.format(AppTime.toMalaysia(r.clockOutTime!)) : '-'}'
+                                                        '${r.workedLabel != null ? '  •  ${r.workedLabel}' : ''}',
                                                         style: const TextStyle(
                                                           fontSize: 12,
                                                           color: AppColors
@@ -328,7 +365,24 @@ class _AttendanceOverviewScreenState extends State<AttendanceOverviewScreen> {
                                                     ],
                                                   ),
                                                 ),
-                                                StatusChip.fromStatus(r.status),
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [
+                                                    StatusChip.fromStatus(
+                                                      r.status,
+                                                    ),
+                                                    if (r.isHalfDayWorked) ...[
+                                                      const SizedBox(height: 6),
+                                                      StatusChip(
+                                                        label:
+                                                            r.sessionShortLabel ??
+                                                            'Half day',
+                                                        color: AppColors.orange,
+                                                      ),
+                                                    ],
+                                                  ],
+                                                ),
                                               ],
                                             ),
                                           ),

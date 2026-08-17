@@ -25,14 +25,11 @@ class AdminWorkSiteScreen extends StatefulWidget {
 class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController(text: 'Workplace');
-  final _latCtrl = TextEditingController();
-  final _lngCtrl = TextEditingController();
   final _radiusCtrl = TextEditingController(
     text: '${Geofence.defaultRadiusMeters}',
   );
 
   final _previewMapController = MapController();
-  Timer? _coordDebounce;
   Timer? _radiusDebounce;
 
   bool _loading = true;
@@ -49,44 +46,18 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   @override
   void initState() {
     super.initState();
-    _latCtrl.addListener(_onCoordFieldsChanged);
-    _lngCtrl.addListener(_onCoordFieldsChanged);
     _radiusCtrl.addListener(_onRadiusFieldChanged);
     _load();
   }
 
   @override
   void dispose() {
-    _coordDebounce?.cancel();
     _radiusDebounce?.cancel();
-    _latCtrl.removeListener(_onCoordFieldsChanged);
-    _lngCtrl.removeListener(_onCoordFieldsChanged);
     _radiusCtrl.removeListener(_onRadiusFieldChanged);
     _nameCtrl.dispose();
-    _latCtrl.dispose();
-    _lngCtrl.dispose();
     _radiusCtrl.dispose();
     _previewMapController.dispose();
     super.dispose();
-  }
-
-  void _onCoordFieldsChanged() {
-    _coordDebounce?.cancel();
-    _coordDebounce = Timer(const Duration(milliseconds: 400), () {
-      if (!mounted) return;
-      final lat = double.tryParse(_latCtrl.text.trim());
-      final lng = double.tryParse(_lngCtrl.text.trim());
-      if (lat == null || lng == null) return;
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return;
-      final next = LatLng(lat, lng);
-      if (_pin != null &&
-          (_pin!.latitude - next.latitude).abs() < 1e-7 &&
-          (_pin!.longitude - next.longitude).abs() < 1e-7) {
-        return;
-      }
-      setState(() => _pin = next);
-      _movePreview(next);
-    });
   }
 
   void _onRadiusFieldChanged() {
@@ -105,11 +76,7 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
   }
 
   void _applyPin(LatLng point, {bool moveCamera = true}) {
-    setState(() {
-      _pin = point;
-      _latCtrl.text = point.latitude.toStringAsFixed(6);
-      _lngCtrl.text = point.longitude.toStringAsFixed(6);
-    });
+    setState(() => _pin = point);
     if (moveCamera) _movePreview(point);
   }
 
@@ -135,8 +102,6 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
       if (site != null) {
         _saved = site;
         _nameCtrl.text = site.name;
-        _latCtrl.text = site.latitude.toStringAsFixed(6);
-        _lngCtrl.text = site.longitude.toStringAsFixed(6);
         _radiusCtrl.text = '${site.radiusMeters}';
         _isActive = site.isActive;
         _pin = LatLng(site.latitude, site.longitude);
@@ -205,17 +170,20 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
     if (_saving) return;
     if (!_formKey.currentState!.validate()) return;
 
-    final lat = double.tryParse(_latCtrl.text.trim());
-    final lng = double.tryParse(_lngCtrl.text.trim());
+    final pin = _pin;
     final radius = int.tryParse(_radiusCtrl.text.trim());
-    if (lat == null || lng == null || radius == null) return;
+    if (pin == null) {
+      _snack('Set the office location on the map first.', error: true);
+      return;
+    }
+    if (radius == null) return;
 
     setState(() => _saving = true);
     try {
       final site = await SupabaseService.saveWorkSite(
         name: _nameCtrl.text,
-        latitude: lat,
-        longitude: lng,
+        latitude: pin.latitude,
+        longitude: pin.longitude,
         radiusMeters: radius,
         isActive: _isActive,
       );
@@ -321,65 +289,6 @@ class _AdminWorkSiteScreenState extends State<AdminWorkSiteScreen> {
                             }
                             return null;
                           },
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: TextFormField(
-                                controller: _latCtrl,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: true,
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'[0-9.\-]'),
-                                  ),
-                                ],
-                                decoration: const InputDecoration(
-                                  labelText: 'Latitude',
-                                  prefixIcon:
-                                      Icon(Icons.my_location_outlined),
-                                ),
-                                validator: (v) {
-                                  final n = double.tryParse((v ?? '').trim());
-                                  if (n == null || n < -90 || n > 90) {
-                                    return 'Invalid lat';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _lngCtrl,
-                                keyboardType:
-                                    const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                  signed: true,
-                                ),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                    RegExp(r'[0-9.\-]'),
-                                  ),
-                                ],
-                                decoration: const InputDecoration(
-                                  labelText: 'Longitude',
-                                ),
-                                validator: (v) {
-                                  final n = double.tryParse((v ?? '').trim());
-                                  if (n == null || n < -180 || n > 180) {
-                                    return 'Invalid lng';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                          ],
                         ),
                         const SizedBox(height: 12),
                         TextFormField(

@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../constants/app_theme.dart';
 
-/// Centered-portrait shortcut card — icon on top, label below.
-/// Designed for a 3-column grid so the whole workspace section fits on-screen.
+/// Centered-portrait shortcut card — pastel icon tile on top, label below.
 class EmployeeQuickAccessTile extends StatelessWidget {
   const EmployeeQuickAccessTile({
     super.key,
@@ -11,7 +10,8 @@ class EmployeeQuickAccessTile extends StatelessWidget {
     required this.semanticAction,
     required this.icon,
     required this.onTap,
-    this.accentColor = AppColors.primary,
+    required this.iconBackground,
+    required this.iconColor,
     this.subLabel = '',
     this.badgeCount,
   });
@@ -21,12 +21,19 @@ class EmployeeQuickAccessTile extends StatelessWidget {
   final String semanticAction;
   final IconData icon;
   final VoidCallback onTap;
-  final Color accentColor;
+
+  /// Soft pastel fill for the 30×30 icon well.
+  final Color iconBackground;
+
+  /// Icon glyph color on the pastel well.
+  final Color iconColor;
 
   /// If non-null and positive, a small red badge is drawn on the icon.
   final int? badgeCount;
 
-  static const double _radius = 16;
+  static const double _cardRadius = 16;
+  static const double _iconTileSize = 30;
+  static const double _iconTileRadius = 8;
 
   @override
   Widget build(BuildContext context) {
@@ -35,132 +42,114 @@ class EmployeeQuickAccessTile extends StatelessWidget {
         ? '$label, $bc new. $semanticAction'
         : '$label. $semanticAction';
 
-    final iconEnd = Color.lerp(accentColor, Colors.white, 0.25)!;
-    final cardBg = Color.alphaBlend(
-      accentColor.withValues(alpha: 0.07),
-      Colors.white,
-    );
-
     return Semantics(
       button: true,
       label: semanticLabel,
-      child: Tooltip(
-        message: label,
-        waitDuration: const Duration(milliseconds: 650),
-        child: Material(
-          color: Colors.transparent,
-          clipBehavior: Clip.none,
-          borderRadius: BorderRadius.circular(_radius),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(_radius),
-            splashColor: accentColor.withValues(alpha: 0.12),
-            highlightColor: accentColor.withValues(alpha: 0.05),
-            child: Ink(
-              decoration: BoxDecoration(
-                color: cardBg,
-                borderRadius: BorderRadius.circular(_radius),
-                border: Border.all(
-                  color: accentColor.withValues(alpha: 0.2),
-                ),
-                // Border lift only — no blur shadow (smooth scroll on web).
+      child: Material(
+        color: Colors.transparent,
+        clipBehavior: Clip.none,
+        borderRadius: BorderRadius.circular(_cardRadius),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(_cardRadius),
+          splashColor: iconColor.withValues(alpha: 0.10),
+          highlightColor: iconColor.withValues(alpha: 0.05),
+          child: Ink(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(_cardRadius),
+              border: Border.all(color: const Color(0xFFE4E6EB)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 6,
+                vertical: 10,
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 12,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // ── Gradient icon well + badge ─────────────────────
-                    Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 42,
-                          height: 42,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [accentColor, iconEnd],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: _iconTileSize,
+                        height: _iconTileSize,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: iconBackground,
+                          borderRadius:
+                              BorderRadius.circular(_iconTileRadius),
+                        ),
+                        child: Icon(
+                          icon,
+                          color: iconColor,
+                          size: 16,
+                        ),
+                      ),
+                      if (bc > 0)
+                        Positioned(
+                          right: -4,
+                          top: -4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
                             ),
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                          child: Icon(
-                            icon,
-                            color: Colors.white,
-                            size: 21,
+                            constraints: const BoxConstraints(minWidth: 18),
+                            decoration: BoxDecoration(
+                              color: AppColors.danger,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: 1.5,
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              bc > 99 ? '99+' : '$bc',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w800,
+                                height: 1,
+                              ),
+                            ),
                           ),
                         ),
-                        if (bc > 0)
-                          Positioned(
-                            right: -4,
-                            top: -4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              constraints: const BoxConstraints(minWidth: 18),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(999),
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                ),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                bc > 99 ? '99+' : '$bc',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                      height: 1.1,
                     ),
-                    const SizedBox(height: 10),
-                    // ── Label ─────────────────────────────────────────
+                  ),
+                  if (subLabel.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      label,
+                      subLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.2,
-                        height: 1.1,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textHint,
+                        height: 1.2,
                       ),
                     ),
-                    if (subLabel.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textHint,
-                          height: 1.2,
-                        ),
-                      ),
-                    ],
                   ],
-                ),
+                ],
               ),
             ),
           ),
