@@ -113,6 +113,59 @@
   </div>
 
   <script>
+    // Always load the latest Vercel deploy on this same URL / home-screen icon.
+    // 1) Drop any leftover Flutter service worker.
+    // 2) If deploy-id.txt changed since last open, clear Cache Storage and reload once.
+    (function () {
+      var STORAGE_KEY = 'myrekod-deploy-id';
+      var reloading = false;
+
+      function clearSiteCaches() {
+        var tasks = [];
+        if (navigator.serviceWorker) {
+          tasks.push(
+            navigator.serviceWorker.getRegistrations().then(function (regs) {
+              return Promise.all(regs.map(function (r) { return r.unregister(); }));
+            }),
+          );
+        }
+        if (window.caches) {
+          tasks.push(
+            caches.keys().then(function (keys) {
+              return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+            }),
+          );
+        }
+        return Promise.all(tasks);
+      }
+
+      function reloadOnce() {
+        if (reloading) return;
+        reloading = true;
+        clearSiteCaches().finally(function () {
+          location.reload();
+        });
+      }
+
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        });
+      }
+
+      fetch('deploy-id.txt?t=' + Date.now(), { cache: 'no-store' })
+        .then(function (res) { return res.ok ? res.text() : ''; })
+        .then(function (raw) {
+          var id = String(raw || '').trim();
+          if (!id) return;
+          var prev = null;
+          try { prev = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+          try { localStorage.setItem(STORAGE_KEY, id); } catch (e) {}
+          if (prev && prev !== id) reloadOnce();
+        })
+        .catch(function () {});
+    })();
+
     // Hide splash once Flutter paints the first frame.
     window.addEventListener('flutter-first-frame', function () {
       var el = document.getElementById('splash');

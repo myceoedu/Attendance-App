@@ -34,9 +34,22 @@ fi
 # - tree-shake unused Material/Cupertino glyphs
 # - host CanvasKit on same origin (better cache / no gstatic CDN hop)
 # - max dart2js optimization
+# - no Flutter PWA worker (home-screen icon must fetch each new Vercel deploy)
 flutter build web --release \
   --no-source-maps \
   --tree-shake-icons \
   --no-web-resources-cdn \
+  --pwa-strategy=none \
   -O4 \
   "${BUILD_ARGS[@]}"
+
+# Phones that already installed the old Flutter worker still request this URL
+# (no-store). Copy the kill-switch after build so Flutter cannot omit it.
+cp -f web/flutter_service_worker.js build/web/flutter_service_worker.js
+
+DEPLOY_ID="${VERCEL_GIT_COMMIT_SHA:-}"
+if [ -z "$DEPLOY_ID" ]; then
+  DEPLOY_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+fi
+printf '%s\n' "$DEPLOY_ID" > build/web/deploy-id.txt
+echo "Wrote deploy-id.txt=$DEPLOY_ID"
