@@ -259,9 +259,9 @@ class _FormCard extends StatelessWidget {
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       prefixIconColor: _kMuted,
-      hintStyle: const TextStyle(
+      hintStyle: TextStyle(
         color: _kMuted,
-        fontSize: 14,
+        fontSize: AppLayout.fieldFontSize,
         fontWeight: FontWeight.w400,
       ),
       border: OutlineInputBorder(
@@ -333,8 +333,8 @@ class _FormCard extends StatelessWidget {
                   keyboardType: TextInputType.text,
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: AppLayout.fieldFontSize,
                     fontWeight: FontWeight.w500,
                     color: _kNavy,
                   ),
@@ -363,8 +363,8 @@ class _FormCard extends StatelessWidget {
                   obscureText: obscure,
                   textInputAction: TextInputAction.done,
                   onFieldSubmitted: (_) => onSubmit(),
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: TextStyle(
+                    fontSize: AppLayout.fieldFontSize,
                     fontWeight: FontWeight.w500,
                     color: _kNavy,
                   ),

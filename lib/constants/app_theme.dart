@@ -483,6 +483,11 @@ abstract class AppLayout {
   static const double sectionGap = 8;
   static const double cardRadiusLg = 20;
   static const double navBarHeight = 72;
+
+  /// iOS home-screen / Safari PWA ignores the keyboard if the DOM input is
+  /// under 16px. Keep 14 elsewhere so Android and desktop stay compact.
+  static double get fieldFontSize =>
+      kIsWeb && defaultTargetPlatform == TargetPlatform.iOS ? 16 : 14;
 }
 
 /// Light single-layer shadows (blur is expensive while scrolling on web).
@@ -560,7 +565,11 @@ ThemeData buildAppTheme() {
       color: AppColors.primary,
       circularTrackColor: AppColors.divider.withValues(alpha: 0.6),
     ),
-    textTheme: textTheme,
+    textTheme: textTheme.copyWith(
+      titleMedium: textTheme.titleMedium?.copyWith(
+        fontSize: AppLayout.fieldFontSize,
+      ),
+    ),
     appBarTheme: AppBarTheme(
       centerTitle: false,
       elevation: 0,
@@ -610,8 +619,8 @@ ThemeData buildAppTheme() {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: AppColors.danger),
       ),
-      hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 14),
-      labelStyle: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+      hintStyle: TextStyle(color: AppColors.textHint, fontSize: AppLayout.fieldFontSize),
+      labelStyle: TextStyle(color: AppColors.textSecondary, fontSize: AppLayout.fieldFontSize),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(

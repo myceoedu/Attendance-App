@@ -122,6 +122,7 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
                               obscureText: _obscure1,
                               textInputAction: TextInputAction.next,
                               autofillHints: const [AutofillHints.newPassword],
+                              style: TextStyle(fontSize: AppLayout.fieldFontSize),
                               decoration: InputDecoration(
                                 labelText: 'New password',
                                 prefixIcon: const Icon(Icons.lock_outline),
@@ -152,6 +153,7 @@ class _SetNewPasswordScreenState extends State<SetNewPasswordScreen> {
                               textInputAction: TextInputAction.done,
                               onFieldSubmitted: (_) => _submit(),
                               autofillHints: const [AutofillHints.newPassword],
+                              style: TextStyle(fontSize: AppLayout.fieldFontSize),
                               decoration: InputDecoration(
                                 labelText: 'Confirm password',
                                 prefixIcon: const Icon(Icons.lock_outline),

@@ -61,9 +61,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       prefixIconColor: _kMuted,
-      hintStyle: const TextStyle(
+      hintStyle: TextStyle(
         color: _kMuted,
-        fontSize: 14,
+        fontSize: AppLayout.fieldFontSize,
         fontWeight: FontWeight.w400,
       ),
       border: OutlineInputBorder(
@@ -190,8 +190,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                             TextInputType.emailAddress,
                                         textInputAction: TextInputAction.done,
                                         onFieldSubmitted: (_) => _submit(),
-                                        style: const TextStyle(
-                                          fontSize: 14,
+                                        style: TextStyle(
+                                          fontSize: AppLayout.fieldFontSize,
                                           fontWeight: FontWeight.w500,
                                           color: _kNavy,
                                         ),

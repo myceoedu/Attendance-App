@@ -19,12 +19,13 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <!-- Allow zoom for accessibility (PageSpeed / low-vision users). -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="description" content="myRekod: workforce attendance, leave and claims.">
   <meta name="theme-color" content="#1A56DB">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="myRekod">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -46,6 +47,12 @@
       height: 100%;
       background: #0F2255;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+      touch-action: manipulation;
+    }
+    /* Flutter's hidden editor must be ≥16px or iOS PWA will not show the keyboard. */
+    input, textarea {
+      font-size: 16px !important;
     }
     #splash {
       position: fixed;
@@ -173,6 +180,87 @@
       el.classList.add('hide');
       setTimeout(function () { el.remove(); }, 320);
     });
+
+    // iOS Add-to-Home-Screen (standalone) blocks the keyboard unless a real
+    // <input> is focused in the same tap. Flutter draws fields on a canvas and
+    // focuses its editor a frame later — Safari tabs allow that; the home-screen
+    // app does not. Unlock on touchstart, then hand off to Flutter's input.
+    (function () {
+      var ua = navigator.userAgent || '';
+      var iOS = /iPad|iPhone|iPod/.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (!iOS) return;
+      var standalone = window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      if (!standalone) return;
+
+      var dummy = document.createElement('input');
+      dummy.id = 'ios-pwa-keyboard';
+      dummy.type = 'text';
+      dummy.inputMode = 'text';
+      dummy.autocomplete = 'off';
+      dummy.setAttribute('autocapitalize', 'off');
+      dummy.setAttribute('autocorrect', 'off');
+      dummy.setAttribute('spellcheck', 'false');
+      dummy.setAttribute('aria-hidden', 'true');
+      dummy.tabIndex = -1;
+      dummy.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;opacity:0.01;font-size:16px;border:0;padding:0;margin:0;z-index:0;pointer-events:none;';
+      document.body.appendChild(dummy);
+
+      function isEditor(el) {
+        if (!el || el === dummy) return false;
+        var tag = el.tagName;
+        return tag === 'INPUT' || tag === 'TEXTAREA' || !!el.isContentEditable;
+      }
+
+      function flutterEditor() {
+        var nodes = document.querySelectorAll('input, textarea');
+        for (var i = 0; i < nodes.length; i++) {
+          if (nodes[i] !== dummy) return nodes[i];
+        }
+        return null;
+      }
+
+      var handoffTimer = 0;
+      function cancelHandoff() {
+        if (handoffTimer) {
+          clearTimeout(handoffTimer);
+          handoffTimer = 0;
+        }
+      }
+
+      function handoffToFlutter() {
+        var editor = flutterEditor();
+        if (editor) {
+          editor.style.fontSize = '16px';
+          editor.focus();
+          cancelHandoff();
+          return true;
+        }
+        return false;
+      }
+
+      document.addEventListener('touchstart', function (e) {
+        if (isEditor(e.target)) return;
+        dummy.focus({ preventScroll: true });
+      }, { capture: true, passive: true });
+
+      document.addEventListener('touchend', function () {
+        if (handoffToFlutter()) return;
+        cancelHandoff();
+        var tries = 0;
+        function tick() {
+          tries += 1;
+          if (handoffToFlutter()) return;
+          if (tries < 12) {
+            handoffTimer = setTimeout(tick, 16);
+            return;
+          }
+          if (document.activeElement === dummy) dummy.blur();
+        }
+        handoffTimer = setTimeout(tick, 16);
+      }, { capture: true, passive: true });
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
