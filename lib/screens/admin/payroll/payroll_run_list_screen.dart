@@ -189,6 +189,8 @@ class _PayrollRunListScreenState extends State<PayrollRunListScreen> {
         title: const Text('Payroll runs'),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _newRun,

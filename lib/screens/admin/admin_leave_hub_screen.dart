@@ -23,6 +23,8 @@ class AdminLeaveHubScreen extends StatelessWidget {
           scrolledUnderElevation: 0,
           backgroundColor: Colors.transparent,
           foregroundColor: AppColors.onBrand,
+          iconTheme: AppChrome.onBrandIcons,
+          actionsIconTheme: AppChrome.onBrandIcons,
           title: const Text('Leave'),
           flexibleSpace: Container(
             decoration: BoxDecoration(

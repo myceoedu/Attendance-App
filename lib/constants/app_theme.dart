@@ -248,6 +248,11 @@ abstract class AppGradients {
 
 /// Status bar: pick based on background behind the status bar.
 abstract class AppChrome {
+  /// Leading / action icons on dark brand AppBars.
+  static const IconThemeData onBrandIcons = IconThemeData(
+    color: AppColors.onBrand,
+  );
+
   static const SystemUiOverlayStyle onBrand = SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -576,18 +581,19 @@ ThemeData buildAppTheme() {
       scrolledUnderElevation: 0.5,
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.white,
+      // Default for light bars. Dark bars must set [AppBar.foregroundColor]
+      // to [AppColors.onBrand] — do not lock [iconTheme]/title color here or
+      // that override is ignored (Material 2).
+      foregroundColor: AppColors.textPrimary,
       titleTextStyle: kIsWeb
           ? const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
             )
           : GoogleFonts.inter(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
             ),
-      iconTheme: const IconThemeData(color: AppColors.textPrimary),
     ),
     cardTheme: CardThemeData(
       elevation: 0,

@@ -230,6 +230,8 @@ class _PayrollItemDetailScreenState extends State<PayrollItemDetailScreen> {
         title: Text(item.employeeNameSnapshot),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

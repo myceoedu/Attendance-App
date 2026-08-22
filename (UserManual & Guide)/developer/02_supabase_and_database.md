@@ -90,19 +90,6 @@ For production, decide with the client and test the full flow.
 | `clock_in_if_allowed` | Clock-in with leave + geofence checks |
 | `distance_meters` | Haversine helper for geofence |
 
----
-
-## Storage buckets
-
-Confirm these exist:
-
-- `leave-attachments`
-- `claim-attachments`
-
-Created by claims/leave SQL bundles (or manually if missing).
-
----
-
 ## Promote admin
 
 ```sql

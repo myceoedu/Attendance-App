@@ -62,6 +62,8 @@ class _PayrollSalaryListScreenState extends State<PayrollSalaryListScreen> {
         title: const Text('Employee salaries'),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
