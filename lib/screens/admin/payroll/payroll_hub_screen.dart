@@ -83,6 +83,8 @@ class _PayrollHubScreenState extends State<PayrollHubScreen> {
         title: const Text('Payroll'),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
         actions: [
           IconButton(icon: const Icon(Icons.refresh_rounded), onPressed: _load),
         ],

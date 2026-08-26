@@ -310,6 +310,8 @@ class _PayrollSalaryEditScreenState extends State<PayrollSalaryEditScreen> {
         title: Text(name),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,

@@ -756,6 +756,8 @@ class _PayrollStatutoryScreenState extends State<PayrollStatutoryScreen> {
         title: const Text('Statutory rates'),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
         actions: [
           IconButton(
             onPressed: _loading ? null : () => _showForm(),

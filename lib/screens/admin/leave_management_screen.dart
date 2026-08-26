@@ -411,6 +411,8 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
           scrolledUnderElevation: 0,
           backgroundColor: Colors.transparent,
           foregroundColor: AppColors.onBrand,
+          iconTheme: AppChrome.onBrandIcons,
+          actionsIconTheme: AppChrome.onBrandIcons,
           titleSpacing: 16,
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,6 +424,7 @@ class _LeaveManagementScreenState extends State<LeaveManagementScreen> {
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
+                  color: AppColors.onBrand,
                 ),
               ),
               Text(

@@ -72,6 +72,8 @@ class _PayrollReportsScreenState extends State<PayrollReportsScreen> {
         title: const Text('Payroll reports'),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

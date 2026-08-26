@@ -176,6 +176,8 @@ class _PayrollRunDetailScreenState extends State<PayrollRunDetailScreen> {
         title: Text(period),
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
       ),
       body: RefreshIndicator(
         onRefresh: _load,

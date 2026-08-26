@@ -256,6 +256,8 @@ class _MonthlyAttendanceScreenState extends State<MonthlyAttendanceScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.adminNavBackground,
         foregroundColor: AppColors.onBrand,
+        iconTheme: AppChrome.onBrandIcons,
+        actionsIconTheme: AppChrome.onBrandIcons,
         surfaceTintColor: Colors.transparent,
         systemOverlayStyle: AppChrome.onBrand,
         title: const Text('Monthly Attendance'),
